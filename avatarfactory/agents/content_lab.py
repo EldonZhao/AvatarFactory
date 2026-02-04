@@ -12,6 +12,7 @@ from avatarfactory.models.schemas import (
     AgentMessage,
     Content,
     ContentStructure,
+    MediaAttachment,
     Persona,
     PlatformType,
     TaskType,
@@ -180,8 +181,19 @@ Output MUST be valid JSON:
   "title": "compelling title (max 60 chars for xiaohongshu)",
   "body": "full content text",
   "tags": ["tag1", "tag2", "tag3"],
-  "structure_notes": "brief notes on how you structured the content"
-}}"""
+  "structure_notes": "brief notes on how you structured the content",
+  "image_prompts": [
+    "detailed prompt for AI image generation for image 1",
+    "detailed prompt for AI image generation for image 2"
+  ],
+  "image_suggestions": [
+    "description of what kind of image/photo would work well here",
+    "description of image 2"
+  ],
+  "recommended_image_count": 2
+}}
+
+Generate 2-4 image prompts that would complement the content for visual platforms."""
 
         user_prompt = f"""Create content about: {topic}
 
@@ -227,7 +239,10 @@ Generate the content in JSON format."""
                 "topic": topic,
                 "template": template,
                 "structure_notes": content_data.get("structure_notes", ""),
+                "image_suggestions": content_data.get("image_suggestions", []),
+                "recommended_image_count": content_data.get("recommended_image_count", 2),
             },
+            image_prompts=content_data.get("image_prompts", []),
         )
 
         # Save to knowledge base

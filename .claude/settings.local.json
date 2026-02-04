@@ -36,7 +36,10 @@
       "mcp__filesystem__list_directory",
       "mcp__filesystem__read_text_file",
       "mcp__copinative__list_features",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(python -m avatarfactory.cli:*)",
+      "Bash(dir:*)",
+      "Bash(git push:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\xueyongzhao\\AvatarFactory\\avatarfactory"

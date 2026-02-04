@@ -146,6 +146,17 @@ class PersonaVersion(BaseModel):
 # ============================================================================
 
 
+class MediaAttachment(BaseModel):
+    """Media attachment for content"""
+
+    type: str = Field(default="image", description="Media type: image, video")
+    url: Optional[str] = None  # Remote URL
+    path: Optional[str] = None  # Local file path
+    alt_text: Optional[str] = None  # Accessibility text
+    caption: Optional[str] = None  # Caption/description
+    blob_ref: Optional[Dict[str, Any]] = None  # Platform-specific blob reference
+
+
 class ContentStructure(BaseModel):
     """Content structure definition"""
 
@@ -170,6 +181,10 @@ class Content(BaseModel):
     structure: Optional[ContentStructure] = None
     tags: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    # Media attachments
+    media: List[MediaAttachment] = Field(default_factory=list, description="Images/videos")
+    image_prompts: List[str] = Field(default_factory=list, description="AI image generation prompts")
 
     # Review results (populated after review)
     review_score: Optional[float] = None
@@ -383,6 +398,11 @@ class TrendingContent(BaseModel):
     published_at: Optional[datetime] = None
     fetched_at: datetime = Field(default_factory=datetime.now)
 
+    # Media information
+    images: List[str] = Field(default_factory=list, description="Image URLs")
+    image_count: int = Field(default=0, description="Number of images")
+    has_media: bool = Field(default=False, description="Whether post has media")
+
     # Analysis results
     relevance_score: Optional[float] = None  # How relevant to persona
     pattern_tags: List[str] = Field(default_factory=list)  # Identified patterns
@@ -442,6 +462,14 @@ class ContentIdea(BaseModel):
         default="medium", description="low/medium/high"
     )
     reasoning: str = Field(default="", description="Why this idea could work")
+
+    # Image/visual suggestions
+    image_suggestions: List[str] = Field(
+        default_factory=list, description="Descriptions of recommended images"
+    )
+    recommended_image_count: int = Field(
+        default=2, description="Recommended number of images for this content"
+    )
 
     # Status tracking
     status: str = Field(default="new", description="new/saved/used/discarded")

@@ -319,6 +319,252 @@ def list_content(
 
 
 @app.command()
+def show_content(
+    content_id: str = typer.Argument(..., help="Content ID to show"),
+):
+    """
+    Show content details with social platform preview.
+
+    Example:
+        avatarfactory show-content content_178b3925
+    """
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb = KnowledgeBase(kb_path)
+
+    content = kb.load_content(content_id)
+
+    if not content:
+        console.print(f"[red]Content not found: {content_id}[/red]")
+        raise typer.Exit(1)
+
+    # Get platform info for styling
+    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+
+    # Platform-specific styling
+    platform_styles = {
+        "xiaohongshu": {"emoji": "📕", "color": "red", "name": "小红书"},
+        "bluesky": {"emoji": "🦋", "color": "blue", "name": "Bluesky"},
+        "twitter": {"emoji": "𝕏", "color": "white", "name": "Twitter/X"},
+        "zhihu": {"emoji": "知", "color": "blue", "name": "知乎"},
+        "douyin": {"emoji": "🎵", "color": "magenta", "name": "抖音"},
+    }
+    style = platform_styles.get(platform, {"emoji": "📱", "color": "cyan", "name": platform})
+
+    # Header with platform info
+    console.print()
+    console.print(f"[bold {style['color']}]{style['emoji']} {style['name']} Preview[/bold {style['color']}]")
+    console.print("─" * 60)
+
+    # Title (platform-native style)
+    console.print(f"\n[bold]{content.title}[/bold]\n")
+
+    # Body content
+    console.print(content.body)
+
+    # Tags/Hashtags
+    if content.tags:
+        console.print()
+        tags_str = " ".join(f"[{style['color']}]#{tag}[/{style['color']}]" for tag in content.tags)
+        console.print(tags_str)
+
+    # Image prompts section
+    if content.image_prompts:
+        console.print("\n" + "─" * 60)
+        console.print(f"[bold yellow]🖼️ Recommended Images ({len(content.image_prompts)})[/bold yellow]")
+        for i, prompt in enumerate(content.image_prompts, 1):
+            console.print(f"\n[dim]Image {i}:[/dim]")
+            console.print(f"  {prompt}")
+
+    # Image suggestions from metadata
+    if content.metadata.get("image_suggestions"):
+        console.print("\n[dim]Image Ideas:[/dim]")
+        for suggestion in content.metadata["image_suggestions"]:
+            console.print(f"  • {suggestion}")
+
+    # Metadata footer
+    console.print("\n" + "─" * 60)
+    console.print(f"[dim]Content ID: {content.id}[/dim]")
+    console.print(f"[dim]Persona: {content.persona_id}[/dim]")
+    console.print(f"[dim]Pillar: {content.pillar}[/dim]")
+    console.print(f"[dim]Created: {content.created_at.strftime('%Y-%m-%d %H:%M')}[/dim]")
+
+    if content.review_score:
+        score_color = "green" if content.review_score >= 80 else "yellow" if content.review_score >= 60 else "red"
+        console.print(f"[dim]Review Score: [{score_color}]{content.review_score:.0f}/100[/{score_color}][/dim]")
+
+    if content.review_issues:
+        console.print(f"\n[yellow]Review Notes:[/yellow]")
+        for issue in content.review_issues[:3]:
+            console.print(f"  • {issue}")
+
+    console.print()
+
+
+@app.command()
+def publish_draft(
+    content_id: str = typer.Argument(..., help="Content ID to publish"),
+    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Override platform (bluesky, twitter)"),
+    images: Optional[str] = typer.Option(None, "--images", "-i", help="Comma-separated image paths"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    force_single: bool = typer.Option(False, "--single", "-s", help="Force single post (truncate instead of thread)"),
+):
+    """
+    Publish a draft content to social platform.
+
+    Long content will be automatically split into a thread for platforms
+    with character limits (Bluesky: 300, Twitter: 280).
+
+    Example:
+        avatarfactory publish-draft content_178b3925
+        avatarfactory publish-draft content_178b3925 --platform bluesky
+        avatarfactory publish-draft content_178b3925 -i "img1.jpg,img2.jpg"
+        avatarfactory publish-draft content_178b3925 --single  # Force truncate
+    """
+    from avatarfactory.connectors.adapters import get_adapter, get_platform_limits
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb = KnowledgeBase(kb_path)
+
+    content = kb.load_content(content_id)
+
+    if not content:
+        console.print(f"[red]Content not found: {content_id}[/red]")
+        raise typer.Exit(1)
+
+    # Determine platform
+    target_platform = platform or (content.platform.value if hasattr(content.platform, 'value') else str(content.platform))
+
+    # For now, only bluesky is fully implemented
+    if target_platform not in ["bluesky", "twitter"]:
+        console.print(f"[yellow]Note: Platform '{target_platform}' connector not fully implemented.[/yellow]")
+        console.print(f"[yellow]Using bluesky for publishing.[/yellow]")
+        target_platform = "bluesky"
+
+    # Parse images
+    image_list = [img.strip() for img in images.split(",")] if images else []
+
+    # Get platform limits and adapt content
+    limits = get_platform_limits(target_platform)
+    adapter = get_adapter(target_platform)
+    adapted = adapter.adapt(content, images=image_list, force_single=force_single)
+
+    # Show preview with adaptation info
+    console.print(Panel.fit(
+        f"[bold]Publishing to {target_platform}[/bold]\n\n"
+        f"[cyan]Title:[/cyan] {content.title}\n"
+        f"[cyan]Original length:[/cyan] {adapted.original_length} chars\n"
+        f"[cyan]Platform limit:[/cyan] {limits.max_text_length} chars/post\n"
+        f"[cyan]Adapted:[/cyan] {'Thread with ' + str(len(adapted.parts)) + ' posts' if adapted.is_thread else 'Single post'}"
+        + (f" [yellow](truncated)[/yellow]" if adapted.truncated else "") + "\n"
+        f"[cyan]Tags:[/cyan] {', '.join(adapted.tags) if adapted.tags else 'None'}\n"
+        f"[cyan]Images:[/cyan] {len(image_list)} provided",
+        title=f"Content: {content_id}",
+        border_style="cyan",
+    ))
+
+    # Show adapted content preview
+    if adapted.is_thread:
+        console.print(f"\n[bold]Thread Preview ({len(adapted.parts)} posts):[/bold]")
+        for i, part in enumerate(adapted.parts, 1):
+            console.print(f"\n[cyan]━━━ Post {i}/{len(adapted.parts)} ━━━[/cyan]")
+            # Show first 150 chars of each part
+            preview = part[:150] + "..." if len(part) > 150 else part
+            console.print(f"[dim]{preview}[/dim]")
+            console.print(f"[dim]({len(part)} chars)[/dim]")
+    else:
+        console.print(f"\n[bold]Post Preview:[/bold]")
+        preview = adapted.parts[0][:300] + "..." if len(adapted.parts[0]) > 300 else adapted.parts[0]
+        console.print(f"[dim]{preview}[/dim]")
+        console.print(f"[dim]({len(adapted.parts[0])} chars)[/dim]")
+
+    console.print()
+
+    # Confirm
+    if not confirm:
+        if adapted.is_thread:
+            proceed = typer.confirm(f"Publish as {len(adapted.parts)}-post thread?")
+        else:
+            proceed = typer.confirm("Publish this content?")
+        if not proceed:
+            console.print("[yellow]Cancelled.[/yellow]")
+            raise typer.Exit(0)
+
+    # Build connector config
+    config = ConnectorConfig()
+
+    if target_platform == "bluesky":
+        config.username = os.getenv("BLUESKY_USERNAME")
+        config.password = os.getenv("BLUESKY_PASSWORD")
+        if not config.username or not config.password:
+            console.print("[red]Error: BLUESKY_USERNAME and BLUESKY_PASSWORD not set[/red]")
+            raise typer.Exit(1)
+    elif target_platform == "twitter":
+        config.api_key = os.getenv("TWITTER_API_KEY")
+        config.api_secret = os.getenv("TWITTER_API_SECRET")
+        config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+
+    try:
+        connector = get_connector(target_platform, config)
+
+        async def do_publish():
+            await connector.connect()
+
+            # Use publish_thread for threads if connector supports it
+            if adapted.is_thread and hasattr(connector, 'publish_thread'):
+                # Use the dedicated thread publishing method
+                results = await connector.publish_thread(
+                    posts=adapted.parts,
+                    images=image_list if image_list else None,
+                )
+                return results
+            else:
+                # Fallback: publish each part separately (no reply chain)
+                results = []
+                for i, part in enumerate(adapted.parts):
+                    part_images = image_list if i == 0 else None
+                    result = await connector.publish(
+                        content=part,
+                        images=part_images,
+                    )
+                    results.append(result)
+                    if not result.success:
+                        return results
+                return results
+
+        with console.status("[bold cyan]Publishing...", spinner="dots"):
+            results = asyncio.run(do_publish())
+
+        # Check results
+        all_success = all(r.success for r in results)
+
+        if all_success:
+            console.print(f"\n[green]✅ Published successfully![/green]")
+            if adapted.is_thread:
+                console.print(f"[bold]Published {len(results)} posts as a thread[/bold]")
+            for i, result in enumerate(results):
+                if result.post_url:
+                    if len(results) > 1:
+                        console.print(f"[dim]Post {i+1}:[/dim] {result.post_url}")
+                    else:
+                        console.print(f"[bold]URL:[/bold] {result.post_url}")
+
+            # Update content status in KB (mark as published)
+            kb.save_content(content, status="published")
+            console.print(f"\n[dim]Content status updated to 'published'[/dim]")
+        else:
+            failed = [r for r in results if not r.success]
+            console.print(f"[red]❌ Failed to publish: {failed[0].error}[/red]")
+            if len(results) > 1:
+                success_count = sum(1 for r in results if r.success)
+                console.print(f"[yellow]Partial publish: {success_count}/{len(results)} posts succeeded[/yellow]")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
 def stats():
     """Show knowledge base statistics."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")

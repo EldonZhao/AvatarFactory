@@ -118,9 +118,14 @@ class ContentAdapter:
         """
         # Get text content
         text = content.body
-        title = content.title if self.limits.supports_title else None
+        title = content.title
         tags = content.tags[:self.limits.max_tags] if content.tags else []
         image_list = (images or [])[:self.limits.max_images]
+
+        # For platforms without title support, prepend title to body
+        if title and not self.limits.supports_title:
+            text = f"【{title}】\n\n{text}"
+            title = None  # Clear title since it's now in body
 
         original_length = len(text)
 

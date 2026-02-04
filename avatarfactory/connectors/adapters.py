@@ -99,6 +99,41 @@ class ContentAdapter:
                 supports_markdown=False,
             )
 
+    def _strip_markdown(self, text: str) -> str:
+        """
+        Convert Markdown to plain text for platforms that don't support it.
+
+        Handles:
+        - **bold** and __bold__ → bold
+        - *italic* and _italic_ → italic
+        - [text](url) → text
+        - `code` → code
+        - # headers → headers
+        """
+        import re
+
+        # Remove bold: **text** or __text__
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        text = re.sub(r'__(.+?)__', r'\1', text)
+
+        # Remove italic: *text* or _text_ (but not inside words)
+        text = re.sub(r'(?<!\w)\*([^*]+?)\*(?!\w)', r'\1', text)
+        text = re.sub(r'(?<!\w)_([^_]+?)_(?!\w)', r'\1', text)
+
+        # Remove links: [text](url) → text
+        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+
+        # Remove inline code: `code` → code
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+
+        # Remove headers: # Header → Header
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+
+        # Remove horizontal rules
+        text = re.sub(r'^[-*_]{3,}\s*$', '———', text, flags=re.MULTILINE)
+
+        return text
+
     def adapt(
         self,
         content: Content,
@@ -121,6 +156,12 @@ class ContentAdapter:
         title = content.title
         tags = content.tags[:self.limits.max_tags] if content.tags else []
         image_list = (images or [])[:self.limits.max_images]
+
+        # Strip markdown for platforms that don't support it
+        if not self.limits.supports_markdown:
+            text = self._strip_markdown(text)
+            if title:
+                title = self._strip_markdown(title)
 
         original_length = len(text)
 

@@ -1,0 +1,17 @@
+# Minimal requirements for production use
+# Install with: pip install -r requirements-minimal.txt
+
+# Core LLM (choose one based on your provider)
+anthropic>=0.39.0  # For Anthropic Claude
+
+# Data & Validation
+pydantic>=2.9.2
+pyyaml>=6.0.2
+python-dotenv>=1.0.1
+
+# CLI & UI
+typer[all]>=0.12.5
+rich>=13.9.4
+
+# Async utilities
+aiofiles>=24.1.0

@@ -1,0 +1,12 @@
+# Azure OpenAI specific requirements
+# Install with: pip install -r requirements-azure.txt
+
+# Base requirements
+-r requirements-minimal.txt
+
+# Azure OpenAI
+openai>=1.0.0
+
+# Optional: Azure SDK for enhanced features
+# azure-identity>=1.15.0
+# azure-keyvault-secrets>=4.7.0

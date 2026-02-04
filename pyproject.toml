@@ -1,0 +1,66 @@
+[tool.poetry]
+name = "avatarfactory"
+version = "0.1.0"
+description = "A Persona Factory for social platforms: design, simulate, evaluate, and evolve social personas"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+# LLM
+anthropic = ">=0.39.0"
+
+# Data & Storage
+pydantic = ">=2.9.2"
+pyyaml = ">=6.0.2"
+python-dotenv = ">=1.0.1"
+
+# CLI & UI
+typer = ">=0.12.5"
+rich = ">=13.9.4"
+
+# Utilities
+aiofiles = ">=24.1.0"
+
+[tool.poetry.extras]
+# Optional LLM providers
+openai = ["openai"]
+azure = ["openai"]
+all-llm = ["openai"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+black = "^24.10.0"
+ruff = "^0.7.4"
+mypy = "^1.13.0"
+
+[tool.poetry.scripts]
+avatarfactory = "avatarfactory.cli:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"

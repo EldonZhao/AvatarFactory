@@ -319,6 +319,207 @@ def list_content(
 
 
 @app.command()
+def show_content(
+    content_id: str = typer.Argument(..., help="Content ID to show"),
+):
+    """
+    Show content details with social platform preview.
+
+    Example:
+        avatarfactory show-content content_178b3925
+    """
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb = KnowledgeBase(kb_path)
+
+    content = kb.load_content(content_id)
+
+    if not content:
+        console.print(f"[red]Content not found: {content_id}[/red]")
+        raise typer.Exit(1)
+
+    # Get platform info for styling
+    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+
+    # Platform-specific styling
+    platform_styles = {
+        "xiaohongshu": {"emoji": "📕", "color": "red", "name": "小红书"},
+        "bluesky": {"emoji": "🦋", "color": "blue", "name": "Bluesky"},
+        "twitter": {"emoji": "𝕏", "color": "white", "name": "Twitter/X"},
+        "zhihu": {"emoji": "知", "color": "blue", "name": "知乎"},
+        "douyin": {"emoji": "🎵", "color": "magenta", "name": "抖音"},
+    }
+    style = platform_styles.get(platform, {"emoji": "📱", "color": "cyan", "name": platform})
+
+    # Header with platform info
+    console.print()
+    console.print(f"[bold {style['color']}]{style['emoji']} {style['name']} Preview[/bold {style['color']}]")
+    console.print("─" * 60)
+
+    # Title (platform-native style)
+    console.print(f"\n[bold]{content.title}[/bold]\n")
+
+    # Body content
+    console.print(content.body)
+
+    # Tags/Hashtags
+    if content.tags:
+        console.print()
+        tags_str = " ".join(f"[{style['color']}]#{tag}[/{style['color']}]" for tag in content.tags)
+        console.print(tags_str)
+
+    # Image prompts section
+    if content.image_prompts:
+        console.print("\n" + "─" * 60)
+        console.print(f"[bold yellow]🖼️ Recommended Images ({len(content.image_prompts)})[/bold yellow]")
+        for i, prompt in enumerate(content.image_prompts, 1):
+            console.print(f"\n[dim]Image {i}:[/dim]")
+            console.print(f"  {prompt}")
+
+    # Image suggestions from metadata
+    if content.metadata.get("image_suggestions"):
+        console.print("\n[dim]Image Ideas:[/dim]")
+        for suggestion in content.metadata["image_suggestions"]:
+            console.print(f"  • {suggestion}")
+
+    # Metadata footer
+    console.print("\n" + "─" * 60)
+    console.print(f"[dim]Content ID: {content.id}[/dim]")
+    console.print(f"[dim]Persona: {content.persona_id}[/dim]")
+    console.print(f"[dim]Pillar: {content.pillar}[/dim]")
+    console.print(f"[dim]Created: {content.created_at.strftime('%Y-%m-%d %H:%M')}[/dim]")
+
+    if content.review_score:
+        score_color = "green" if content.review_score >= 80 else "yellow" if content.review_score >= 60 else "red"
+        console.print(f"[dim]Review Score: [{score_color}]{content.review_score:.0f}/100[/{score_color}][/dim]")
+
+    if content.review_issues:
+        console.print(f"\n[yellow]Review Notes:[/yellow]")
+        for issue in content.review_issues[:3]:
+            console.print(f"  • {issue}")
+
+    console.print()
+
+
+@app.command()
+def publish_draft(
+    content_id: str = typer.Argument(..., help="Content ID to publish"),
+    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Override platform (bluesky, twitter)"),
+    images: Optional[str] = typer.Option(None, "--images", "-i", help="Comma-separated image paths"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """
+    Publish a draft content to social platform.
+
+    Example:
+        avatarfactory publish-draft content_178b3925
+        avatarfactory publish-draft content_178b3925 --platform bluesky
+        avatarfactory publish-draft content_178b3925 -i "img1.jpg,img2.jpg"
+    """
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb = KnowledgeBase(kb_path)
+
+    content = kb.load_content(content_id)
+
+    if not content:
+        console.print(f"[red]Content not found: {content_id}[/red]")
+        raise typer.Exit(1)
+
+    # Determine platform
+    target_platform = platform or (content.platform.value if hasattr(content.platform, 'value') else str(content.platform))
+
+    # For now, only bluesky is fully implemented
+    if target_platform not in ["bluesky", "twitter"]:
+        console.print(f"[yellow]Note: Platform '{target_platform}' connector not fully implemented.[/yellow]")
+        console.print(f"[yellow]Using bluesky for publishing.[/yellow]")
+        target_platform = "bluesky"
+
+    # Show preview
+    console.print(Panel.fit(
+        f"[bold]Publishing to {target_platform}[/bold]\n\n"
+        f"[cyan]Title:[/cyan] {content.title}\n"
+        f"[cyan]Tags:[/cyan] {', '.join(content.tags) if content.tags else 'None'}\n"
+        f"[cyan]Images:[/cyan] {images or 'None provided'}",
+        title=f"Content: {content_id}",
+        border_style="cyan",
+    ))
+
+    # Show content preview
+    body_preview = content.body[:200] + "..." if len(content.body) > 200 else content.body
+    console.print(f"\n[dim]{body_preview}[/dim]\n")
+
+    # Confirm
+    if not confirm:
+        proceed = typer.confirm("Publish this content?")
+        if not proceed:
+            console.print("[yellow]Cancelled.[/yellow]")
+            raise typer.Exit(0)
+
+    # Build connector config
+    config = ConnectorConfig()
+
+    if target_platform == "bluesky":
+        config.username = os.getenv("BLUESKY_USERNAME")
+        config.password = os.getenv("BLUESKY_PASSWORD")
+        if not config.username or not config.password:
+            console.print("[red]Error: BLUESKY_USERNAME and BLUESKY_PASSWORD not set[/red]")
+            raise typer.Exit(1)
+    elif target_platform == "twitter":
+        config.api_key = os.getenv("TWITTER_API_KEY")
+        config.api_secret = os.getenv("TWITTER_API_SECRET")
+        config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+
+    # Parse images
+    image_list = None
+    if images:
+        image_list = [img.strip() for img in images.split(",")]
+        console.print(f"[dim]Including {len(image_list)} images[/dim]")
+
+    try:
+        connector = get_connector(target_platform, config)
+
+        async def do_publish():
+            await connector.connect()
+
+            # For Bluesky, we need to format the content appropriately
+            # Bluesky has 300 char limit, so we may need to truncate
+            publish_text = content.body
+
+            # Add title if it fits
+            if content.title and len(content.title) + len(publish_text) + 2 < 300:
+                publish_text = f"{content.title}\n\n{publish_text}"
+
+            # Truncate if needed (Bluesky limit is 300)
+            if len(publish_text) > 300:
+                publish_text = publish_text[:297] + "..."
+
+            return await connector.publish(
+                content=publish_text,
+                tags=content.tags,
+                images=image_list,
+            )
+
+        with console.status("[bold cyan]Publishing...", spinner="dots"):
+            result = asyncio.run(do_publish())
+
+        if result.success:
+            console.print(f"\n[green]✅ Published successfully![/green]")
+            if result.post_url:
+                console.print(f"[bold]URL:[/bold] {result.post_url}")
+            console.print(f"[dim]Post ID: {result.post_id}[/dim]")
+
+            # Update content status in KB (mark as published)
+            kb.save_content(content, status="published")
+            console.print(f"[dim]Content status updated to 'published'[/dim]")
+        else:
+            console.print(f"[red]❌ Failed to publish: {result.error}[/red]")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
 def stats():
     """Show knowledge base statistics."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")

@@ -119,19 +119,10 @@ python -m pip install --upgrade pip
 选择适合您的 requirements 文件：
 
 ```bash
-# 完整安装 (所有 LLM 提供商)
+# 安装依赖
 pip install -r requirements.txt
 
-# 最小安装 (仅 Anthropic Claude)
-pip install -r requirements-minimal.txt
-
-# Azure OpenAI
-pip install -r requirements-azure.txt
-
-# OpenAI
-pip install -r requirements-openai.txt
-
-# 开发环境
+# 开发环境 (包含测试工具)
 pip install -r requirements-dev.txt
 ```
 

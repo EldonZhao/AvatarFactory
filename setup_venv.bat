@@ -52,31 +52,19 @@ REM Install requirements
 echo 5. Installing dependencies...
 echo.
 echo    Choose installation type:
-echo    1) Full (all LLM providers)
-echo    2) Minimal (Anthropic Claude only)
-echo    3) Azure OpenAI
-echo    4) OpenAI
-echo    5) Development (with testing tools)
+echo    1) Standard (all LLM providers)
+echo    2) Development (with testing tools)
 echo.
-set /p choice="   Enter choice [1-5]: "
+set /p choice="   Enter choice [1-2]: "
 
 if "%choice%"=="1" (
     set REQ_FILE=requirements.txt
-    echo    Installing: Full ^(all providers^)
+    echo    Installing: Standard
 ) else if "%choice%"=="2" (
-    set REQ_FILE=requirements-minimal.txt
-    echo    Installing: Minimal ^(Anthropic only^)
-) else if "%choice%"=="3" (
-    set REQ_FILE=requirements-azure.txt
-    echo    Installing: Azure OpenAI
-) else if "%choice%"=="4" (
-    set REQ_FILE=requirements-openai.txt
-    echo    Installing: OpenAI
-) else if "%choice%"=="5" (
     set REQ_FILE=requirements-dev.txt
     echo    Installing: Development
 ) else (
-    echo    Invalid choice, using Full installation
+    echo    Invalid choice, using Standard installation
     set REQ_FILE=requirements.txt
 )
 

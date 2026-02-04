@@ -116,16 +116,11 @@ The script will:
 git clone https://github.com/yourusername/AvatarFactory.git
 cd AvatarFactory
 
-# Install all dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# Or install based on your LLM provider:
-pip install -r requirements-minimal.txt  # Anthropic Claude only
-pip install -r requirements-azure.txt    # Azure OpenAI
-pip install -r requirements-openai.txt   # OpenAI
-
-# Or using poetry
-poetry install
+# For development (includes testing tools)
+pip install -r requirements-dev.txt
 ```
 
 📖 See [Installation Guide](docs/installation.md) for detailed options.

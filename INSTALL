@@ -2,24 +2,13 @@
 
 ## Quick Install
 
-### For Azure OpenAI users:
-```bash
-pip install -r requirements-azure.txt
-```
-
-### For Anthropic Claude users:
-```bash
-pip install -r requirements-minimal.txt
-```
-
-### For OpenAI users:
-```bash
-pip install -r requirements-openai.txt
-```
-
-### For all features (all LLM providers):
 ```bash
 pip install -r requirements.txt
+```
+
+For development (includes testing tools):
+```bash
+pip install -r requirements-dev.txt
 ```
 
 ---
@@ -42,8 +31,8 @@ python verify_install.py
 
 ## Full Documentation
 
-See [docs/INSTALLATION.md](docs/INSTALLATION.md) for detailed instructions.
+See [docs/installation.md](docs/installation.md) for detailed instructions.
 
 ## Quick Reference
 
-See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for commands and troubleshooting.
+See [docs/quick-reference.md](docs/quick-reference.md) for commands and troubleshooting.

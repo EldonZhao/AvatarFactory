@@ -60,37 +60,22 @@ Write-Host ""
 Write-Host "5️⃣  Installing dependencies..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "   Choose installation type:" -ForegroundColor Cyan
-Write-Host "   1) Full (all LLM providers)"
-Write-Host "   2) Minimal (Anthropic Claude only)"
-Write-Host "   3) Azure OpenAI"
-Write-Host "   4) OpenAI"
-Write-Host "   5) Development (with testing tools)"
+Write-Host "   1) Standard (all LLM providers)"
+Write-Host "   2) Development (with testing tools)"
 Write-Host ""
-$choice = Read-Host "   Enter choice [1-5]"
+$choice = Read-Host "   Enter choice [1-2]"
 
 switch ($choice) {
     "1" {
         $reqFile = "requirements.txt"
-        Write-Host "   Installing: Full (all providers)" -ForegroundColor Cyan
+        Write-Host "   Installing: Standard" -ForegroundColor Cyan
     }
     "2" {
-        $reqFile = "requirements-minimal.txt"
-        Write-Host "   Installing: Minimal (Anthropic only)" -ForegroundColor Cyan
-    }
-    "3" {
-        $reqFile = "requirements-azure.txt"
-        Write-Host "   Installing: Azure OpenAI" -ForegroundColor Cyan
-    }
-    "4" {
-        $reqFile = "requirements-openai.txt"
-        Write-Host "   Installing: OpenAI" -ForegroundColor Cyan
-    }
-    "5" {
         $reqFile = "requirements-dev.txt"
         Write-Host "   Installing: Development" -ForegroundColor Cyan
     }
     default {
-        Write-Host "   Invalid choice, using Full installation" -ForegroundColor Yellow
+        Write-Host "   Invalid choice, using Standard installation" -ForegroundColor Yellow
         $reqFile = "requirements.txt"
     }
 }

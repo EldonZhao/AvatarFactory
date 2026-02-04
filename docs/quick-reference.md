@@ -1,19 +1,13 @@
 # AvatarFactory - Quick Reference
 
-## 🚀 Installation (Choose One)
+## 🚀 Installation
 
 ```bash
-# Full (all LLM providers)
+# Install all dependencies
 pip install -r requirements.txt
 
-# Minimal (Anthropic Claude only)
-pip install -r requirements-minimal.txt
-
-# Azure OpenAI
-pip install -r requirements-azure.txt
-
-# OpenAI
-pip install -r requirements-openai.txt
+# For development (includes testing tools)
+pip install -r requirements-dev.txt
 ```
 
 ---

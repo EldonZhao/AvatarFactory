@@ -79,37 +79,22 @@ echo ""
 echo "5️⃣  Installing dependencies..."
 echo ""
 echo "   Choose installation type:"
-echo "   1) Full (all LLM providers)"
-echo "   2) Minimal (Anthropic Claude only)"
-echo "   3) Azure OpenAI"
-echo "   4) OpenAI"
-echo "   5) Development (with testing tools)"
+echo "   1) Standard (all LLM providers)"
+echo "   2) Development (with testing tools)"
 echo ""
-read -p "   Enter choice [1-5]: " choice
+read -p "   Enter choice [1-2]: " choice
 
 case $choice in
     1)
         REQ_FILE="requirements.txt"
-        echo "   Installing: Full (all providers)"
+        echo "   Installing: Standard"
         ;;
     2)
-        REQ_FILE="requirements-minimal.txt"
-        echo "   Installing: Minimal (Anthropic only)"
-        ;;
-    3)
-        REQ_FILE="requirements-azure.txt"
-        echo "   Installing: Azure OpenAI"
-        ;;
-    4)
-        REQ_FILE="requirements-openai.txt"
-        echo "   Installing: OpenAI"
-        ;;
-    5)
         REQ_FILE="requirements-dev.txt"
         echo "   Installing: Development"
         ;;
     *)
-        echo "   Invalid choice, using Full installation"
+        echo "   Invalid choice, using Standard installation"
         REQ_FILE="requirements.txt"
         ;;
 esac

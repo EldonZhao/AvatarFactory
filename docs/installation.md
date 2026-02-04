@@ -1,246 +1,131 @@
 # Installation Guide
 
-AvatarFactory provides multiple installation options depending on your needs and LLM provider choice.
+AvatarFactory supports multiple LLM providers (Anthropic Claude, Azure OpenAI, OpenAI).
 
 ---
 
-## Quick Install (Recommended)
+## Quick Install
 
-### Option 1: Full Installation (All Features)
+### Standard Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-This installs everything including support for all LLM providers (Anthropic, Azure OpenAI, OpenAI).
+This installs all dependencies including support for all LLM providers.
 
 ---
 
-### Option 2: Minimal Installation (Anthropic Claude only)
-
-```bash
-pip install -r requirements-minimal.txt
-```
-
-This installs only the essential packages for using Anthropic Claude (default provider).
-
-**Best for:** Production deployments with Anthropic Claude
-
----
-
-### Option 3: Azure OpenAI
-
-```bash
-pip install -r requirements-azure.txt
-```
-
-This installs minimal requirements + OpenAI package for Azure OpenAI support.
-
-**Best for:** Enterprise users with Azure OpenAI
-
----
-
-### Option 4: OpenAI
-
-```bash
-pip install -r requirements-openai.txt
-```
-
-This installs minimal requirements + OpenAI package for OpenAI API support.
-
-**Best for:** Users with OpenAI API keys
-
----
-
-### Option 5: Development
+### Development Installation
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-This installs everything including testing and development tools.
-
-**Best for:** Contributors and developers
+This includes testing and code quality tools (pytest, black, ruff, mypy).
 
 ---
 
-## Alternative: Using Poetry
+## Virtual Environment Setup (Recommended)
 
-If you prefer Poetry for dependency management:
+### Windows
 
-```bash
-# Install base dependencies
-poetry install
+```powershell
+# PowerShell
+.\setup_venv.ps1
 
-# Install with OpenAI support
-poetry install -E openai
-
-# Install with all extras
-poetry install -E all-llm
-
-# Install for development
-poetry install --with dev
+# Or CMD
+setup_venv.bat
 ```
 
----
-
-## Editable Installation
-
-For development or if you want to modify the code:
+### macOS/Linux
 
 ```bash
+chmod +x setup_venv.sh
+./setup_venv.sh
+```
+
+### Manual Setup
+
+```bash
+# Create virtual environment
+python -m venv .venv
+
+# Activate (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# Activate (macOS/Linux)
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install in development mode
 pip install -e .
 ```
 
-Or with a specific requirements file:
+---
 
+## Configuration
+
+1. Copy the example environment file:
 ```bash
-pip install -e . -r requirements-azure.txt
+cp .env.example .env
+```
+
+2. Configure your LLM provider in `.env`:
+
+**Anthropic Claude (Default)**
+```bash
+AVATARFACTORY_LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your_key_here
+```
+
+**Azure OpenAI**
+```bash
+AVATARFACTORY_LLM_PROVIDER=azure_openai
+AVATARFACTORY_MODEL=gpt-4
+AZURE_OPENAI_API_KEY=your_key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+```
+
+**OpenAI**
+```bash
+AVATARFACTORY_LLM_PROVIDER=openai
+AVATARFACTORY_MODEL=gpt-4-turbo-preview
+OPENAI_API_KEY=your_key
 ```
 
 ---
 
-## Verifying Installation
-
-After installation, verify it works:
+## Verify Installation
 
 ```bash
 # Check version
 avatarfactory version
 
-# Test your LLM configuration
-python tests/test_llm_provider.py
-
-# Start interactive mode
-avatarfactory chat
-```
-
----
-
-## Requirements Files Summary
-
-| File | Contents | Use Case |
-|------|----------|----------|
-| `requirements.txt` | All packages (Anthropic + OpenAI + LangChain) | Full features, all providers |
-| `requirements-minimal.txt` | Essential packages only (Anthropic) | Production, Claude only |
-| `requirements-azure.txt` | Minimal + OpenAI for Azure | Azure OpenAI users |
-| `requirements-openai.txt` | Minimal + OpenAI for OpenAI API | OpenAI users |
-| `requirements-dev.txt` | All + dev tools (pytest, black, etc.) | Development & testing |
-
----
-
-## Platform-Specific Notes
-
-### Windows
-
-```bash
-# Use regular pip commands
-pip install -r requirements.txt
-```
-
-### macOS / Linux
-
-```bash
-# You might need pip3
-pip3 install -r requirements.txt
-
-# Or use python -m pip
-python -m pip install -r requirements.txt
-```
-
-### Virtual Environment (Recommended)
-
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-venv\Scripts\activate
-
-# Activate (macOS/Linux)
-source venv/bin/activate
-
-# Install
-pip install -r requirements.txt
+# Run tests
+pytest tests/ -v
 ```
 
 ---
 
 ## Troubleshooting
 
-### "Command not found: avatarfactory"
-
-Solution:
+### Import Errors
 ```bash
-# Reinstall in editable mode
 pip install -e .
 ```
 
-### "Module not found: openai"
+### API Key Issues
+Ensure your `.env` file is in the project root and contains valid API keys.
 
-For Azure OpenAI or OpenAI users:
-```bash
-pip install openai
-```
-
-### "Dependency conflict"
-
-Try upgrading pip first:
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### Fresh install
-
-```bash
-# Uninstall everything
-pip uninstall -y avatarfactory anthropic openai pydantic typer rich
-
-# Reinstall
-pip install -r requirements.txt
-```
-
----
-
-## Upgrading
-
-### Upgrade all packages
-
-```bash
-pip install --upgrade -r requirements.txt
-```
-
-### Upgrade specific package
-
-```bash
-pip install --upgrade anthropic
-pip install --upgrade openai
-```
-
----
-
-## Docker Installation (Future)
-
-Coming soon! We'll provide a Dockerfile for containerized deployment.
+### Windows Unicode Issues
+The CLI automatically handles Windows console encoding. If you see garbled characters, try running in Windows Terminal instead of CMD.
 
 ---
 
 ## Next Steps
 
-After installation:
-
-1. **Configure**: Create `.env` file from `.env.example`
-2. **Setup**: Add your API keys to `.env`
-3. **Test**: Run `python tests/test_llm_provider.py`
-4. **Use**: Run `avatarfactory chat`
-
-See [quickstart.md](quickstart.md) for detailed usage guide.
-
----
-
-## Support
-
-- Installation issues? Check [Troubleshooting](#troubleshooting)
-- LLM configuration? See [llm-providers.md](llm-providers.md)
-- General questions? See [README.md](../README.md)
+- [Quick Start Guide](quickstart.md) - Get started with AvatarFactory
+- [LLM Providers](llm-providers.md) - Detailed provider configuration

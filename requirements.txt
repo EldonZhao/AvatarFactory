@@ -1,17 +1,14 @@
 # AvatarFactory Requirements
 # Python 3.10+
+#
+# Install: pip install -r requirements.txt
+# For development: pip install -r requirements.txt[dev]
 
 # =============================================================================
-# Core LLM & AI Framework
+# Core LLM Providers
 # =============================================================================
 anthropic>=0.39.0
-openai>=1.0.0  # For Azure OpenAI and OpenAI support
-
-# LangChain (optional, for future enhancements)
-langgraph>=0.2.45
-langchain>=0.3.7
-langchain-anthropic>=0.2.5
-langchain-core>=0.3.15
+openai>=1.0.0
 
 # =============================================================================
 # Data & Validation
@@ -23,20 +20,17 @@ python-dotenv>=1.0.1
 # =============================================================================
 # CLI & User Interface
 # =============================================================================
-typer[all]>=0.12.5
+typer>=0.12.5
 rich>=13.9.4
-prompt-toolkit>=3.0.48
 
 # =============================================================================
 # Async & Utilities
 # =============================================================================
 aiofiles>=24.1.0
-tenacity>=9.0.0
 
 # =============================================================================
-# Development & Testing (Optional)
+# Development & Testing (install with: pip install -r requirements-dev.txt)
 # =============================================================================
-# Uncomment for development:
 # pytest>=8.3.3
 # pytest-asyncio>=0.24.0
 # pytest-cov>=6.0.0

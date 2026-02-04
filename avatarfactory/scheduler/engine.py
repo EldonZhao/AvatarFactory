@@ -311,6 +311,9 @@ class Scheduler:
                 task.last_status = "success"
                 task.last_error = None
                 self._emit("task_completed", {"task": task, "result": result})
+
+                # Send notification
+                await self._notify_task_completed(task, result)
             else:
                 task.last_status = "error"
                 task.last_error = f"Unknown task type: {task.task_type}"
@@ -321,7 +324,57 @@ class Scheduler:
             task.last_error = str(e)
             self._emit("task_failed", {"task": task, "error": str(e)})
 
+            # Send error notification
+            await self._notify_task_failed(task, str(e))
+
         self._save_state()
+
+    async def _notify_task_completed(self, task: ScheduledTask, result: Dict[str, Any]) -> None:
+        """Send notification when task completes."""
+        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
+
+        notifier = ConsoleNotifier()
+
+        if task.task_type == "discovery":
+            title = f"Discovery Complete: {task.name}"
+            body = f"Found {result.get('trending_count', 0)} trending posts, generated {result.get('ideas_count', 0)} ideas."
+            if result.get('suggestions'):
+                body += f"\nSuggestions: {result['suggestions'][0][:100]}..."
+        elif task.task_type == "content":
+            title = f"Content Generated: {task.name}"
+            body = f"Created: {result.get('title', 'New content')}\nID: {result.get('content_id', 'N/A')}"
+        elif task.task_type == "report":
+            title = f"Report Ready: {task.name}"
+            report = result.get('report', {})
+            stats = report.get('stats', {})
+            body = f"Published: {stats.get('total_published', 0)}, Drafts: {stats.get('total_drafts', 0)}"
+        else:
+            title = f"Task Complete: {task.name}"
+            body = f"Result: {result}"
+
+        message = NotificationMessage(
+            title=title,
+            body=body,
+            priority=NotificationPriority.NORMAL,
+            category="task_completed",
+        )
+
+        await notifier.send(message)
+
+    async def _notify_task_failed(self, task: ScheduledTask, error: str) -> None:
+        """Send notification when task fails."""
+        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
+
+        notifier = ConsoleNotifier()
+
+        message = NotificationMessage(
+            title=f"Task Failed: {task.name}",
+            body=f"Error: {error}",
+            priority=NotificationPriority.HIGH,
+            category="error",
+        )
+
+        await notifier.send(message)
 
     async def _process_publish_queue(self) -> None:
         """Process pending items in publish queue."""

@@ -697,7 +697,7 @@ def connect(
 
 @app.command()
 def fetch(
-    platform: str = typer.Argument(..., help="Platform to fetch from (bluesky, twitter)"),
+    platform: str = typer.Argument(..., help="Platform to fetch from (bluesky, twitter, xiaohongshu/xhs)"),
     query: Optional[str] = typer.Option(None, "--query", "-q", help="Search query"),
     limit: int = typer.Option(10, "--limit", "-n", help="Number of posts to fetch"),
 ):
@@ -707,6 +707,8 @@ def fetch(
     Example:
         avatarfactory fetch bluesky --query "AI tools"
         avatarfactory fetch twitter -q "productivity" -n 20
+        avatarfactory fetch xiaohongshu -q "产品经理"
+        avatarfactory fetch xhs -n 20
     """
     console.print(Panel.fit(f"Fetching from {platform}...", border_style="cyan"))
 

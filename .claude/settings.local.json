@@ -31,7 +31,11 @@
       "Bash(python -m avatarfactory:*)",
       "mcp__copinative__get_git_status",
       "mcp__copinative__suggest_workitem_for_commit",
-      "mcp__copinative__create_commit"
+      "mcp__copinative__create_commit",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__list_directory",
+      "mcp__filesystem__read_text_file",
+      "mcp__copinative__list_features"
     ],
     "additionalDirectories": [
       "c:\\Users\\xueyongzhao\\AvatarFactory\\avatarfactory"

@@ -25,6 +25,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
+from avatarfactory.agents.discovery import DiscoveryAgent
 from avatarfactory.core.knowledge_base import KnowledgeBase
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
@@ -535,6 +536,190 @@ def publish(
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
+
+
+# =============================================================================
+# Discovery Commands
+# =============================================================================
+
+def get_discovery_agent() -> DiscoveryAgent:
+    """Initialize discovery agent with LLM provider from environment."""
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb = KnowledgeBase(kb_path)
+
+    try:
+        provider = LLMProviderFactory.from_env()
+    except Exception as e:
+        console.print(f"[red]Error initializing LLM provider: {e}[/red]")
+        raise typer.Exit(1)
+
+    return DiscoveryAgent(knowledge_base=kb, llm_provider=provider)
+
+
+@app.command()
+def discover(
+    platform: str = typer.Argument("bluesky", help="Platform to discover from (bluesky, twitter)"),
+    persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Persona ID for targeted discovery"),
+    query: Optional[str] = typer.Option(None, "--query", "-q", help="Search query (uses persona keywords if not provided)"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Number of posts to analyze"),
+):
+    """
+    Discover trending content and analyze patterns.
+
+    This command fetches trending content, analyzes patterns, and generates
+    content ideas based on your persona.
+
+    Example:
+        avatarfactory discover bluesky --persona persona_xxx
+        avatarfactory discover twitter -q "AI productivity" -n 30
+    """
+    console.print(Panel.fit(
+        f"[bold cyan]Discovery Agent[/bold cyan]\n"
+        f"Platform: {platform}\n"
+        f"Persona: {persona_id or 'None (general discovery)'}\n"
+        f"Query: {query or 'Auto (from persona)'}",
+        border_style="cyan",
+    ))
+
+    agent = get_discovery_agent()
+
+    async def run_discovery():
+        if persona_id:
+            return await agent.discover_and_analyze(
+                persona_id=persona_id,
+                platform=platform,
+                query=query,
+                limit=limit,
+            )
+        else:
+            # Just fetch trending without full analysis
+            from avatarfactory.models.schemas import AgentMessage, TaskType
+            return await agent._discover_trending({
+                "platform": platform,
+                "query": query,
+                "limit": limit,
+            })
+
+    with console.status("[bold cyan]Discovering and analyzing content...", spinner="dots"):
+        result = asyncio.run(run_discovery())
+
+    if result.get("status") != "success":
+        console.print(f"[red]Error: {result.get('message')}[/red]")
+        raise typer.Exit(1)
+
+    data = result.get("data", {})
+
+    # Display trending content summary
+    if "contents" in data:
+        console.print(f"\n[green]Found {len(data['contents'])} trending posts[/green]")
+
+        table = Table(title="Top Trending Content")
+        table.add_column("Author", style="cyan")
+        table.add_column("Content", style="white", max_width=50)
+        table.add_column("Engagement", style="green")
+
+        for post in data["contents"][:10]:
+            body = post.get("body", "")[:80].replace("\n", " ")
+            engagement = f"❤️ {post.get('likes', 0)} 💬 {post.get('comments', 0)}"
+            table.add_row(f"@{post.get('author', '?')}", body, engagement)
+
+        console.print(table)
+
+    # Display pattern analysis
+    if "pattern_analysis" in data and data["pattern_analysis"]:
+        analysis = data["pattern_analysis"]
+        console.print("\n[bold]Pattern Analysis[/bold]")
+
+        if analysis.get("trending_topics"):
+            console.print(f"[yellow]Trending Topics:[/yellow] {', '.join(analysis['trending_topics'][:5])}")
+
+        if analysis.get("key_insights"):
+            console.print("\n[yellow]Key Insights:[/yellow]")
+            for insight in analysis["key_insights"][:5]:
+                console.print(f"  • {insight}")
+
+    # Display content ideas
+    if "ideas" in data and data["ideas"]:
+        console.print("\n[bold]Generated Content Ideas[/bold]")
+
+        for i, idea in enumerate(data["ideas"], 1):
+            console.print(f"\n[cyan]{i}. {idea.get('topic', 'Untitled')}[/cyan]")
+            console.print(f"   [dim]Angle:[/dim] {idea.get('angle', 'N/A')}")
+            if idea.get("hook"):
+                console.print(f"   [dim]Hook:[/dim] \"{idea['hook']}\"")
+            console.print(f"   [dim]Pillar:[/dim] {idea.get('suggested_pillar', 'N/A')} | [dim]Engagement:[/dim] {idea.get('estimated_engagement', 'medium')}")
+
+    # Display persona suggestions
+    if "persona_suggestions" in data and data["persona_suggestions"]:
+        console.print("\n[bold]Persona Optimization Suggestions[/bold]")
+        for suggestion in data["persona_suggestions"]:
+            console.print(f"  → {suggestion}")
+
+    console.print(f"\n[dim]{result.get('message', 'Discovery complete.')}[/dim]")
+
+
+@app.command()
+def inspire(
+    persona_id: str = typer.Argument(..., help="Persona ID to get inspiration for"),
+    platform: str = typer.Option("bluesky", "--platform", "-t", help="Platform to analyze"),
+    ideas: int = typer.Option(5, "--ideas", "-n", help="Number of ideas to generate"),
+):
+    """
+    Get content inspiration based on your persona and market trends.
+
+    This is a shortcut for the full discovery workflow focused on idea generation.
+
+    Example:
+        avatarfactory inspire persona_xxx
+        avatarfactory inspire persona_xxx --platform twitter --ideas 10
+    """
+    console.print(Panel.fit(
+        f"[bold cyan]Getting Inspiration[/bold cyan]\n"
+        f"Persona: {persona_id}\n"
+        f"Platform: {platform}",
+        border_style="cyan",
+    ))
+
+    agent = get_discovery_agent()
+
+    async def run_inspiration():
+        return await agent.discover_and_analyze(
+            persona_id=persona_id,
+            platform=platform,
+            limit=30,  # Fetch more for better analysis
+        )
+
+    with console.status("[bold cyan]Analyzing trends and generating ideas...", spinner="dots"):
+        result = asyncio.run(run_inspiration())
+
+    if result.get("status") != "success":
+        console.print(f"[red]Error: {result.get('message')}[/red]")
+        raise typer.Exit(1)
+
+    data = result.get("data", {})
+
+    console.print(f"\n[green]Analyzed {data.get('trending_count', 0)} trending posts[/green]")
+
+    # Focus on ideas
+    if "ideas" in data and data["ideas"]:
+        console.print("\n[bold cyan]Content Ideas for You[/bold cyan]")
+
+        for i, idea in enumerate(data["ideas"][:ideas], 1):
+            console.print(f"\n{'─' * 60}")
+            console.print(f"[bold]{i}. {idea.get('topic', 'Untitled')}[/bold]")
+            console.print(f"[yellow]Angle:[/yellow] {idea.get('angle', 'N/A')}")
+            if idea.get("hook"):
+                console.print(f"[yellow]Hook:[/yellow] \"{idea['hook']}\"")
+            console.print(f"[dim]Type: {idea.get('content_type', 'post')} | Pillar: {idea.get('suggested_pillar', 'N/A')}[/dim]")
+            if idea.get("reasoning"):
+                console.print(f"[dim]Why: {idea['reasoning']}[/dim]")
+
+    # Show suggestions
+    if "persona_suggestions" in data and data["persona_suggestions"]:
+        console.print(f"\n{'─' * 60}")
+        console.print("[bold]Tips to Improve Your Persona[/bold]")
+        for suggestion in data["persona_suggestions"]:
+            console.print(f"  💡 {suggestion}")
 
 
 if __name__ == "__main__":

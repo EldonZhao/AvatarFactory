@@ -722,5 +722,323 @@ def inspire(
             console.print(f"  💡 {suggestion}")
 
 
+# =============================================================================
+# Scheduler Commands
+# =============================================================================
+
+@app.command()
+def daemon(
+    action: str = typer.Argument(..., help="Action: start, stop, status"),
+):
+    """
+    Manage the background scheduler daemon.
+
+    Example:
+        avatarfactory daemon start
+        avatarfactory daemon status
+        avatarfactory daemon stop
+    """
+    from avatarfactory.scheduler import Scheduler, SchedulerConfig
+
+    config = SchedulerConfig(
+        data_dir=os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            "scheduler"
+        )
+    )
+    scheduler = Scheduler(config)
+
+    if action == "start":
+        console.print(Panel.fit(
+            "[bold cyan]Starting AvatarFactory Daemon[/bold cyan]\n"
+            "Press Ctrl+C to stop",
+            border_style="cyan",
+        ))
+
+        # Show scheduled tasks
+        tasks = scheduler.list_tasks()
+        if tasks:
+            console.print(f"\n[green]Scheduled Tasks ({len(tasks)}):[/green]")
+            for task in tasks:
+                status = "✓" if task.enabled else "○"
+                console.print(f"  {status} {task.name} ({task.schedule})")
+        else:
+            console.print("\n[yellow]No scheduled tasks. Use 'avatarfactory schedule add' to create tasks.[/yellow]")
+
+        queue = scheduler.get_publish_queue(status="pending")
+        if queue:
+            console.print(f"\n[green]Publish Queue: {len(queue)} pending[/green]")
+
+        console.print("\n[dim]Daemon running...[/dim]\n")
+
+        try:
+            scheduler.start(blocking=True)
+        except KeyboardInterrupt:
+            console.print("\n[cyan]Daemon stopped.[/cyan]")
+
+    elif action == "status":
+        status = scheduler.get_status()
+
+        table = Table(title="Scheduler Status")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Running", "Yes" if status["running"] else "No")
+        table.add_row("Total Tasks", str(status["tasks_count"]))
+        table.add_row("Enabled Tasks", str(status["enabled_tasks"]))
+        table.add_row("Queue Pending", str(status["queue_pending"]))
+        table.add_row("Queue Published", str(status["queue_published"]))
+
+        console.print(table)
+
+        # Show tasks
+        tasks = scheduler.list_tasks()
+        if tasks:
+            console.print("\n[bold]Scheduled Tasks:[/bold]")
+            for task in tasks:
+                status_icon = "✓" if task.enabled else "○"
+                last_run = task.last_run.strftime("%Y-%m-%d %H:%M") if task.last_run else "Never"
+                last_status = task.last_status or "N/A"
+                console.print(f"  {status_icon} [cyan]{task.name}[/cyan] ({task.schedule})")
+                console.print(f"      Last: {last_run} | Status: {last_status} | Runs: {task.run_count}")
+
+    elif action == "stop":
+        console.print("[yellow]Note: Daemon runs in foreground. Use Ctrl+C to stop.[/yellow]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available actions: start, status, stop")
+        raise typer.Exit(1)
+
+
+@app.command()
+def schedule(
+    action: str = typer.Argument(..., help="Action: add, remove, list, enable, disable"),
+    task_type: Optional[str] = typer.Option(None, "--type", "-t", help="Task type: discovery, content, publish, report"),
+    persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Persona ID"),
+    platform: Optional[str] = typer.Option(None, "--platform", help="Platform (bluesky, twitter)"),
+    cron: Optional[str] = typer.Option(None, "--cron", "-c", help="Cron schedule (e.g., '0 9 * * *')"),
+    task_id: Optional[str] = typer.Option(None, "--id", help="Task ID (for remove/enable/disable)"),
+):
+    """
+    Manage scheduled tasks.
+
+    Example:
+        avatarfactory schedule list
+        avatarfactory schedule add --type discovery --persona persona_xxx --cron "0 9 * * *"
+        avatarfactory schedule remove --id task_xxx
+        avatarfactory schedule enable --id task_xxx
+    """
+    from avatarfactory.scheduler import Scheduler, SchedulerConfig
+    from avatarfactory.scheduler.engine import ScheduledTask
+    import uuid
+
+    config = SchedulerConfig(
+        data_dir=os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            "scheduler"
+        )
+    )
+    scheduler = Scheduler(config)
+
+    if action == "list":
+        tasks = scheduler.list_tasks()
+
+        if not tasks:
+            console.print("[yellow]No scheduled tasks.[/yellow]")
+            console.print("Create one with: avatarfactory schedule add --type discovery --persona <id> --cron '0 9 * * *'")
+            return
+
+        table = Table(title="Scheduled Tasks")
+        table.add_column("ID", style="dim")
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="yellow")
+        table.add_column("Schedule", style="green")
+        table.add_column("Enabled", style="white")
+        table.add_column("Last Run", style="dim")
+
+        for task in tasks:
+            last_run = task.last_run.strftime("%m-%d %H:%M") if task.last_run else "-"
+            table.add_row(
+                task.id,
+                task.name,
+                task.task_type,
+                task.schedule,
+                "✓" if task.enabled else "○",
+                last_run,
+            )
+
+        console.print(table)
+
+    elif action == "add":
+        if not task_type:
+            console.print("[red]--type required (discovery, content, publish, report)[/red]")
+            raise typer.Exit(1)
+
+        if task_type in ("discovery", "content", "report") and not persona_id:
+            console.print(f"[red]--persona required for {task_type} tasks[/red]")
+            raise typer.Exit(1)
+
+        schedule_cron = cron or {
+            "discovery": "0 9 * * *",
+            "content": "0 10 * * *",
+            "publish": "0 12 * * *",
+            "report": "0 18 * * 5",
+        }.get(task_type, "0 9 * * *")
+
+        task = ScheduledTask(
+            id=f"task_{uuid.uuid4().hex[:8]}",
+            name=f"{task_type.capitalize()} - {persona_id or 'all'}",
+            task_type=task_type,
+            schedule=schedule_cron,
+            persona_id=persona_id,
+            platform=platform or "bluesky",
+        )
+
+        scheduler.add_task(task)
+        console.print(f"[green]Created task: {task.name}[/green]")
+        console.print(f"  ID: {task.id}")
+        console.print(f"  Schedule: {task.schedule}")
+
+    elif action == "remove":
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.remove_task(task_id):
+            console.print(f"[green]Removed task: {task_id}[/green]")
+        else:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+
+    elif action == "enable":
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.enable_task(task_id):
+            console.print(f"[green]Enabled task: {task_id}[/green]")
+        else:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+
+    elif action == "disable":
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.disable_task(task_id):
+            console.print(f"[yellow]Disabled task: {task_id}[/yellow]")
+        else:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available: add, remove, list, enable, disable")
+        raise typer.Exit(1)
+
+
+@app.command()
+def queue(
+    action: str = typer.Argument(..., help="Action: add, remove, list"),
+    content_id: Optional[str] = typer.Option(None, "--content", "-c", help="Content ID to queue"),
+    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Target platform"),
+    schedule_time: Optional[str] = typer.Option(None, "--time", "-t", help="Schedule time (ISO format or 'now')"),
+    item_id: Optional[str] = typer.Option(None, "--id", help="Queue item ID (for remove)"),
+):
+    """
+    Manage the publish queue.
+
+    Example:
+        avatarfactory queue list
+        avatarfactory queue add --content content_xxx --platform bluesky
+        avatarfactory queue add --content content_xxx --platform bluesky --time "2024-01-15T10:00:00"
+        avatarfactory queue remove --id pub_xxx
+    """
+    from avatarfactory.scheduler import Scheduler, SchedulerConfig
+    from datetime import datetime
+
+    config = SchedulerConfig(
+        data_dir=os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            "scheduler"
+        )
+    )
+    scheduler = Scheduler(config)
+
+    if action == "list":
+        queue_items = scheduler.get_publish_queue()
+
+        if not queue_items:
+            console.print("[yellow]Publish queue is empty.[/yellow]")
+            return
+
+        table = Table(title="Publish Queue")
+        table.add_column("ID", style="dim")
+        table.add_column("Content", style="cyan")
+        table.add_column("Platform", style="yellow")
+        table.add_column("Scheduled", style="green")
+        table.add_column("Status", style="white")
+
+        for item in queue_items:
+            scheduled = item.scheduled_time.strftime("%m-%d %H:%M") if item.scheduled_time else "ASAP"
+            status_style = {
+                "pending": "yellow",
+                "published": "green",
+                "failed": "red",
+            }.get(item.status, "white")
+
+            table.add_row(
+                item.id,
+                item.content_id,
+                item.platform,
+                scheduled,
+                f"[{status_style}]{item.status}[/{status_style}]",
+            )
+
+        console.print(table)
+
+    elif action == "add":
+        if not content_id:
+            console.print("[red]--content required[/red]")
+            raise typer.Exit(1)
+
+        if not platform:
+            console.print("[red]--platform required (bluesky, twitter)[/red]")
+            raise typer.Exit(1)
+
+        scheduled_dt = None
+        if schedule_time and schedule_time != "now":
+            try:
+                scheduled_dt = datetime.fromisoformat(schedule_time)
+            except ValueError:
+                console.print(f"[red]Invalid time format: {schedule_time}[/red]")
+                console.print("Use ISO format: 2024-01-15T10:00:00")
+                raise typer.Exit(1)
+
+        item = scheduler.queue_publish(
+            content_id=content_id,
+            platform=platform,
+            scheduled_time=scheduled_dt,
+        )
+
+        console.print(f"[green]Added to publish queue[/green]")
+        console.print(f"  ID: {item.id}")
+        console.print(f"  Scheduled: {scheduled_dt or 'ASAP'}")
+
+    elif action == "remove":
+        if not item_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.remove_from_queue(item_id):
+            console.print(f"[green]Removed from queue: {item_id}[/green]")
+        else:
+            console.print(f"[red]Item not found: {item_id}[/red]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available: add, remove, list")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

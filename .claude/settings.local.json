@@ -35,7 +35,8 @@
       "mcp__filesystem__directory_tree",
       "mcp__filesystem__list_directory",
       "mcp__filesystem__read_text_file",
-      "mcp__copinative__list_features"
+      "mcp__copinative__list_features",
+      "Bash(pip install:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\xueyongzhao\\AvatarFactory\\avatarfactory"

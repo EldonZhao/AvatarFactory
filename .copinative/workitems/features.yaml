@@ -169,9 +169,10 @@ features:
       └── cli.py                   # 添加 daemon/notify 命令
       ```
     priority: high
-    status: pending
+    status: completed
     createdAt: '2026-02-04T11:58:41.339Z'
-    updatedAt: '2026-02-04T11:58:41.339Z'
+    updatedAt: '2026-02-04T12:51:05.938Z'
+    completedAt: '2026-02-04T12:51:05.938Z'
   - id: feat-003
     title: Discovery Agent - 热门文案搜索与灵感发现
     description: |-
@@ -401,6 +402,7 @@ features:
       - 任务状态持久化
       - 优雅停止和恢复
     priority: medium
-    status: pending
+    status: completed
     createdAt: '2026-02-04T12:34:24.820Z'
-    updatedAt: '2026-02-04T12:34:24.820Z'
+    updatedAt: '2026-02-04T12:51:05.918Z'
+    completedAt: '2026-02-04T12:51:05.918Z'

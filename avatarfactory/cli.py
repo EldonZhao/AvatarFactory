@@ -28,6 +28,7 @@ from avatarfactory.agents.orchestrator import OrchestratorAgent
 from avatarfactory.core.knowledge_base import KnowledgeBase
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
+from avatarfactory.connectors import get_connector, ConnectorConfig
 
 app = typer.Typer(
     name="avatarfactory",
@@ -347,6 +348,193 @@ def version():
     model = os.getenv("AVATARFACTORY_MODEL", "default")
     console.print(f"\nLLM Provider: {provider_type}")
     console.print(f"Model: {model}")
+
+
+# =============================================================================
+# Platform Connector Commands
+# =============================================================================
+
+@app.command()
+def connect(
+    platform: str = typer.Argument(..., help="Platform to connect to (bluesky, twitter)"),
+):
+    """
+    Connect to a social platform.
+
+    Example:
+        avatarfactory connect bluesky
+        avatarfactory connect twitter
+    """
+    console.print(Panel.fit(f"Connecting to {platform}...", border_style="cyan"))
+
+    # Build config from environment
+    config = ConnectorConfig()
+
+    if platform.lower() == "bluesky":
+        config.username = os.getenv("BLUESKY_USERNAME")
+        config.password = os.getenv("BLUESKY_PASSWORD")
+        if not config.username or not config.password:
+            console.print("[red]Error: BLUESKY_USERNAME and BLUESKY_PASSWORD not set in .env[/red]")
+            console.print("Set these environment variables:")
+            console.print("  BLUESKY_USERNAME=your.handle.bsky.social")
+            console.print("  BLUESKY_PASSWORD=your-app-password")
+            raise typer.Exit(1)
+
+    elif platform.lower() == "twitter":
+        config.api_key = os.getenv("TWITTER_API_KEY")
+        config.api_secret = os.getenv("TWITTER_API_SECRET")
+        config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+        if not config.access_token and not (config.api_key and config.api_secret):
+            console.print("[red]Error: Twitter API credentials not set in .env[/red]")
+            console.print("Set these environment variables:")
+            console.print("  TWITTER_ACCESS_TOKEN=your-bearer-token")
+            console.print("  or")
+            console.print("  TWITTER_API_KEY=your-api-key")
+            console.print("  TWITTER_API_SECRET=your-api-secret")
+            raise typer.Exit(1)
+    else:
+        console.print(f"[red]Error: Unknown platform '{platform}'[/red]")
+        console.print("Available platforms: bluesky, twitter")
+        raise typer.Exit(1)
+
+    try:
+        connector = get_connector(platform, config)
+
+        async def test_connection():
+            await connector.connect()
+            return await connector.verify_credentials()
+
+        with console.status(f"[bold cyan]Connecting to {platform}...", spinner="dots"):
+            is_valid = asyncio.run(test_connection())
+
+        if is_valid:
+            console.print(f"[green]Successfully connected to {platform}![/green]")
+        else:
+            console.print(f"[yellow]Connected but credentials may have limited permissions[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Failed to connect: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def fetch(
+    platform: str = typer.Argument(..., help="Platform to fetch from (bluesky, twitter)"),
+    query: Optional[str] = typer.Option(None, "--query", "-q", help="Search query"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Number of posts to fetch"),
+):
+    """
+    Fetch trending content from a platform.
+
+    Example:
+        avatarfactory fetch bluesky --query "AI tools"
+        avatarfactory fetch twitter -q "productivity" -n 20
+    """
+    console.print(Panel.fit(f"Fetching from {platform}...", border_style="cyan"))
+
+    # Build config from environment
+    config = ConnectorConfig()
+
+    if platform.lower() == "bluesky":
+        config.username = os.getenv("BLUESKY_USERNAME")
+        config.password = os.getenv("BLUESKY_PASSWORD")
+    elif platform.lower() == "twitter":
+        config.api_key = os.getenv("TWITTER_API_KEY")
+        config.api_secret = os.getenv("TWITTER_API_SECRET")
+        config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+
+    try:
+        connector = get_connector(platform, config)
+
+        async def do_fetch():
+            await connector.connect()
+            return await connector.fetch_trending(query=query, limit=limit)
+
+        with console.status(f"[bold cyan]Fetching content...", spinner="dots"):
+            result = asyncio.run(do_fetch())
+
+        if not result.success:
+            console.print(f"[red]Error: {result.error}[/red]")
+            raise typer.Exit(1)
+
+        # Display results
+        table = Table(title=f"Trending on {platform}" + (f" for '{query}'" if query else ""))
+        table.add_column("Author", style="cyan")
+        table.add_column("Content", style="white", max_width=60)
+        table.add_column("Likes", style="green")
+        table.add_column("Comments", style="yellow")
+
+        for post in result.data:
+            body = post.get("body", "")
+            preview = body[:100] + "..." if len(body) > 100 else body
+            # Replace newlines for table display
+            preview = preview.replace("\n", " ")
+
+            table.add_row(
+                f"@{post.get('author', 'unknown')}",
+                preview,
+                str(post.get("likes", 0)),
+                str(post.get("comments", 0)),
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Fetched {len(result.data)} posts[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def publish(
+    platform: str = typer.Argument(..., help="Platform to publish to (bluesky, twitter)"),
+    content: str = typer.Argument(..., help="Content to publish"),
+    tags: Optional[str] = typer.Option(None, "--tags", "-t", help="Comma-separated hashtags"),
+):
+    """
+    Publish content to a platform.
+
+    Example:
+        avatarfactory publish bluesky "Hello world!"
+        avatarfactory publish twitter "Check this out" --tags "ai,productivity"
+    """
+    console.print(Panel.fit(f"Publishing to {platform}...", border_style="cyan"))
+
+    # Build config from environment
+    config = ConnectorConfig()
+
+    if platform.lower() == "bluesky":
+        config.username = os.getenv("BLUESKY_USERNAME")
+        config.password = os.getenv("BLUESKY_PASSWORD")
+    elif platform.lower() == "twitter":
+        config.api_key = os.getenv("TWITTER_API_KEY")
+        config.api_secret = os.getenv("TWITTER_API_SECRET")
+        config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+
+    tag_list = [t.strip() for t in tags.split(",")] if tags else None
+
+    try:
+        connector = get_connector(platform, config)
+
+        async def do_publish():
+            await connector.connect()
+            return await connector.publish(content=content, tags=tag_list)
+
+        with console.status(f"[bold cyan]Publishing...", spinner="dots"):
+            result = asyncio.run(do_publish())
+
+        if result.success:
+            console.print(f"[green]Published successfully![/green]")
+            if result.post_url:
+                console.print(f"URL: {result.post_url}")
+            console.print(f"Post ID: {result.post_id}")
+        else:
+            console.print(f"[red]Failed to publish: {result.error}[/red]")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

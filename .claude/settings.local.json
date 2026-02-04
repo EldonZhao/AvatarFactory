@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test:*)",
+      "Bash(wc:*)",
+      "Bash(tree:*)",
+      "Bash(.venv/Scripts/avatarfactory.exe chat:*)",
+      "Bash(.venv/Scripts/pip.exe install:*)",
+      "Bash(timeout 120 .venv/Scripts/avatarfactory.exe:*)",
+      "Bash(.venv/Scripts/avatarfactory.exe:*)",
+      "Bash(chcp:*)",
+      "Bash(git add:*)",
+      "Bash(git config:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Add AvatarFactory v0.1.0 MVP implementation\n\n- Multi-agent system with Orchestrator, PersonaLab, ContentLab, Review agents\n- LLM provider abstraction supporting Anthropic, Azure OpenAI, and OpenAI\n- Knowledge base for persona and content persistence \\(YAML/JSON\\)\n- Platform adapters for Xiaohongshu, Zhihu, Twitter\n- CLI interface with natural language chat mode\n- Multi-dimensional review scoring \\(persona consistency, platform fit, compliance, engagement\\)\n- Documentation and setup scripts for Windows/macOS/Linux\n\nKey fixes:\n- Azure OpenAI reasoning model \\(gpt-5/o1\\) compatibility\n- Windows console Unicode encoding support\n- YAML serialization for Pydantic enums\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)",
+      "mcp__copinative__list_tasks",
+      "mcp__copinative__init_project",
+      "mcp__copinative__save_design_doc",
+      "mcp__copinative__save_principles_doc",
+      "mcp__copinative__get_project_context",
+      "mcp__copinative__create_feature",
+      "mcp__copinative__create_bug",
+      "Bash(.venv/Scripts/python.exe -c \"from avatarfactory.adapters import XiaohongshuAdapter, ZhihuAdapter, TwitterAdapter; print\\(''All adapters imported successfully''\\)\")",
+      "mcp__copinative__update_bug_status",
+      "mcp__copinative__do_workitem",
+      "mcp__copinative__get_workitem_context",
+      "mcp__copinative__update_feature_status",
+      "Bash(python -c:*)",
+      "Bash(python -m avatarfactory:*)",
+      "mcp__copinative__get_git_status",
+      "mcp__copinative__suggest_workitem_for_commit",
+      "mcp__copinative__create_commit"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\xueyongzhao\\AvatarFactory\\avatarfactory"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "filesystem",
+    "copinative"
+  ]
+}

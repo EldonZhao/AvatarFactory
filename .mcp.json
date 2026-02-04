@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Users\\xueyongzhao\\AvatarFactory"
+      ]
+    },
+    "copinative": {
+      "command": "copinative-mcp",
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

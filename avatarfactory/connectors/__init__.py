@@ -45,10 +45,13 @@ def get_connector(platform: str, config: ConnectorConfig) -> BasePlatformConnect
     """
     from avatarfactory.connectors.twitter import TwitterConnector
     from avatarfactory.connectors.bluesky import BlueskyConnector
+    from avatarfactory.connectors.xiaohongshu import XiaohongshuConnector
 
     connectors = {
         "twitter": TwitterConnector,
         "bluesky": BlueskyConnector,
+        "xiaohongshu": XiaohongshuConnector,
+        "xhs": XiaohongshuConnector,  # Alias
     }
 
     connector_class = connectors.get(platform.lower())

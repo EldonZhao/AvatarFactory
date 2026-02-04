@@ -502,6 +502,16 @@ def publish_draft(
         config.api_key = os.getenv("TWITTER_API_KEY")
         config.api_secret = os.getenv("TWITTER_API_SECRET")
         config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+    elif target_platform in ("xiaohongshu", "xhs"):
+        xhs_cookie = os.getenv("XIAOHONGSHU_COOKIE")
+        if not xhs_cookie:
+            console.print("[red]Error: XIAOHONGSHU_COOKIE not set[/red]")
+            console.print("Get your cookie from browser DevTools after logging in to xiaohongshu.com")
+            raise typer.Exit(1)
+        config.extra = {
+            "cookie": xhs_cookie,
+            "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+        }
 
     try:
         connector = get_connector(target_platform, config)
@@ -639,9 +649,21 @@ def connect(
             console.print("  TWITTER_API_KEY=your-api-key")
             console.print("  TWITTER_API_SECRET=your-api-secret")
             raise typer.Exit(1)
+
+    elif platform.lower() in ("xiaohongshu", "xhs"):
+        xhs_cookie = os.getenv("XIAOHONGSHU_COOKIE")
+        if not xhs_cookie:
+            console.print("[red]Error: XIAOHONGSHU_COOKIE not set in .env[/red]")
+            console.print("Get your cookie from browser DevTools after logging in to xiaohongshu.com")
+            raise typer.Exit(1)
+        config.extra = {
+            "cookie": xhs_cookie,
+            "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+        }
+
     else:
         console.print(f"[red]Error: Unknown platform '{platform}'[/red]")
-        console.print("Available platforms: bluesky, twitter")
+        console.print("Available platforms: bluesky, twitter, xiaohongshu")
         raise typer.Exit(1)
 
     try:
@@ -689,6 +711,11 @@ def fetch(
         config.api_key = os.getenv("TWITTER_API_KEY")
         config.api_secret = os.getenv("TWITTER_API_SECRET")
         config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+    elif platform.lower() in ("xiaohongshu", "xhs"):
+        config.extra = {
+            "cookie": os.getenv("XIAOHONGSHU_COOKIE"),
+            "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+        }
 
     try:
         connector = get_connector(platform, config)
@@ -757,6 +784,11 @@ def publish(
         config.api_key = os.getenv("TWITTER_API_KEY")
         config.api_secret = os.getenv("TWITTER_API_SECRET")
         config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+    elif platform.lower() in ("xiaohongshu", "xhs"):
+        config.extra = {
+            "cookie": os.getenv("XIAOHONGSHU_COOKIE"),
+            "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+        }
 
     tag_list = [t.strip() for t in tags.split(",")] if tags else None
 

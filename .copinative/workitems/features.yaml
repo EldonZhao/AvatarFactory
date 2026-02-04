@@ -328,8 +328,10 @@ features:
     priority: high
     status: completed
     createdAt: '2026-02-04T12:34:24.782Z'
-    updatedAt: '2026-02-04T12:39:36.099Z'
+    updatedAt: '2026-02-04T12:39:52.080Z'
     completedAt: '2026-02-04T12:39:36.099Z'
+    linkedPRs:
+      - https://github.com/EldonZhao/AvatarFactory/pull/2
   - id: feat-005
     title: 评论互动 Agent - 自动回复管理
     description: |-

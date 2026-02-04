@@ -1,0 +1,27 @@
+bugs:
+  - id: bug-001
+    title: xiaohongshu.py adapter 文件缺失导致导入错误
+    description: |-
+      ## 问题描述
+      `avatarfactory/adapters/__init__.py` 引用了 `XiaohongshuAdapter`，但 `xiaohongshu.py` 文件不存在，导致导入时会报错。
+
+      ## 影响
+      - 任何尝试使用小红书平台的操作都会失败
+      - `from avatarfactory.adapters import XiaohongshuAdapter` 会抛出 ImportError
+
+      ## 复现步骤
+      ```python
+      from avatarfactory.adapters import XiaohongshuAdapter
+      # ImportError: cannot import name 'XiaohongshuAdapter'
+      ```
+
+      ## 修复方案
+      创建 `avatarfactory/adapters/xiaohongshu.py` 文件，实现 `XiaohongshuAdapter` 类。
+    priority: high
+    reproSteps:
+      - from avatarfactory.adapters import XiaohongshuAdapter
+      - 'ImportError: cannot import name ''XiaohongshuAdapter'''
+    status: completed
+    createdAt: '2026-02-04T11:51:34.023Z'
+    updatedAt: '2026-02-04T11:53:46.855Z'
+    resolvedAt: '2026-02-04T11:53:46.855Z'

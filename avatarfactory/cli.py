@@ -30,6 +30,7 @@ from avatarfactory.core.knowledge_base import KnowledgeBase
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
 from avatarfactory.connectors import get_connector, ConnectorConfig
+from avatarfactory.connectors.xiaohongshu import CookieExpiredError
 
 app = typer.Typer(
     name="avatarfactory",
@@ -569,6 +570,14 @@ def publish_draft(
                 console.print(f"[yellow]Partial publish: {success_count}/{len(results)} posts succeeded[/yellow]")
             raise typer.Exit(1)
 
+    except CookieExpiredError as e:
+        console.print(f"[red]❌ Cookie Expired[/red]")
+        console.print(str(e))
+        # Show refresh instructions for xiaohongshu
+        if target_platform in ("xiaohongshu", "xhs"):
+            from avatarfactory.connectors.xiaohongshu import XiaohongshuConnector
+            console.print(XiaohongshuConnector(ConnectorConfig()).get_cookie_refresh_instructions())
+        raise typer.Exit(1)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)

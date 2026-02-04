@@ -12,9 +12,19 @@ import hashlib
 import json
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+
+class CookieExpiredError(Exception):
+    """Raised when the Xiaohongshu cookie has expired."""
+    pass
+
+
+class CookieExpiringWarning(Warning):
+    """Warning when the cookie is about to expire."""
+    pass
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
@@ -46,11 +56,18 @@ class XiaohongshuConnector(BasePlatformConnector):
     BASE_URL = "https://edith.xiaohongshu.com"
     WEB_URL = "https://www.xiaohongshu.com"
 
+    # Cookie expiration settings
+    COOKIE_WARNING_DAYS = 3  # Warn when cookie might expire within this many days
+    COOKIE_CHECK_INTERVAL = 3600  # Check cookie status every hour (seconds)
+
     def __init__(self, config: ConnectorConfig):
         super().__init__(config)
         self._cookie: Optional[str] = None
         self._user_id: Optional[str] = None
         self._headers: Dict[str, str] = {}
+        self._last_cookie_check: Optional[datetime] = None
+        self._cookie_valid: bool = False
+        self._consecutive_failures: int = 0
 
     @property
     def platform_name(self) -> str:
@@ -138,12 +155,143 @@ class XiaohongshuConnector(BasePlatformConnector):
                         user_info = data.get("data", {})
                         if user_info.get("user_id"):
                             self._user_id = user_info["user_id"]
+                        self._cookie_valid = True
+                        self._consecutive_failures = 0
+                        self._last_cookie_check = datetime.now()
                         return True
+
+                # Check for specific error codes indicating expired cookie
+                if response.status_code == 401:
+                    self._cookie_valid = False
+                    raise CookieExpiredError(
+                        "Cookie has expired. Please update XIAOHONGSHU_COOKIE in your .env file.\n"
+                        "Steps: 1) Login to xiaohongshu.com 2) Open DevTools (F12) 3) Copy cookie from Network tab"
+                    )
 
                 return False
 
+        except CookieExpiredError:
+            raise
         except Exception:
             return False
+
+    async def check_cookie_status(self) -> Tuple[bool, Optional[str]]:
+        """
+        Check if the cookie is still valid and return status with message.
+
+        Returns:
+            Tuple of (is_valid, warning_message)
+            - is_valid: True if cookie is working
+            - warning_message: Warning string if cookie might expire soon, None otherwise
+        """
+        # Skip check if we checked recently
+        if self._last_cookie_check:
+            elapsed = (datetime.now() - self._last_cookie_check).total_seconds()
+            if elapsed < self.COOKIE_CHECK_INTERVAL and self._cookie_valid:
+                return (True, None)
+
+        try:
+            is_valid = await self.verify_credentials()
+
+            if not is_valid:
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= 3:
+                    return (False, "Cookie appears to be expired or invalid. Please refresh your cookie.")
+                return (False, f"Cookie check failed ({self._consecutive_failures}/3 attempts)")
+
+            # Cookie is valid - check for potential expiration warning
+            warning = self._check_cookie_expiration_warning()
+            return (True, warning)
+
+        except CookieExpiredError as e:
+            return (False, str(e))
+        except Exception as e:
+            return (False, f"Error checking cookie: {e}")
+
+    def _check_cookie_expiration_warning(self) -> Optional[str]:
+        """
+        Analyze cookie to detect potential expiration.
+
+        Returns warning message if cookie might expire soon, None otherwise.
+        """
+        if not self._cookie:
+            return None
+
+        # Try to parse cookie expiration from common cookie fields
+        # Note: Most session cookies don't have explicit expiration in the string
+        # This is a heuristic based on cookie age tracking
+
+        # Check for timestamp-based cookies that XHS might use
+        import re
+
+        # Look for timestamp patterns in cookie (some cookies embed creation time)
+        timestamp_patterns = [
+            r'timestamp=(\d+)',
+            r'_ts=(\d+)',
+            r'create_time=(\d+)',
+        ]
+
+        for pattern in timestamp_patterns:
+            match = re.search(pattern, self._cookie)
+            if match:
+                try:
+                    ts = int(match.group(1))
+                    # Handle milliseconds
+                    if ts > 1e12:
+                        ts = ts / 1000
+                    cookie_time = datetime.fromtimestamp(ts)
+                    age = datetime.now() - cookie_time
+
+                    # Warn if cookie is older than 25 days (assuming ~30 day expiry)
+                    if age.days >= 25:
+                        days_remaining = max(0, 30 - age.days)
+                        return (
+                            f"⚠️ Cookie is {age.days} days old and may expire soon "
+                            f"(~{days_remaining} days remaining). Consider refreshing."
+                        )
+                except (ValueError, OSError):
+                    pass
+
+        return None
+
+    async def ensure_valid_cookie(self) -> None:
+        """
+        Ensure cookie is valid before making requests.
+        Raises CookieExpiredError if cookie is expired.
+        """
+        is_valid, message = await self.check_cookie_status()
+
+        if not is_valid:
+            self.status = ConnectionStatus.ERROR
+            raise CookieExpiredError(
+                message or "Cookie has expired. Please update XIAOHONGSHU_COOKIE."
+            )
+
+        if message:
+            # Log warning but don't fail
+            import warnings
+            warnings.warn(message, CookieExpiringWarning)
+
+    def get_cookie_refresh_instructions(self) -> str:
+        """Return instructions for refreshing the cookie."""
+        return """
+╔══════════════════════════════════════════════════════════════════╗
+║           如何刷新小红书 Cookie (How to Refresh Cookie)           ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  1. 打开浏览器，访问 https://www.xiaohongshu.com                   ║
+║  2. 登录你的账号                                                  ║
+║  3. 按 F12 打开开发者工具                                         ║
+║  4. 切换到 Network (网络) 标签页                                   ║
+║  5. 刷新页面，点击任意一个请求                                      ║
+║  6. 在 Headers 中找到 Cookie 字段                                 ║
+║  7. 复制完整的 Cookie 值                                          ║
+║  8. 更新 .env 文件中的 XIAOHONGSHU_COOKIE                         ║
+║                                                                  ║
+║  Cookie 通常有效期为 7-30 天                                       ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
 
     async def _upload_image(self, image_path: str) -> Optional[Dict[str, Any]]:
         """
@@ -246,6 +394,16 @@ class XiaohongshuConnector(BasePlatformConnector):
             return PublishResult(
                 success=False,
                 error="Not connected to Xiaohongshu",
+                platform=self.platform_name,
+            )
+
+        # Check cookie validity before publishing
+        try:
+            await self.ensure_valid_cookie()
+        except CookieExpiredError as e:
+            return PublishResult(
+                success=False,
+                error=str(e),
                 platform=self.platform_name,
             )
 
@@ -363,6 +521,16 @@ class XiaohongshuConnector(BasePlatformConnector):
             return FetchResult(
                 success=False,
                 error="Not connected to Xiaohongshu",
+                platform=self.platform_name,
+            )
+
+        # Check cookie validity
+        try:
+            await self.ensure_valid_cookie()
+        except CookieExpiredError as e:
+            return FetchResult(
+                success=False,
+                error=str(e),
                 platform=self.platform_name,
             )
 
@@ -487,6 +655,16 @@ class XiaohongshuConnector(BasePlatformConnector):
             return FetchResult(
                 success=False,
                 error="Not connected to Xiaohongshu",
+                platform=self.platform_name,
+            )
+
+        # Check cookie validity
+        try:
+            await self.ensure_valid_cookie()
+        except CookieExpiredError as e:
+            return FetchResult(
+                success=False,
+                error=str(e),
                 platform=self.platform_name,
             )
 

@@ -134,6 +134,10 @@ class DiscoveryAgent(BaseAgent):
                     views=item.get("views", 0),
                     url=item.get("url"),
                     published_at=item.get("published_at"),
+                    # Image information
+                    images=item.get("images", []),
+                    image_count=item.get("image_count", 0),
+                    has_media=item.get("has_media", False),
                 )
                 trending_contents.append(tc)
 
@@ -194,10 +198,17 @@ Target Persona Context:
         # Prepare content summaries for LLM
         content_summaries = []
         for i, c in enumerate(contents[:15]):  # Limit to 15 for token efficiency
+            # Include image/media info
+            media_info = ""
+            if c.get("has_media") or c.get("image_count", 0) > 0:
+                img_count = c.get("image_count", 0)
+                media_info = f" | Images: {img_count}"
+
             summary = f"""
 Content {i+1}:
 - Author: @{c.get('author', 'unknown')}
-- Likes: {c.get('likes', 0)} | Comments: {c.get('comments', 0)} | Shares: {c.get('shares', 0)}
+- Likes: {c.get('likes', 0)} | Comments: {c.get('comments', 0)} | Shares: {c.get('shares', 0)}{media_info}
+- Has Media: {'Yes' if c.get('has_media') else 'No'}
 - Text: {c.get('body', '')[:300]}...
 """
             content_summaries.append(summary)
@@ -209,7 +220,7 @@ Content {i+1}:
 {"".join(content_summaries)}
 
 === ANALYSIS TASK ===
-Identify patterns in the successful content above. Return a JSON object with:
+Identify patterns in the successful content above, including visual/media patterns. Return a JSON object with:
 
 {{
     "hook_patterns": [
@@ -224,16 +235,24 @@ Identify patterns in the successful content above. Return a JSON object with:
     "style_patterns": [
         {{"name": "style element", "description": "writing style pattern", "frequency": count}}
     ],
+    "visual_patterns": [
+        {{"name": "visual pattern", "description": "how images/media are used", "avg_image_count": number, "frequency": count}}
+    ],
     "trending_topics": ["topic1", "topic2", ...],
     "trending_hashtags": ["#tag1", "#tag2", ...],
     "key_insights": [
         "insight 1 about what makes this content successful",
         "insight 2 about audience preferences",
-        "insight 3 about content strategy"
-    ]
+        "insight 3 about visual content strategy"
+    ],
+    "media_recommendations": {{
+        "optimal_image_count": number,
+        "image_style": "description of effective image styles",
+        "visual_themes": ["theme1", "theme2"]
+    }}
 }}
 
-Focus on actionable patterns that could inform content creation.
+Focus on actionable patterns that could inform content creation, especially regarding visual content.
 Return ONLY valid JSON, no other text."""
 
         try:
@@ -375,6 +394,7 @@ Avoid: {', '.join(persona.boundaries.avoid[:3])}
 
         # Add pattern analysis if available
         patterns_context = ""
+        media_context = ""
         if pattern_analysis:
             insights = pattern_analysis.get("key_insights", [])
             topics = pattern_analysis.get("trending_topics", [])
@@ -387,6 +407,15 @@ Effective Hook Patterns: {', '.join(hooks[:5])}
 Key Insights:
 {chr(10).join(f"- {i}" for i in insights[:5])}
 """
+            # Add media recommendations if available
+            media_recs = pattern_analysis.get("media_recommendations", {})
+            if media_recs:
+                media_context = f"""
+=== VISUAL CONTENT PATTERNS ===
+Optimal Image Count: {media_recs.get('optimal_image_count', 2)}
+Image Style: {media_recs.get('image_style', 'Not specified')}
+Visual Themes: {', '.join(media_recs.get('visual_themes', []))}
+"""
 
         # Add sample trending content
         trending_context = ""
@@ -396,13 +425,15 @@ Key Insights:
 === HIGH-PERFORMING CONTENT EXAMPLES ===
 """
             for i, c in enumerate(samples):
+                img_info = f" | Images: {c.get('image_count', 0)}" if c.get('has_media') else ""
                 trending_context += f"""
-Example {i+1} (Likes: {c.get('likes', 0)}):
+Example {i+1} (Likes: {c.get('likes', 0)}{img_info}):
 {c.get('body', '')[:200]}...
 """
 
         prompt = f"""{persona_context}
 {patterns_context}
+{media_context}
 {trending_context}
 
 === TASK ===
@@ -411,6 +442,7 @@ Generate {idea_count} unique content ideas that:
 2. Address target audience pain points
 3. Leverage trending topics and successful patterns
 4. Fit within the persona's content pillars
+5. Include visual content suggestions for engagement
 
 Return a JSON array of content ideas:
 [
@@ -421,11 +453,16 @@ Return a JSON array of content ideas:
         "content_type": "post/thread/tutorial/comparison",
         "suggested_pillar": "which content pillar this fits",
         "estimated_engagement": "low/medium/high",
-        "reasoning": "why this idea could resonate with the audience"
+        "reasoning": "why this idea could resonate with the audience",
+        "image_suggestions": [
+            "description of recommended image 1",
+            "description of recommended image 2"
+        ],
+        "recommended_image_count": 2
     }}
 ]
 
-Be specific and actionable. Each idea should be distinct.
+Be specific and actionable. Each idea should be distinct and include image recommendations.
 Return ONLY valid JSON array, no other text."""
 
         try:
@@ -459,6 +496,8 @@ Return ONLY valid JSON array, no other text."""
                     suggested_pillar=idea.get("suggested_pillar"),
                     estimated_engagement=idea.get("estimated_engagement", "medium"),
                     reasoning=idea.get("reasoning", ""),
+                    image_suggestions=idea.get("image_suggestions", []),
+                    recommended_image_count=idea.get("recommended_image_count", 2),
                 )
                 content_ideas.append(ci)
 

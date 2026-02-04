@@ -5,7 +5,9 @@ Bluesky has an open AT Protocol API, making it the simplest platform to integrat
 Documentation: https://docs.bsky.app/
 """
 
+import mimetypes
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from avatarfactory.connectors.base import (
@@ -14,7 +16,6 @@ from avatarfactory.connectors.base import (
     ConnectorConfig,
     FetchResult,
     PublishResult,
-    TrendingContent,
 )
 
 
@@ -89,15 +90,71 @@ class BlueskyConnector(BasePlatformConnector):
         except Exception:
             return False
 
+    async def _upload_image(self, image_path: str) -> Optional[Dict[str, Any]]:
+        """
+        Upload an image to Bluesky blob storage.
+
+        Args:
+            image_path: Local file path or URL to image
+
+        Returns:
+            Blob reference dict with $link and mimeType, or None on failure
+        """
+        try:
+            import httpx
+
+            # Read image file
+            path = Path(image_path)
+            if not path.exists():
+                return None
+
+            # Determine MIME type
+            mime_type, _ = mimetypes.guess_type(str(path))
+            if not mime_type or not mime_type.startswith("image/"):
+                mime_type = "image/jpeg"  # Default fallback
+
+            with open(path, "rb") as f:
+                image_data = f.read()
+
+            # Upload to Bluesky
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+                    headers={
+                        "Authorization": f"Bearer {self._session.get('accessJwt')}",
+                        "Content-Type": mime_type,
+                    },
+                    content=image_data,
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("blob")
+                else:
+                    return None
+
+        except Exception:
+            return None
+
     async def publish(
         self,
         content: str,
         title: Optional[str] = None,
         images: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
+        alt_texts: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> PublishResult:
-        """Publish a post to Bluesky"""
+        """
+        Publish a post to Bluesky with optional images.
+
+        Args:
+            content: Post text (max 300 chars)
+            title: Not used for Bluesky
+            images: List of image file paths (max 4)
+            tags: Hashtags to append
+            alt_texts: Alt text for each image
+        """
         if not self.is_connected():
             return PublishResult(
                 success=False,
@@ -116,11 +173,31 @@ class BlueskyConnector(BasePlatformConnector):
 
             # Create post record
             now = datetime.utcnow().isoformat() + "Z"
-            record = {
+            record: Dict[str, Any] = {
                 "$type": "app.bsky.feed.post",
                 "text": post_text[:300],  # Bluesky limit is 300 chars
                 "createdAt": now,
             }
+
+            # Upload and attach images if provided
+            if images:
+                uploaded_images = []
+                for i, image_path in enumerate(images[:4]):  # Max 4 images
+                    blob = await self._upload_image(image_path)
+                    if blob:
+                        alt_text = ""
+                        if alt_texts and i < len(alt_texts):
+                            alt_text = alt_texts[i]
+                        uploaded_images.append({
+                            "alt": alt_text,
+                            "image": blob,
+                        })
+
+                if uploaded_images:
+                    record["embed"] = {
+                        "$type": "app.bsky.embed.images",
+                        "images": uploaded_images,
+                    }
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -136,8 +213,6 @@ class BlueskyConnector(BasePlatformConnector):
                 if response.status_code == 200:
                     data = response.json()
                     uri = data.get("uri", "")
-                    # Convert AT URI to web URL
-                    # at://did:plc:xxx/app.bsky.feed.post/xxx -> https://bsky.app/profile/xxx/post/xxx
                     parts = uri.split("/")
                     post_id = parts[-1] if parts else ""
                     handle = self.config.username
@@ -165,13 +240,33 @@ class BlueskyConnector(BasePlatformConnector):
                 platform=self.platform_name,
             )
 
+    def _extract_images_from_embed(self, embed: Dict[str, Any]) -> List[str]:
+        """Extract image URLs from post embed."""
+        images = []
+        embed_type = embed.get("$type", "")
+
+        if embed_type == "app.bsky.embed.images#view":
+            for img in embed.get("images", []):
+                if "fullsize" in img:
+                    images.append(img["fullsize"])
+                elif "thumb" in img:
+                    images.append(img["thumb"])
+        elif embed_type == "app.bsky.embed.images":
+            # Record format (not view format)
+            for img in embed.get("images", []):
+                if "image" in img and "$link" in img["image"]:
+                    # This is a blob reference, not a URL
+                    pass
+
+        return images
+
     async def fetch_trending(
         self,
         query: Optional[str] = None,
         limit: int = 20,
         **kwargs: Any,
     ) -> FetchResult:
-        """Fetch trending/popular posts from Bluesky"""
+        """Fetch trending/popular posts from Bluesky with image information"""
         if not self.is_connected():
             return FetchResult(
                 success=False,
@@ -184,14 +279,12 @@ class BlueskyConnector(BasePlatformConnector):
 
             async with httpx.AsyncClient() as client:
                 if query:
-                    # Search posts
                     response = await client.get(
                         "https://bsky.social/xrpc/app.bsky.feed.searchPosts",
                         params={"q": query, "limit": min(limit, 100)},
                         headers={"Authorization": f"Bearer {self._session.get('accessJwt')}"},
                     )
                 else:
-                    # Get popular feed
                     response = await client.get(
                         "https://bsky.social/xrpc/app.bsky.feed.getTimeline",
                         params={"limit": min(limit, 100)},
@@ -210,6 +303,11 @@ class BlueskyConnector(BasePlatformConnector):
 
                         record = post.get("record", {})
                         author = post.get("author", {})
+                        embed = post.get("embed", {})
+
+                        # Extract images from embed
+                        images = self._extract_images_from_embed(embed)
+                        has_media = len(images) > 0 or "$type" in embed
 
                         results.append({
                             "platform": self.platform_name,
@@ -222,6 +320,10 @@ class BlueskyConnector(BasePlatformConnector):
                             "shares": post.get("repostCount", 0),
                             "published_at": record.get("createdAt"),
                             "url": f"https://bsky.app/profile/{author.get('handle')}/post/{post.get('uri', '').split('/')[-1]}",
+                            # Image information
+                            "images": images,
+                            "image_count": len(images),
+                            "has_media": has_media,
                         })
 
                     return FetchResult(
@@ -281,6 +383,9 @@ class BlueskyConnector(BasePlatformConnector):
                         post = item.get("post", {})
                         record = post.get("record", {})
                         author = post.get("author", {})
+                        embed = post.get("embed", {})
+
+                        images = self._extract_images_from_embed(embed)
 
                         results.append({
                             "platform": self.platform_name,
@@ -292,6 +397,9 @@ class BlueskyConnector(BasePlatformConnector):
                             "comments": post.get("replyCount", 0),
                             "shares": post.get("repostCount", 0),
                             "published_at": record.get("createdAt"),
+                            "images": images,
+                            "image_count": len(images),
+                            "has_media": len(images) > 0,
                         })
 
                     return FetchResult(

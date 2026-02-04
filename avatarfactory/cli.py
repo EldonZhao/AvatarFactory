@@ -406,15 +406,22 @@ def publish_draft(
     platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Override platform (bluesky, twitter)"),
     images: Optional[str] = typer.Option(None, "--images", "-i", help="Comma-separated image paths"),
     confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    force_single: bool = typer.Option(False, "--single", "-s", help="Force single post (truncate instead of thread)"),
 ):
     """
     Publish a draft content to social platform.
+
+    Long content will be automatically split into a thread for platforms
+    with character limits (Bluesky: 300, Twitter: 280).
 
     Example:
         avatarfactory publish-draft content_178b3925
         avatarfactory publish-draft content_178b3925 --platform bluesky
         avatarfactory publish-draft content_178b3925 -i "img1.jpg,img2.jpg"
+        avatarfactory publish-draft content_178b3925 --single  # Force truncate
     """
+    from avatarfactory.connectors.adapters import get_adapter, get_platform_limits
+
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
     kb = KnowledgeBase(kb_path)
 
@@ -433,23 +440,51 @@ def publish_draft(
         console.print(f"[yellow]Using bluesky for publishing.[/yellow]")
         target_platform = "bluesky"
 
-    # Show preview
+    # Parse images
+    image_list = [img.strip() for img in images.split(",")] if images else []
+
+    # Get platform limits and adapt content
+    limits = get_platform_limits(target_platform)
+    adapter = get_adapter(target_platform)
+    adapted = adapter.adapt(content, images=image_list, force_single=force_single)
+
+    # Show preview with adaptation info
     console.print(Panel.fit(
         f"[bold]Publishing to {target_platform}[/bold]\n\n"
         f"[cyan]Title:[/cyan] {content.title}\n"
-        f"[cyan]Tags:[/cyan] {', '.join(content.tags) if content.tags else 'None'}\n"
-        f"[cyan]Images:[/cyan] {images or 'None provided'}",
+        f"[cyan]Original length:[/cyan] {adapted.original_length} chars\n"
+        f"[cyan]Platform limit:[/cyan] {limits.max_text_length} chars/post\n"
+        f"[cyan]Adapted:[/cyan] {'Thread with ' + str(len(adapted.parts)) + ' posts' if adapted.is_thread else 'Single post'}"
+        + (f" [yellow](truncated)[/yellow]" if adapted.truncated else "") + "\n"
+        f"[cyan]Tags:[/cyan] {', '.join(adapted.tags) if adapted.tags else 'None'}\n"
+        f"[cyan]Images:[/cyan] {len(image_list)} provided",
         title=f"Content: {content_id}",
         border_style="cyan",
     ))
 
-    # Show content preview
-    body_preview = content.body[:200] + "..." if len(content.body) > 200 else content.body
-    console.print(f"\n[dim]{body_preview}[/dim]\n")
+    # Show adapted content preview
+    if adapted.is_thread:
+        console.print(f"\n[bold]Thread Preview ({len(adapted.parts)} posts):[/bold]")
+        for i, part in enumerate(adapted.parts, 1):
+            console.print(f"\n[cyan]━━━ Post {i}/{len(adapted.parts)} ━━━[/cyan]")
+            # Show first 150 chars of each part
+            preview = part[:150] + "..." if len(part) > 150 else part
+            console.print(f"[dim]{preview}[/dim]")
+            console.print(f"[dim]({len(part)} chars)[/dim]")
+    else:
+        console.print(f"\n[bold]Post Preview:[/bold]")
+        preview = adapted.parts[0][:300] + "..." if len(adapted.parts[0]) > 300 else adapted.parts[0]
+        console.print(f"[dim]{preview}[/dim]")
+        console.print(f"[dim]({len(adapted.parts[0])} chars)[/dim]")
+
+    console.print()
 
     # Confirm
     if not confirm:
-        proceed = typer.confirm("Publish this content?")
+        if adapted.is_thread:
+            proceed = typer.confirm(f"Publish as {len(adapted.parts)}-post thread?")
+        else:
+            proceed = typer.confirm("Publish this content?")
         if not proceed:
             console.print("[yellow]Cancelled.[/yellow]")
             raise typer.Exit(0)
@@ -468,50 +503,58 @@ def publish_draft(
         config.api_secret = os.getenv("TWITTER_API_SECRET")
         config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
 
-    # Parse images
-    image_list = None
-    if images:
-        image_list = [img.strip() for img in images.split(",")]
-        console.print(f"[dim]Including {len(image_list)} images[/dim]")
-
     try:
         connector = get_connector(target_platform, config)
 
         async def do_publish():
             await connector.connect()
 
-            # For Bluesky, we need to format the content appropriately
-            # Bluesky has 300 char limit, so we may need to truncate
-            publish_text = content.body
+            results = []
+            # Publish each part
+            for i, part in enumerate(adapted.parts):
+                # Only include images in first post
+                part_images = image_list if i == 0 else None
+                # Only include tags in last post (already added by adapter)
+                part_tags = None  # Tags are embedded in the text by adapter
 
-            # Add title if it fits
-            if content.title and len(content.title) + len(publish_text) + 2 < 300:
-                publish_text = f"{content.title}\n\n{publish_text}"
+                result = await connector.publish(
+                    content=part,
+                    tags=part_tags,
+                    images=part_images,
+                )
+                results.append(result)
 
-            # Truncate if needed (Bluesky limit is 300)
-            if len(publish_text) > 300:
-                publish_text = publish_text[:297] + "..."
+                if not result.success:
+                    return results
 
-            return await connector.publish(
-                content=publish_text,
-                tags=content.tags,
-                images=image_list,
-            )
+            return results
 
         with console.status("[bold cyan]Publishing...", spinner="dots"):
-            result = asyncio.run(do_publish())
+            results = asyncio.run(do_publish())
 
-        if result.success:
+        # Check results
+        all_success = all(r.success for r in results)
+
+        if all_success:
             console.print(f"\n[green]✅ Published successfully![/green]")
-            if result.post_url:
-                console.print(f"[bold]URL:[/bold] {result.post_url}")
-            console.print(f"[dim]Post ID: {result.post_id}[/dim]")
+            if adapted.is_thread:
+                console.print(f"[bold]Published {len(results)} posts as a thread[/bold]")
+            for i, result in enumerate(results):
+                if result.post_url:
+                    if len(results) > 1:
+                        console.print(f"[dim]Post {i+1}:[/dim] {result.post_url}")
+                    else:
+                        console.print(f"[bold]URL:[/bold] {result.post_url}")
 
             # Update content status in KB (mark as published)
             kb.save_content(content, status="published")
-            console.print(f"[dim]Content status updated to 'published'[/dim]")
+            console.print(f"\n[dim]Content status updated to 'published'[/dim]")
         else:
-            console.print(f"[red]❌ Failed to publish: {result.error}[/red]")
+            failed = [r for r in results if not r.success]
+            console.print(f"[red]❌ Failed to publish: {failed[0].error}[/red]")
+            if len(results) > 1:
+                success_count = sum(1 for r in results if r.success)
+                console.print(f"[yellow]Partial publish: {success_count}/{len(results)} posts succeeded[/yellow]")
             raise typer.Exit(1)
 
     except Exception as e:

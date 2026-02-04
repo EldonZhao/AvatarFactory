@@ -512,6 +512,7 @@ def publish_draft(
         config.extra = {
             "cookie": xhs_cookie,
             "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+            "b1": os.getenv("XIAOHONGSHU_B1"),
         }
 
     try:
@@ -668,6 +669,7 @@ def connect(
         config.extra = {
             "cookie": xhs_cookie,
             "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+            "b1": os.getenv("XIAOHONGSHU_B1"),
         }
 
     else:
@@ -726,6 +728,7 @@ def fetch(
         config.extra = {
             "cookie": os.getenv("XIAOHONGSHU_COOKIE"),
             "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+            "b1": os.getenv("XIAOHONGSHU_B1"),
         }
 
     try:
@@ -799,6 +802,7 @@ def publish(
         config.extra = {
             "cookie": os.getenv("XIAOHONGSHU_COOKIE"),
             "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
+            "b1": os.getenv("XIAOHONGSHU_B1"),
         }
 
     tag_list = [t.strip() for t in tags.split(",")] if tags else None

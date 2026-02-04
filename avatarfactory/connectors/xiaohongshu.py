@@ -79,16 +79,23 @@ class XiaohongshuConnector(BasePlatformConnector):
         try:
             from xhs.help import sign as xhs_sign
 
-            # Extract a1 from cookie for signing
+            # Extract a1 and b1 from config/cookie
             a1_value = ""
+            b1_value = ""
+
             if self._cookie:
+                import re
                 a1_match = re.search(r'a1=([^;]+)', self._cookie)
                 a1_value = a1_match.group(1) if a1_match else ""
+
+            # b1 can be passed in extra config
+            b1_value = self.config.extra.get("b1", "")
 
             # Wrapper to match expected signature (accepts any kwargs)
             def sign_wrapper(uri, data=None, **kwargs):
                 a1 = kwargs.get('a1', a1_value)
-                return xhs_sign(uri, data, a1=a1)
+                b1 = kwargs.get('b1', b1_value)
+                return xhs_sign(uri, data, a1=a1, b1=b1)
 
             return sign_wrapper
         except ImportError:
@@ -328,12 +335,13 @@ class XiaohongshuConnector(BasePlatformConnector):
                 data = self._xhs_client.get_note_by_keyword(
                     keyword=query,
                     page=1,
-                    page_size=min(limit, 40),
+                    page_size=min(limit, 20),
                 )
                 notes = data.get("items", [])
             else:
-                # Get home feed
-                data = self._xhs_client.get_home_feed(num=min(limit, 40))
+                # Get home feed (recommend feed)
+                from xhs import FeedType
+                data = self._xhs_client.get_home_feed(feed_type=FeedType.RECOMMEND)
                 notes = data.get("items", data.get("notes", []))
 
             results = []

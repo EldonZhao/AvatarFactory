@@ -122,12 +122,38 @@ class ContentAdapter:
         tags = content.tags[:self.limits.max_tags] if content.tags else []
         image_list = (images or [])[:self.limits.max_images]
 
-        # For platforms without title support, prepend title to body
-        if title and not self.limits.supports_title:
-            text = f"【{title}】\n\n{text}"
-            title = None  # Clear title since it's now in body
-
         original_length = len(text)
+
+        # For platforms without title support, use title as first post in thread
+        if title and not self.limits.supports_title and self.limits.supports_threads:
+            # Title becomes first post, body becomes replies
+            body_parts = self._split_into_thread(text, tags)
+            # Prepend title as first post (no thread indicator on title)
+            title_post = f"📌 {title}"
+            # Re-number the body parts starting from 2
+            total = len(body_parts) + 1
+            renumbered_parts = []
+            for i, part in enumerate(body_parts):
+                # Remove old numbering if present and add new
+                import re
+                part_text = re.sub(r'^\d+/\d+\s*🧵?\s*\n?', '', part)
+                if i < len(body_parts) - 1:
+                    renumbered_parts.append(f"{i+2}/{total} 🧵\n{part_text}")
+                else:
+                    renumbered_parts.append(f"{i+2}/{total}\n{part_text}")
+
+            all_parts = [title_post] + renumbered_parts
+            return AdaptedContent(
+                platform=self.platform,
+                parts=all_parts,
+                title=None,  # Title is now in parts
+                tags=tags,
+                images=image_list,
+                is_thread=True,
+                original_length=original_length,
+                adapted_length=sum(len(p) for p in all_parts),
+                truncated=False,
+            )
 
         # Check if content fits in single post
         if len(text) <= self.limits.max_text_length:

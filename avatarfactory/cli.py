@@ -25,6 +25,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
+from avatarfactory.agents.discovery import DiscoveryAgent
 from avatarfactory.core.knowledge_base import KnowledgeBase
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
@@ -534,6 +535,508 @@ def publish(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+# =============================================================================
+# Discovery Commands
+# =============================================================================
+
+def get_discovery_agent() -> DiscoveryAgent:
+    """Initialize discovery agent with LLM provider from environment."""
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb = KnowledgeBase(kb_path)
+
+    try:
+        provider = LLMProviderFactory.from_env()
+    except Exception as e:
+        console.print(f"[red]Error initializing LLM provider: {e}[/red]")
+        raise typer.Exit(1)
+
+    return DiscoveryAgent(knowledge_base=kb, llm_provider=provider)
+
+
+@app.command()
+def discover(
+    platform: str = typer.Argument("bluesky", help="Platform to discover from (bluesky, twitter)"),
+    persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Persona ID for targeted discovery"),
+    query: Optional[str] = typer.Option(None, "--query", "-q", help="Search query (uses persona keywords if not provided)"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Number of posts to analyze"),
+):
+    """
+    Discover trending content and analyze patterns.
+
+    This command fetches trending content, analyzes patterns, and generates
+    content ideas based on your persona.
+
+    Example:
+        avatarfactory discover bluesky --persona persona_xxx
+        avatarfactory discover twitter -q "AI productivity" -n 30
+    """
+    console.print(Panel.fit(
+        f"[bold cyan]Discovery Agent[/bold cyan]\n"
+        f"Platform: {platform}\n"
+        f"Persona: {persona_id or 'None (general discovery)'}\n"
+        f"Query: {query or 'Auto (from persona)'}",
+        border_style="cyan",
+    ))
+
+    agent = get_discovery_agent()
+
+    async def run_discovery():
+        if persona_id:
+            return await agent.discover_and_analyze(
+                persona_id=persona_id,
+                platform=platform,
+                query=query,
+                limit=limit,
+            )
+        else:
+            # Just fetch trending without full analysis
+            from avatarfactory.models.schemas import AgentMessage, TaskType
+            return await agent._discover_trending({
+                "platform": platform,
+                "query": query,
+                "limit": limit,
+            })
+
+    with console.status("[bold cyan]Discovering and analyzing content...", spinner="dots"):
+        result = asyncio.run(run_discovery())
+
+    if result.get("status") != "success":
+        console.print(f"[red]Error: {result.get('message')}[/red]")
+        raise typer.Exit(1)
+
+    data = result.get("data", {})
+
+    # Display trending content summary
+    if "contents" in data:
+        console.print(f"\n[green]Found {len(data['contents'])} trending posts[/green]")
+
+        table = Table(title="Top Trending Content")
+        table.add_column("Author", style="cyan")
+        table.add_column("Content", style="white", max_width=50)
+        table.add_column("Engagement", style="green")
+
+        for post in data["contents"][:10]:
+            body = post.get("body", "")[:80].replace("\n", " ")
+            engagement = f"❤️ {post.get('likes', 0)} 💬 {post.get('comments', 0)}"
+            table.add_row(f"@{post.get('author', '?')}", body, engagement)
+
+        console.print(table)
+
+    # Display pattern analysis
+    if "pattern_analysis" in data and data["pattern_analysis"]:
+        analysis = data["pattern_analysis"]
+        console.print("\n[bold]Pattern Analysis[/bold]")
+
+        if analysis.get("trending_topics"):
+            console.print(f"[yellow]Trending Topics:[/yellow] {', '.join(analysis['trending_topics'][:5])}")
+
+        if analysis.get("key_insights"):
+            console.print("\n[yellow]Key Insights:[/yellow]")
+            for insight in analysis["key_insights"][:5]:
+                console.print(f"  • {insight}")
+
+    # Display content ideas
+    if "ideas" in data and data["ideas"]:
+        console.print("\n[bold]Generated Content Ideas[/bold]")
+
+        for i, idea in enumerate(data["ideas"], 1):
+            console.print(f"\n[cyan]{i}. {idea.get('topic', 'Untitled')}[/cyan]")
+            console.print(f"   [dim]Angle:[/dim] {idea.get('angle', 'N/A')}")
+            if idea.get("hook"):
+                console.print(f"   [dim]Hook:[/dim] \"{idea['hook']}\"")
+            console.print(f"   [dim]Pillar:[/dim] {idea.get('suggested_pillar', 'N/A')} | [dim]Engagement:[/dim] {idea.get('estimated_engagement', 'medium')}")
+
+    # Display persona suggestions
+    if "persona_suggestions" in data and data["persona_suggestions"]:
+        console.print("\n[bold]Persona Optimization Suggestions[/bold]")
+        for suggestion in data["persona_suggestions"]:
+            console.print(f"  → {suggestion}")
+
+    console.print(f"\n[dim]{result.get('message', 'Discovery complete.')}[/dim]")
+
+
+@app.command()
+def inspire(
+    persona_id: str = typer.Argument(..., help="Persona ID to get inspiration for"),
+    platform: str = typer.Option("bluesky", "--platform", "-t", help="Platform to analyze"),
+    ideas: int = typer.Option(5, "--ideas", "-n", help="Number of ideas to generate"),
+):
+    """
+    Get content inspiration based on your persona and market trends.
+
+    This is a shortcut for the full discovery workflow focused on idea generation.
+
+    Example:
+        avatarfactory inspire persona_xxx
+        avatarfactory inspire persona_xxx --platform twitter --ideas 10
+    """
+    console.print(Panel.fit(
+        f"[bold cyan]Getting Inspiration[/bold cyan]\n"
+        f"Persona: {persona_id}\n"
+        f"Platform: {platform}",
+        border_style="cyan",
+    ))
+
+    agent = get_discovery_agent()
+
+    async def run_inspiration():
+        return await agent.discover_and_analyze(
+            persona_id=persona_id,
+            platform=platform,
+            limit=30,  # Fetch more for better analysis
+        )
+
+    with console.status("[bold cyan]Analyzing trends and generating ideas...", spinner="dots"):
+        result = asyncio.run(run_inspiration())
+
+    if result.get("status") != "success":
+        console.print(f"[red]Error: {result.get('message')}[/red]")
+        raise typer.Exit(1)
+
+    data = result.get("data", {})
+
+    console.print(f"\n[green]Analyzed {data.get('trending_count', 0)} trending posts[/green]")
+
+    # Focus on ideas
+    if "ideas" in data and data["ideas"]:
+        console.print("\n[bold cyan]Content Ideas for You[/bold cyan]")
+
+        for i, idea in enumerate(data["ideas"][:ideas], 1):
+            console.print(f"\n{'─' * 60}")
+            console.print(f"[bold]{i}. {idea.get('topic', 'Untitled')}[/bold]")
+            console.print(f"[yellow]Angle:[/yellow] {idea.get('angle', 'N/A')}")
+            if idea.get("hook"):
+                console.print(f"[yellow]Hook:[/yellow] \"{idea['hook']}\"")
+            console.print(f"[dim]Type: {idea.get('content_type', 'post')} | Pillar: {idea.get('suggested_pillar', 'N/A')}[/dim]")
+            if idea.get("reasoning"):
+                console.print(f"[dim]Why: {idea['reasoning']}[/dim]")
+
+    # Show suggestions
+    if "persona_suggestions" in data and data["persona_suggestions"]:
+        console.print(f"\n{'─' * 60}")
+        console.print("[bold]Tips to Improve Your Persona[/bold]")
+        for suggestion in data["persona_suggestions"]:
+            console.print(f"  💡 {suggestion}")
+
+
+# =============================================================================
+# Scheduler Commands
+# =============================================================================
+
+@app.command()
+def daemon(
+    action: str = typer.Argument(..., help="Action: start, stop, status"),
+):
+    """
+    Manage the background scheduler daemon.
+
+    Example:
+        avatarfactory daemon start
+        avatarfactory daemon status
+        avatarfactory daemon stop
+    """
+    from avatarfactory.scheduler import Scheduler, SchedulerConfig
+
+    config = SchedulerConfig(
+        data_dir=os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            "scheduler"
+        )
+    )
+    scheduler = Scheduler(config)
+
+    if action == "start":
+        console.print(Panel.fit(
+            "[bold cyan]Starting AvatarFactory Daemon[/bold cyan]\n"
+            "Press Ctrl+C to stop",
+            border_style="cyan",
+        ))
+
+        # Show scheduled tasks
+        tasks = scheduler.list_tasks()
+        if tasks:
+            console.print(f"\n[green]Scheduled Tasks ({len(tasks)}):[/green]")
+            for task in tasks:
+                status = "✓" if task.enabled else "○"
+                console.print(f"  {status} {task.name} ({task.schedule})")
+        else:
+            console.print("\n[yellow]No scheduled tasks. Use 'avatarfactory schedule add' to create tasks.[/yellow]")
+
+        queue = scheduler.get_publish_queue(status="pending")
+        if queue:
+            console.print(f"\n[green]Publish Queue: {len(queue)} pending[/green]")
+
+        console.print("\n[dim]Daemon running...[/dim]\n")
+
+        try:
+            scheduler.start(blocking=True)
+        except KeyboardInterrupt:
+            console.print("\n[cyan]Daemon stopped.[/cyan]")
+
+    elif action == "status":
+        status = scheduler.get_status()
+
+        table = Table(title="Scheduler Status")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Running", "Yes" if status["running"] else "No")
+        table.add_row("Total Tasks", str(status["tasks_count"]))
+        table.add_row("Enabled Tasks", str(status["enabled_tasks"]))
+        table.add_row("Queue Pending", str(status["queue_pending"]))
+        table.add_row("Queue Published", str(status["queue_published"]))
+
+        console.print(table)
+
+        # Show tasks
+        tasks = scheduler.list_tasks()
+        if tasks:
+            console.print("\n[bold]Scheduled Tasks:[/bold]")
+            for task in tasks:
+                status_icon = "✓" if task.enabled else "○"
+                last_run = task.last_run.strftime("%Y-%m-%d %H:%M") if task.last_run else "Never"
+                last_status = task.last_status or "N/A"
+                console.print(f"  {status_icon} [cyan]{task.name}[/cyan] ({task.schedule})")
+                console.print(f"      Last: {last_run} | Status: {last_status} | Runs: {task.run_count}")
+
+    elif action == "stop":
+        console.print("[yellow]Note: Daemon runs in foreground. Use Ctrl+C to stop.[/yellow]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available actions: start, status, stop")
+        raise typer.Exit(1)
+
+
+@app.command()
+def schedule(
+    action: str = typer.Argument(..., help="Action: add, remove, list, enable, disable"),
+    task_type: Optional[str] = typer.Option(None, "--type", "-t", help="Task type: discovery, content, publish, report"),
+    persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Persona ID"),
+    platform: Optional[str] = typer.Option(None, "--platform", help="Platform (bluesky, twitter)"),
+    cron: Optional[str] = typer.Option(None, "--cron", "-c", help="Cron schedule (e.g., '0 9 * * *')"),
+    task_id: Optional[str] = typer.Option(None, "--id", help="Task ID (for remove/enable/disable)"),
+):
+    """
+    Manage scheduled tasks.
+
+    Example:
+        avatarfactory schedule list
+        avatarfactory schedule add --type discovery --persona persona_xxx --cron "0 9 * * *"
+        avatarfactory schedule remove --id task_xxx
+        avatarfactory schedule enable --id task_xxx
+    """
+    from avatarfactory.scheduler import Scheduler, SchedulerConfig
+    from avatarfactory.scheduler.engine import ScheduledTask
+    import uuid
+
+    config = SchedulerConfig(
+        data_dir=os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            "scheduler"
+        )
+    )
+    scheduler = Scheduler(config)
+
+    if action == "list":
+        tasks = scheduler.list_tasks()
+
+        if not tasks:
+            console.print("[yellow]No scheduled tasks.[/yellow]")
+            console.print("Create one with: avatarfactory schedule add --type discovery --persona <id> --cron '0 9 * * *'")
+            return
+
+        table = Table(title="Scheduled Tasks")
+        table.add_column("ID", style="dim")
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="yellow")
+        table.add_column("Schedule", style="green")
+        table.add_column("Enabled", style="white")
+        table.add_column("Last Run", style="dim")
+
+        for task in tasks:
+            last_run = task.last_run.strftime("%m-%d %H:%M") if task.last_run else "-"
+            table.add_row(
+                task.id,
+                task.name,
+                task.task_type,
+                task.schedule,
+                "✓" if task.enabled else "○",
+                last_run,
+            )
+
+        console.print(table)
+
+    elif action == "add":
+        if not task_type:
+            console.print("[red]--type required (discovery, content, publish, report)[/red]")
+            raise typer.Exit(1)
+
+        if task_type in ("discovery", "content", "report") and not persona_id:
+            console.print(f"[red]--persona required for {task_type} tasks[/red]")
+            raise typer.Exit(1)
+
+        schedule_cron = cron or {
+            "discovery": "0 9 * * *",
+            "content": "0 10 * * *",
+            "publish": "0 12 * * *",
+            "report": "0 18 * * 5",
+        }.get(task_type, "0 9 * * *")
+
+        task = ScheduledTask(
+            id=f"task_{uuid.uuid4().hex[:8]}",
+            name=f"{task_type.capitalize()} - {persona_id or 'all'}",
+            task_type=task_type,
+            schedule=schedule_cron,
+            persona_id=persona_id,
+            platform=platform or "bluesky",
+        )
+
+        scheduler.add_task(task)
+        console.print(f"[green]Created task: {task.name}[/green]")
+        console.print(f"  ID: {task.id}")
+        console.print(f"  Schedule: {task.schedule}")
+
+    elif action == "remove":
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.remove_task(task_id):
+            console.print(f"[green]Removed task: {task_id}[/green]")
+        else:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+
+    elif action == "enable":
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.enable_task(task_id):
+            console.print(f"[green]Enabled task: {task_id}[/green]")
+        else:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+
+    elif action == "disable":
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.disable_task(task_id):
+            console.print(f"[yellow]Disabled task: {task_id}[/yellow]")
+        else:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available: add, remove, list, enable, disable")
+        raise typer.Exit(1)
+
+
+@app.command()
+def queue(
+    action: str = typer.Argument(..., help="Action: add, remove, list"),
+    content_id: Optional[str] = typer.Option(None, "--content", "-c", help="Content ID to queue"),
+    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Target platform"),
+    schedule_time: Optional[str] = typer.Option(None, "--time", "-t", help="Schedule time (ISO format or 'now')"),
+    item_id: Optional[str] = typer.Option(None, "--id", help="Queue item ID (for remove)"),
+):
+    """
+    Manage the publish queue.
+
+    Example:
+        avatarfactory queue list
+        avatarfactory queue add --content content_xxx --platform bluesky
+        avatarfactory queue add --content content_xxx --platform bluesky --time "2024-01-15T10:00:00"
+        avatarfactory queue remove --id pub_xxx
+    """
+    from avatarfactory.scheduler import Scheduler, SchedulerConfig
+    from datetime import datetime
+
+    config = SchedulerConfig(
+        data_dir=os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            "scheduler"
+        )
+    )
+    scheduler = Scheduler(config)
+
+    if action == "list":
+        queue_items = scheduler.get_publish_queue()
+
+        if not queue_items:
+            console.print("[yellow]Publish queue is empty.[/yellow]")
+            return
+
+        table = Table(title="Publish Queue")
+        table.add_column("ID", style="dim")
+        table.add_column("Content", style="cyan")
+        table.add_column("Platform", style="yellow")
+        table.add_column("Scheduled", style="green")
+        table.add_column("Status", style="white")
+
+        for item in queue_items:
+            scheduled = item.scheduled_time.strftime("%m-%d %H:%M") if item.scheduled_time else "ASAP"
+            status_style = {
+                "pending": "yellow",
+                "published": "green",
+                "failed": "red",
+            }.get(item.status, "white")
+
+            table.add_row(
+                item.id,
+                item.content_id,
+                item.platform,
+                scheduled,
+                f"[{status_style}]{item.status}[/{status_style}]",
+            )
+
+        console.print(table)
+
+    elif action == "add":
+        if not content_id:
+            console.print("[red]--content required[/red]")
+            raise typer.Exit(1)
+
+        if not platform:
+            console.print("[red]--platform required (bluesky, twitter)[/red]")
+            raise typer.Exit(1)
+
+        scheduled_dt = None
+        if schedule_time and schedule_time != "now":
+            try:
+                scheduled_dt = datetime.fromisoformat(schedule_time)
+            except ValueError:
+                console.print(f"[red]Invalid time format: {schedule_time}[/red]")
+                console.print("Use ISO format: 2024-01-15T10:00:00")
+                raise typer.Exit(1)
+
+        item = scheduler.queue_publish(
+            content_id=content_id,
+            platform=platform,
+            scheduled_time=scheduled_dt,
+        )
+
+        console.print(f"[green]Added to publish queue[/green]")
+        console.print(f"  ID: {item.id}")
+        console.print(f"  Scheduled: {scheduled_dt or 'ASAP'}")
+
+    elif action == "remove":
+        if not item_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        if scheduler.remove_from_queue(item_id):
+            console.print(f"[green]Removed from queue: {item_id}[/green]")
+        else:
+            console.print(f"[red]Item not found: {item_id}[/red]")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available: add, remove, list")
         raise typer.Exit(1)
 
 

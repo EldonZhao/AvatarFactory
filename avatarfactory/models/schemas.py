@@ -52,6 +52,9 @@ class TaskType(str, Enum):
     REVIEW_CONTENT = "review_content"
     PREDICT_ENGAGEMENT = "predict_engagement"
     ANALYZE_DATA = "analyze_data"
+    DISCOVER_TRENDING = "discover_trending"
+    ANALYZE_PATTERNS = "analyze_patterns"
+    GET_INSPIRATION = "get_inspiration"
 
 
 # ============================================================================
@@ -350,3 +353,120 @@ class Intent(BaseModel):
     )
     parameters: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = Field(default=1.0, ge=0, le=1)
+
+
+# ============================================================================
+# Discovery Models
+# ============================================================================
+
+
+class TrendingContent(BaseModel):
+    """Trending content fetched from social platforms"""
+
+    id: str = Field(..., description="Unique ID for this trending content")
+    platform: str = Field(..., description="Source platform")
+    post_id: str = Field(..., description="Original post ID on platform")
+
+    author: str = Field(..., description="Author username/handle")
+    author_id: Optional[str] = None
+
+    title: Optional[str] = None
+    body: str = Field(..., description="Content body/text")
+
+    likes: int = Field(default=0)
+    comments: int = Field(default=0)
+    shares: int = Field(default=0)
+    views: int = Field(default=0)
+
+    tags: List[str] = Field(default_factory=list)
+    url: Optional[str] = None
+    published_at: Optional[datetime] = None
+    fetched_at: datetime = Field(default_factory=datetime.now)
+
+    # Analysis results
+    relevance_score: Optional[float] = None  # How relevant to persona
+    pattern_tags: List[str] = Field(default_factory=list)  # Identified patterns
+
+
+class ContentPattern(BaseModel):
+    """Identified pattern in successful content"""
+
+    pattern_type: str = Field(..., description="Type: hook/structure/topic/style")
+    name: str = Field(..., description="Pattern name")
+    description: str = Field(..., description="Pattern description")
+    examples: List[str] = Field(default_factory=list, description="Example content IDs")
+    frequency: int = Field(default=1, description="How often this pattern appears")
+    avg_engagement: float = Field(default=0.0, description="Average engagement score")
+
+
+class ContentPatternAnalysis(BaseModel):
+    """Analysis of content patterns from trending content"""
+
+    analyzed_at: datetime = Field(default_factory=datetime.now)
+    platform: str
+    query: Optional[str] = None
+    content_count: int = Field(default=0)
+
+    # Identified patterns
+    hook_patterns: List[ContentPattern] = Field(default_factory=list)
+    structure_patterns: List[ContentPattern] = Field(default_factory=list)
+    topic_patterns: List[ContentPattern] = Field(default_factory=list)
+    style_patterns: List[ContentPattern] = Field(default_factory=list)
+
+    # Trending topics
+    trending_topics: List[str] = Field(default_factory=list)
+    trending_hashtags: List[str] = Field(default_factory=list)
+
+    # Summary insights
+    key_insights: List[str] = Field(default_factory=list)
+
+
+class ContentIdea(BaseModel):
+    """Content idea generated from discovery analysis"""
+
+    id: str = Field(..., description="Unique idea ID")
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    topic: str = Field(..., description="Suggested topic")
+    angle: str = Field(..., description="Unique angle/perspective")
+    hook: Optional[str] = None  # Suggested hook
+
+    content_type: str = Field(default="post", description="post/thread/story/etc")
+    suggested_pillar: Optional[str] = None  # Which persona pillar this fits
+
+    reference_contents: List[str] = Field(
+        default_factory=list, description="IDs of inspiring trending content"
+    )
+
+    estimated_engagement: str = Field(
+        default="medium", description="low/medium/high"
+    )
+    reasoning: str = Field(default="", description="Why this idea could work")
+
+    # Status tracking
+    status: str = Field(default="new", description="new/saved/used/discarded")
+
+
+class DiscoveryReport(BaseModel):
+    """Discovery session report"""
+
+    id: str = Field(..., description="Report ID")
+    persona_id: str
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    platforms_searched: List[str] = Field(default_factory=list)
+    queries_used: List[str] = Field(default_factory=list)
+
+    # Results
+    trending_content_count: int = Field(default=0)
+    patterns_found: int = Field(default=0)
+    ideas_generated: int = Field(default=0)
+
+    # Pattern analysis
+    pattern_analysis: Optional[ContentPatternAnalysis] = None
+
+    # Generated ideas
+    content_ideas: List[ContentIdea] = Field(default_factory=list)
+
+    # Persona optimization suggestions
+    persona_suggestions: List[str] = Field(default_factory=list)

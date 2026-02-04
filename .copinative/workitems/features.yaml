@@ -42,10 +42,11 @@ features:
     priority: high
     status: in-progress
     createdAt: '2026-02-04T11:51:00.132Z'
-    updatedAt: '2026-02-04T14:59:51.430Z'
+    updatedAt: '2026-02-04T15:07:46.600Z'
     completedAt: '2026-02-04T12:21:34.263Z'
     linkedPRs:
       - https://github.com/EldonZhao/AvatarFactory/pull/1
+      - https://github.com/EldonZhao/AvatarFactory/pull/4
       - https://github.com/EldonZhao/AvatarFactory/pull/4
   - id: feat-002
     title: Long-Running 后台服务与通知系统

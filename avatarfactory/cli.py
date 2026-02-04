@@ -509,25 +509,27 @@ def publish_draft(
         async def do_publish():
             await connector.connect()
 
-            results = []
-            # Publish each part
-            for i, part in enumerate(adapted.parts):
-                # Only include images in first post
-                part_images = image_list if i == 0 else None
-                # Only include tags in last post (already added by adapter)
-                part_tags = None  # Tags are embedded in the text by adapter
-
-                result = await connector.publish(
-                    content=part,
-                    tags=part_tags,
-                    images=part_images,
+            # Use publish_thread for threads if connector supports it
+            if adapted.is_thread and hasattr(connector, 'publish_thread'):
+                # Use the dedicated thread publishing method
+                results = await connector.publish_thread(
+                    posts=adapted.parts,
+                    images=image_list if image_list else None,
                 )
-                results.append(result)
-
-                if not result.success:
-                    return results
-
-            return results
+                return results
+            else:
+                # Fallback: publish each part separately (no reply chain)
+                results = []
+                for i, part in enumerate(adapted.parts):
+                    part_images = image_list if i == 0 else None
+                    result = await connector.publish(
+                        content=part,
+                        images=part_images,
+                    )
+                    results.append(result)
+                    if not result.success:
+                        return results
+                return results
 
         with console.status("[bold cyan]Publishing...", spinner="dots"):
             results = asyncio.run(do_publish())

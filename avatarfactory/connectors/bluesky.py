@@ -143,6 +143,7 @@ class BlueskyConnector(BasePlatformConnector):
         images: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
         alt_texts: Optional[List[str]] = None,
+        reply_to: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> PublishResult:
         """
@@ -154,6 +155,7 @@ class BlueskyConnector(BasePlatformConnector):
             images: List of image file paths (max 4)
             tags: Hashtags to append
             alt_texts: Alt text for each image
+            reply_to: Reply reference dict with 'uri' and 'cid' of parent post
         """
         if not self.is_connected():
             return PublishResult(
@@ -178,6 +180,21 @@ class BlueskyConnector(BasePlatformConnector):
                 "text": post_text[:300],  # Bluesky limit is 300 chars
                 "createdAt": now,
             }
+
+            # Add reply reference if this is a reply
+            if reply_to and reply_to.get("uri") and reply_to.get("cid"):
+                # For a thread, we need both root and parent references
+                root = reply_to.get("root", reply_to)  # First post is root
+                record["reply"] = {
+                    "root": {
+                        "uri": root.get("uri"),
+                        "cid": root.get("cid"),
+                    },
+                    "parent": {
+                        "uri": reply_to.get("uri"),
+                        "cid": reply_to.get("cid"),
+                    },
+                }
 
             # Upload and attach images if provided
             if images:
@@ -213,6 +230,7 @@ class BlueskyConnector(BasePlatformConnector):
                 if response.status_code == 200:
                     data = response.json()
                     uri = data.get("uri", "")
+                    cid = data.get("cid", "")
                     parts = uri.split("/")
                     post_id = parts[-1] if parts else ""
                     handle = self.config.username
@@ -223,7 +241,7 @@ class BlueskyConnector(BasePlatformConnector):
                         post_url=f"https://bsky.app/profile/{handle}/post/{post_id}",
                         platform=self.platform_name,
                         published_at=datetime.utcnow(),
-                        raw_response=data,
+                        raw_response={"uri": uri, "cid": cid, **data},
                     )
                 else:
                     error = response.json().get("message", "Unknown error")
@@ -239,6 +257,75 @@ class BlueskyConnector(BasePlatformConnector):
                 error=str(e),
                 platform=self.platform_name,
             )
+
+    async def publish_thread(
+        self,
+        posts: List[str],
+        images: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+    ) -> List[PublishResult]:
+        """
+        Publish a thread of connected posts.
+
+        Args:
+            posts: List of post texts (each max 300 chars)
+            images: Images to attach to first post only
+            tags: Tags (usually already in last post text)
+
+        Returns:
+            List of PublishResult for each post in thread
+        """
+        if not self.is_connected():
+            return [PublishResult(
+                success=False,
+                error="Not connected to Bluesky",
+                platform=self.platform_name,
+            )]
+
+        results = []
+        root_ref = None  # Reference to first post (thread root)
+        parent_ref = None  # Reference to previous post
+
+        for i, post_text in enumerate(posts):
+            # Only attach images to first post
+            post_images = images if i == 0 else None
+
+            # Build reply reference for posts after the first
+            reply_to = None
+            if parent_ref:
+                reply_to = {
+                    "uri": parent_ref["uri"],
+                    "cid": parent_ref["cid"],
+                    "root": root_ref,  # Always reference the root
+                }
+
+            result = await self.publish(
+                content=post_text,
+                images=post_images,
+                reply_to=reply_to,
+            )
+
+            results.append(result)
+
+            if not result.success:
+                # Stop on first failure
+                break
+
+            # Extract uri and cid for next post's reply reference
+            raw = result.raw_response or {}
+            current_ref = {
+                "uri": raw.get("uri"),
+                "cid": raw.get("cid"),
+            }
+
+            # First post becomes the root
+            if i == 0:
+                root_ref = current_ref
+
+            # Current post becomes parent for next post
+            parent_ref = current_ref
+
+        return results
 
     def _extract_images_from_embed(self, embed: Dict[str, Any]) -> List[str]:
         """Extract image URLs from post embed."""

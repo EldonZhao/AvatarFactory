@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  avatarfactory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: avatarfactory:latest
+    container_name: avatarfactory
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist knowledge data
+      - ./knowledges:/app/knowledges
+      # Optionally mount custom config
+      # - ./config:/app/config:ro
+    env_file:
+      - .env
+    environment:
+      - AVATARFACTORY_KB_PATH=/app/knowledges
+      # Uncomment and set your LLM provider
+      # - AVATARFACTORY_LLM_PROVIDER=anthropic
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Run scheduler only (for distributed deployments)
+  # avatarfactory-scheduler:
+  #   build: .
+  #   container_name: avatarfactory-scheduler
+  #   command: ["python", "-m", "avatarfactory.daemon_runner", "--mode", "scheduler"]
+  #   volumes:
+  #     - ./knowledges:/app/knowledges
+  #   env_file:
+  #     - .env
+  #   restart: unless-stopped
+
+volumes:
+  knowledges:

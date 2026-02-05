@@ -17,8 +17,11 @@ from avatarfactory.connectors.base import (
     FetchResult,
     PublishResult,
 )
+from avatarfactory.connectors.registry import ConnectorRegistry
 
 
+@ConnectorRegistry.register_decorator("bluesky")
+@ConnectorRegistry.register_decorator("bsky")
 class BlueskyConnector(BasePlatformConnector):
     """Bluesky platform connector using AT Protocol"""
 

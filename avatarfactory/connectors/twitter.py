@@ -15,8 +15,11 @@ from avatarfactory.connectors.base import (
     FetchResult,
     PublishResult,
 )
+from avatarfactory.connectors.registry import ConnectorRegistry
 
 
+@ConnectorRegistry.register_decorator("twitter")
+@ConnectorRegistry.register_decorator("x")
 class TwitterConnector(BasePlatformConnector):
     """Twitter/X platform connector using API v2"""
 

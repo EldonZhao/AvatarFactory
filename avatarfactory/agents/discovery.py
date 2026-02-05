@@ -636,14 +636,24 @@ Return ONLY a JSON array of suggestion strings:
         if inspiration_result.get("status") != "success":
             return inspiration_result
 
+        # Build result data
+        result_data = {
+            "trending_count": len(contents),
+            "pattern_analysis": pattern_analysis,
+            "ideas": inspiration_result["data"]["ideas"],
+            "persona_suggestions": inspiration_result["data"]["persona_suggestions"],
+            "report": inspiration_result["data"]["report"],
+        }
+
+        # Step 4: Save results to knowledge base for ContentAgent to read
+        try:
+            self.kb.save_discovery_results(persona_id, platform, result_data)
+            self.log("INFO", f"Saved discovery results to KB for {persona_id}/{platform}")
+        except Exception as e:
+            self.log("WARNING", f"Failed to save discovery results: {e}")
+
         return {
             "status": "success",
-            "data": {
-                "trending_count": len(contents),
-                "pattern_analysis": pattern_analysis,
-                "ideas": inspiration_result["data"]["ideas"],
-                "persona_suggestions": inspiration_result["data"]["persona_suggestions"],
-                "report": inspiration_result["data"]["report"],
-            },
+            "data": result_data,
             "message": f"Discovered {len(contents)} trending posts, analyzed patterns, generated {len(inspiration_result['data']['ideas'])} content ideas.",
         }

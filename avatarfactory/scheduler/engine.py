@@ -23,7 +23,7 @@ class SchedulerConfig(BaseModel):
     """Scheduler configuration."""
 
     # Persistence
-    data_dir: str = Field(default="./knowledge_base/scheduler")
+    data_dir: str = Field(default="./knowledges/scheduler")
 
     # Default schedules (cron expressions)
     discovery_schedule: str = Field(
@@ -291,7 +291,22 @@ class Scheduler:
         except Exception as e:
             logger.error(f"Failed to schedule task {task.id}: {e}")
 
-    async def _run_task(self, task_id: str) -> None:
+    def _run_task(self, task_id: str) -> None:
+        """Execute a scheduled task (synchronous wrapper)."""
+        import asyncio
+
+        # Run the async task in a new event loop
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._run_task_async(task_id))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error running task {task_id}: {e}")
+
+    async def _run_task_async(self, task_id: str) -> None:
         """Execute a scheduled task."""
         task = self._tasks.get(task_id)
         if not task or not task.enabled:
@@ -408,7 +423,7 @@ class Scheduler:
     def start(self, blocking: bool = True) -> None:
         """Start the scheduler."""
         try:
-            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            from apscheduler.schedulers.background import BackgroundScheduler
         except ImportError:
             raise ImportError("apscheduler required. Install with: pip install apscheduler")
 
@@ -416,7 +431,7 @@ class Scheduler:
             logger.warning("Scheduler is already running")
             return
 
-        self._scheduler = AsyncIOScheduler()
+        self._scheduler = BackgroundScheduler()
 
         # Schedule all enabled tasks
         for task in self._tasks.values():
@@ -444,11 +459,14 @@ class Scheduler:
                 sys.exit(0)
 
             signal.signal(signal.SIGINT, signal_handler)
-            signal.signal(signal.SIGTERM, signal_handler)
+            if hasattr(signal, 'SIGTERM'):
+                signal.signal(signal.SIGTERM, signal_handler)
 
-            # Keep running
+            # Keep running - use a simple loop that works with AsyncIOScheduler
             try:
-                asyncio.get_event_loop().run_forever()
+                import time
+                while self._running:
+                    time.sleep(1)
             except KeyboardInterrupt:
                 self.stop()
 

@@ -53,7 +53,7 @@ async def run_discovery_task(task: ScheduledTask) -> Dict[str, Any]:
     - query: str (optional)
     """
     from avatarfactory.agents.discovery import DiscoveryAgent
-    from avatarfactory.core.knowledge_base import KnowledgeBase
+    from avatarfactory.core.knowledges import KnowledgeBase
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     persona_id = task.persona_id
@@ -64,7 +64,7 @@ async def run_discovery_task(task: ScheduledTask) -> Dict[str, Any]:
     if not persona_id:
         return {"success": False, "error": "persona_id required for discovery"}
 
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
     provider = LLMProviderFactory.from_env()
 
@@ -100,7 +100,7 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
     - count: int (default: 1)
     """
     from avatarfactory.agents.orchestrator import OrchestratorAgent
-    from avatarfactory.core.knowledge_base import KnowledgeBase
+    from avatarfactory.core.knowledges import KnowledgeBase
     from avatarfactory.core.llm_provider import LLMProviderFactory
     from avatarfactory.models.schemas import AgentMessage
 
@@ -111,7 +111,7 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
     if not persona_id:
         return {"success": False, "error": "persona_id required for content generation"}
 
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
     provider = LLMProviderFactory.from_env()
 
@@ -172,13 +172,13 @@ async def run_report_task(task: ScheduledTask) -> Dict[str, Any]:
     Expected task params:
     - persona_id: str
     """
-    from avatarfactory.core.knowledge_base import KnowledgeBase
+    from avatarfactory.core.knowledges import KnowledgeBase
 
     persona_id = task.persona_id
     if not persona_id:
         return {"success": False, "error": "persona_id required for report"}
 
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     # Get statistics
@@ -214,6 +214,98 @@ async def run_report_task(task: ScheduledTask) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Proactive Task Runners
+# =============================================================================
+
+
+def _get_proactive_orchestrator():
+    """Get a ProactiveOrchestrator instance for task execution."""
+    import os
+    from avatarfactory.agents.proactive_orchestrator import ProactiveOrchestrator
+    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.llm_provider import LLMProviderFactory
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+    provider = LLMProviderFactory.from_env()
+
+    return ProactiveOrchestrator(knowledge_base=kb, llm_provider=provider)
+
+
+@TaskRegistry.register("proactive_trending")
+async def run_proactive_trending(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run proactive trending scan task.
+
+    Expected task params:
+    - persona_id: str
+    - platforms: List[str] (optional, defaults to ["bluesky"])
+    """
+    orchestrator = _get_proactive_orchestrator()
+    persona_id = task.persona_id
+
+    if not persona_id:
+        return {"success": False, "error": "persona_id required for trending scan"}
+
+    platforms = task.extra_params.get("platforms", [task.platform or "bluesky"])
+    result = await orchestrator.run_trending_scan(persona_id, platforms)
+
+    return {
+        "success": result.get("status") == "success",
+        "platforms": platforms,
+        "results": result.get("results", {}),
+    }
+
+
+@TaskRegistry.register("proactive_content")
+async def run_proactive_content(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run proactive content suggestions task.
+
+    Expected task params:
+    - persona_id: str
+    - count: int (optional, defaults to 3)
+    """
+    orchestrator = _get_proactive_orchestrator()
+    persona_id = task.persona_id
+
+    if not persona_id:
+        return {"success": False, "error": "persona_id required for content suggestions"}
+
+    count = task.extra_params.get("count", 3)
+    result = await orchestrator.generate_content_suggestions(persona_id, count)
+
+    return {
+        "success": result.get("status") == "success",
+        "suggestions": result.get("suggestions", []),
+    }
+
+
+@TaskRegistry.register("proactive_optimize")
+async def run_proactive_optimize(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run proactive persona optimization task.
+
+    Expected task params:
+    - persona_id: str
+    """
+    orchestrator = _get_proactive_orchestrator()
+    persona_id = task.persona_id
+
+    if not persona_id:
+        return {"success": False, "error": "persona_id required for optimization"}
+
+    feedback = task.extra_params.get("feedback", {})
+    result = await orchestrator.run_persona_optimization(persona_id, feedback)
+
+    return {
+        "success": result.get("status") == "success",
+        "suggestions": result.get("suggestions", []),
+        "requires_human_review": result.get("requires_human_review", True),
+    }
+
+
+# =============================================================================
 # Publish Content Helper
 # =============================================================================
 
@@ -230,9 +322,9 @@ async def publish_content(item: PublishQueueItem) -> Dict[str, Any]:
     """
     import os
     from avatarfactory.connectors import ConnectorConfig, get_connector
-    from avatarfactory.core.knowledge_base import KnowledgeBase
+    from avatarfactory.core.knowledges import KnowledgeBase
 
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     # Load content

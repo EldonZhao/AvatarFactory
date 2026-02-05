@@ -39,7 +39,11 @@
       "Bash(pip install:*)",
       "Bash(python -m avatarfactory.cli:*)",
       "Bash(dir:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(pip show:*)",
+      "Bash(playwright install:*)",
+      "WebSearch",
+      "Bash(avatarfactory fetch:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\xueyongzhao\\AvatarFactory\\avatarfactory"

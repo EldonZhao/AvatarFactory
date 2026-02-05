@@ -27,7 +27,7 @@ from avatarfactory.models.schemas import (
 class KnowledgeBase:
     """Knowledge base for storing and retrieving all AvatarFactory data"""
 
-    def __init__(self, base_path: str = "./knowledge_base"):
+    def __init__(self, base_path: str = "./knowledges"):
         self.base_path = Path(base_path)
         self._ensure_structure()
 
@@ -366,3 +366,87 @@ class KnowledgeBase:
             "published_contents": len(self.list_content(status="published")),
             "total_experiments": len(self.list_experiments()),
         }
+
+    # ========================================================================
+    # Discovery Results (Trending Data)
+    # ========================================================================
+
+    def save_discovery_results(
+        self,
+        persona_id: str,
+        platform: str,
+        results: Dict[str, Any],
+    ) -> None:
+        """
+        Save discovery/trending results for a persona.
+
+        Args:
+            persona_id: Persona ID
+            platform: Platform name (e.g., "bluesky", "twitter")
+            results: Discovery results including patterns and ideas
+        """
+        persona_dir = self.base_path / "personas" / persona_id
+        discovery_dir = persona_dir / "discovery"
+        discovery_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save platform-specific results
+        result_path = discovery_dir / f"{platform}.json"
+        data = {
+            "platform": platform,
+            "updated_at": datetime.now().isoformat(),
+            **results,
+        }
+        with open(result_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def get_latest_discovery(
+        self,
+        persona_id: str,
+        platform: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get latest discovery results for a persona.
+
+        Args:
+            persona_id: Persona ID
+            platform: Platform name (optional, returns first available if not specified)
+
+        Returns:
+            Discovery results or None if not found
+        """
+        persona_dir = self.base_path / "personas" / persona_id
+        discovery_dir = persona_dir / "discovery"
+
+        if not discovery_dir.exists():
+            return None
+
+        if platform:
+            result_path = discovery_dir / f"{platform}.json"
+            if result_path.exists():
+                with open(result_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            return None
+        else:
+            # Return first available platform's results
+            for result_path in discovery_dir.glob("*.json"):
+                with open(result_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            return None
+
+    def list_discovery_platforms(self, persona_id: str) -> List[str]:
+        """
+        List platforms with discovery results for a persona.
+
+        Args:
+            persona_id: Persona ID
+
+        Returns:
+            List of platform names
+        """
+        persona_dir = self.base_path / "personas" / persona_id
+        discovery_dir = persona_dir / "discovery"
+
+        if not discovery_dir.exists():
+            return []
+
+        return [p.stem for p in discovery_dir.glob("*.json")]

@@ -112,7 +112,25 @@ class TwitterAdapter(BasePlatformAdapter):
 
         current_tweet = ""
         for para in paragraphs:
-            if len(current_tweet) + len(para) + 2 <= max_length:
+            # If single paragraph is longer than max_length, split it by sentences/words
+            if len(para) > max_length:
+                # First, flush current tweet
+                if current_tweet:
+                    tweets.append(current_tweet.strip())
+                    current_tweet = ""
+                # Split long paragraph by sentences or words
+                words = para.split()
+                chunk = ""
+                for word in words:
+                    if len(chunk) + len(word) + 1 <= max_length:
+                        chunk += (" " + word) if chunk else word
+                    else:
+                        if chunk:
+                            tweets.append(chunk.strip())
+                        chunk = word
+                if chunk:
+                    current_tweet = chunk
+            elif len(current_tweet) + len(para) + 2 <= max_length:
                 current_tweet += (para + "\n\n") if current_tweet else para
             else:
                 if current_tweet:

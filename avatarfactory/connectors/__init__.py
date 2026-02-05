@@ -16,6 +16,10 @@ from avatarfactory.connectors.base import (
     PublishResult,
     FetchResult,
 )
+from avatarfactory.connectors.registry import ConnectorRegistry
+
+# Import connectors to trigger registration
+from avatarfactory.connectors import twitter, bluesky, xiaohongshu, wecom
 
 __all__ = [
     "BasePlatformConnector",
@@ -23,7 +27,9 @@ __all__ = [
     "ConnectionStatus",
     "PublishResult",
     "FetchResult",
+    "ConnectorRegistry",
     "get_connector",
+    "list_platforms",
 ]
 
 
@@ -31,8 +37,11 @@ def get_connector(platform: str, config: ConnectorConfig) -> BasePlatformConnect
     """
     Get platform connector instance.
 
+    This is a convenience function that delegates to ConnectorRegistry.
+    For more control, use ConnectorRegistry directly.
+
     Args:
-        platform: Platform name (twitter, bluesky, etc.)
+        platform: Platform name (twitter, bluesky, xiaohongshu, xhs, etc.)
         config: Connector configuration
 
     Returns:
@@ -43,17 +52,14 @@ def get_connector(platform: str, config: ConnectorConfig) -> BasePlatformConnect
         connector = get_connector("twitter", config)
         await connector.connect()
     """
-    from avatarfactory.connectors.twitter import TwitterConnector
-    from avatarfactory.connectors.bluesky import BlueskyConnector
+    return ConnectorRegistry.create_connector(platform, config)
 
-    connectors = {
-        "twitter": TwitterConnector,
-        "bluesky": BlueskyConnector,
-    }
 
-    connector_class = connectors.get(platform.lower())
-    if not connector_class:
-        available = ", ".join(connectors.keys())
-        raise ValueError(f"Unknown platform: {platform}. Available: {available}")
+def list_platforms() -> list:
+    """
+    List all available platform names.
 
-    return connector_class(config)
+    Returns:
+        List of registered platform names
+    """
+    return ConnectorRegistry.list_platforms()

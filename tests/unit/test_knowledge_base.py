@@ -3,7 +3,7 @@ Basic functionality tests for AvatarFactory.
 """
 
 import pytest
-from avatarfactory.core.knowledge_base import KnowledgeBase
+from avatarfactory.core.knowledges import KnowledgeBase
 from avatarfactory.models.schemas import (
     Boundaries,
     ContentPillar,

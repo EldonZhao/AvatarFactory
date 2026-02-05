@@ -17,10 +17,13 @@ class XiaohongshuAdapter(BasePlatformAdapter):
     def get_content_guidelines(self) -> Dict[str, Any]:
         """Get Xiaohongshu content guidelines"""
         return {
+            "title_max_length": 60,
             "title_style": "Catchy, emoji-rich, curiosity-driven",
             "body_length": {"min": 200, "max": 1000, "optimal": 500},
             "tone": "Friendly, personal, authentic",
             "structure": "Short paragraphs, lists, emojis between sections",
+            "emoji_density": "Every 1-2 sentences",
+            "image_count": {"min": 3, "max": 9, "optimal": 6},
             "formatting": {
                 "use_emojis": True,
                 "emoji_frequency": "Every 1-2 sentences",
@@ -73,7 +76,10 @@ class XiaohongshuAdapter(BasePlatformAdapter):
             warnings.append("Consider adding emojis for better engagement on XHS")
 
         # Check title length
-        if len(content.title) > 20:
+        title_max = guidelines["title_max_length"]
+        if len(content.title) > title_max:
+            issues.append(f"Title too long ({len(content.title)} chars, max {title_max})")
+        elif len(content.title) > 20:
             warnings.append("Title may be too long, consider shortening for mobile display")
 
         # Check for external links
@@ -105,6 +111,7 @@ class XiaohongshuAdapter(BasePlatformAdapter):
                 "content_id": content.id,
                 "pillar": content.pillar,
                 "content_type": "note",
+                "suggested_image_count": 6,
                 "posting_tips": [
                     "Add 3-6 high-quality images",
                     "Use relevant topic tags",

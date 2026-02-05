@@ -1022,16 +1022,26 @@ def inspire(
 @app.command()
 def daemon(
     action: str = typer.Argument(..., help="Action: start, stop, status"),
+    background: bool = typer.Option(False, "--background", "-b", help="Run daemon in background"),
 ):
     """
     Manage the background scheduler daemon.
 
     Example:
-        avatarfactory daemon start
+        avatarfactory daemon start              # Run in foreground
+        avatarfactory daemon start --background # Run in background
         avatarfactory daemon status
         avatarfactory daemon stop
     """
+    import subprocess
+    import sys
     from avatarfactory.scheduler import Scheduler, SchedulerConfig
+
+    pid_file = os.path.join(
+        os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+        "scheduler",
+        "daemon.pid"
+    )
 
     config = SchedulerConfig(
         data_dir=os.path.join(
@@ -1042,6 +1052,61 @@ def daemon(
     scheduler = Scheduler(config)
 
     if action == "start":
+        if background:
+            # Check if already running
+            if os.path.exists(pid_file):
+                try:
+                    with open(pid_file, "r") as f:
+                        old_pid = int(f.read().strip())
+                    # Check if process is still running (Windows-compatible)
+                    import signal
+                    try:
+                        os.kill(old_pid, 0)
+                        console.print(f"[yellow]Daemon already running (PID: {old_pid})[/yellow]")
+                        console.print("Use 'avatarfactory daemon stop' to stop it first.")
+                        return
+                    except OSError:
+                        # Process not running, remove stale PID file
+                        os.remove(pid_file)
+                except (ValueError, FileNotFoundError):
+                    pass
+
+            # Start daemon in background
+            console.print("[cyan]Starting daemon in background...[/cyan]")
+
+            # Create a detached subprocess
+            if sys.platform == "win32":
+                # Windows: use CREATE_NO_WINDOW flag
+                DETACHED_PROCESS = 0x00000008
+                CREATE_NO_WINDOW = 0x08000000
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "avatarfactory.daemon_runner"],
+                    creationflags=DETACHED_PROCESS | CREATE_NO_WINDOW,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                )
+            else:
+                # Unix: use nohup-style double fork
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "avatarfactory.daemon_runner"],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                )
+
+            # Save PID
+            os.makedirs(os.path.dirname(pid_file), exist_ok=True)
+            with open(pid_file, "w") as f:
+                f.write(str(proc.pid))
+
+            console.print(f"[green]Daemon started (PID: {proc.pid})[/green]")
+            console.print("Use 'avatarfactory daemon status' to check status.")
+            console.print("Use 'avatarfactory daemon stop' to stop.")
+            return
+
+        # Foreground mode
         console.print(Panel.fit(
             "[bold cyan]Starting AvatarFactory Daemon[/bold cyan]\n"
             "Press Ctrl+C to stop",
@@ -1096,7 +1161,33 @@ def daemon(
                 console.print(f"      Last: {last_run} | Status: {last_status} | Runs: {task.run_count}")
 
     elif action == "stop":
-        console.print("[yellow]Note: Daemon runs in foreground. Use Ctrl+C to stop.[/yellow]")
+        # Try to stop background daemon
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, "r") as f:
+                    daemon_pid = int(f.read().strip())
+
+                import signal
+                try:
+                    if sys.platform == "win32":
+                        # Windows: use taskkill
+                        subprocess.run(
+                            ["taskkill", "/F", "/PID", str(daemon_pid)],
+                            capture_output=True
+                        )
+                    else:
+                        os.kill(daemon_pid, signal.SIGTERM)
+
+                    console.print(f"[green]Daemon stopped (PID: {daemon_pid})[/green]")
+                except OSError as e:
+                    console.print(f"[yellow]Daemon not running (PID {daemon_pid} not found)[/yellow]")
+
+                os.remove(pid_file)
+            except (ValueError, FileNotFoundError):
+                console.print("[yellow]No daemon PID file found[/yellow]")
+        else:
+            console.print("[yellow]No background daemon running.[/yellow]")
+            console.print("For foreground daemon, use Ctrl+C to stop.")
 
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
@@ -1222,6 +1313,32 @@ def schedule(
             console.print(f"[yellow]Disabled task: {task_id}[/yellow]")
         else:
             console.print(f"[red]Task not found: {task_id}[/red]")
+
+    elif action == "run":
+        # Manually run a task
+        if not task_id:
+            console.print("[red]--id required[/red]")
+            raise typer.Exit(1)
+
+        task = scheduler.get_task(task_id)
+        if not task:
+            console.print(f"[red]Task not found: {task_id}[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[cyan]Running task: {task.name}...[/cyan]")
+
+        import asyncio
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(scheduler._run_task_async(task_id))
+            finally:
+                loop.close()
+            console.print(f"[green]Task completed successfully[/green]")
+        except Exception as e:
+            console.print(f"[red]Task failed: {e}[/red]")
+            raise typer.Exit(1)
 
     else:
         console.print(f"[red]Unknown action: {action}[/red]")

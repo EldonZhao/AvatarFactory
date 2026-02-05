@@ -17,9 +17,20 @@ avatarfactory chat [--persona PERSONA_ID]
 # Quick CLI commands
 avatarfactory create-persona "description"
 avatarfactory generate "topic"
+avatarfactory discover --platform bluesky --limit 20
 avatarfactory list-personas
 avatarfactory list-content
+avatarfactory show-content <content_id>
+avatarfactory publish-draft <content_id> --platform bluesky
 avatarfactory stats
+
+# Service deployment
+avatarfactory serve --host 0.0.0.0 --port 8000
+avatarfactory serve --mode scheduler
+
+# Scheduler commands
+avatarfactory schedule list
+avatarfactory schedule run <task_id>
 
 # Testing
 pytest tests/ -v
@@ -33,8 +44,8 @@ mypy avatarfactory
 
 # Install (development)
 pip install -e .
-# or with specific provider extras
-pip install -e ".[openai]"
+# or with service extras
+pip install -e ".[service]"
 ```
 
 ## Architecture
@@ -44,23 +55,41 @@ pip install -e ".[openai]"
 The system uses message-based orchestration with one master agent coordinating specialized sub-agents:
 
 ```
-CLI (chat/commands)
+CLI (chat/commands) / FastAPI Service
     ↓
-Orchestrator Agent (intent routing)
-    ├→ Persona Lab Agent (persona CRUD, versioning)
-    ├→ Content Lab Agent (multi-variant generation)
-    ├→ Review Agent (4-dimension scoring)
-    ├→ Simulation Agent (engagement prediction)
-    └→ Knowledge Base (file-based persistence)
+ProactiveOrchestrator (intent routing + scheduled tasks)
+    ├→ PersonaAgent (persona CRUD, versioning)
+    ├→ ContentAgent (multi-variant generation + hot-topic integration)
+    ├→ DiscoveryAgent (platform trend analysis)
+    ├→ ReviewAgent (4-dimension scoring)
+    ├→ SimulationAgent (engagement prediction)
+    └→ KnowledgeBase (file-based persistence)
+
+Platform Connectors (via ConnectorRegistry)
+    ├→ BlueskyConnector (AT Protocol)
+    ├→ TwitterConnector (API v2)
+    ├→ XiaohongshuConnector (cookie + xhs signing)
+    └→ WeComConnector (webhook notifications)
 ```
 
 ### Key Modules
 
 - **`avatarfactory/agents/`** - Agent implementations inheriting from `BaseAgent`
-- **`avatarfactory/core/knowledge_base.py`** - File-based YAML/JSON storage at `./knowledge_base/`
+  - `persona.py` - PersonaAgent (persona CRUD, versioning)
+  - `content.py` - ContentAgent (content generation with hot-topic support)
+  - `discovery.py` - DiscoveryAgent (platform trend analysis)
+  - `orchestrator.py` - OrchestratorAgent (intent routing)
+  - `proactive_orchestrator.py` - ProactiveOrchestrator (scheduled tasks)
+- **`avatarfactory/connectors/`** - Platform connectors
+  - `registry.py` - ConnectorRegistry with decorator-based registration
+  - `bluesky.py`, `twitter.py`, `xiaohongshu.py`, `wecom.py`
+- **`avatarfactory/core/knowledges.py`** - File-based YAML/JSON storage at `./knowledges/`
 - **`avatarfactory/core/llm_provider.py`** - LLM abstraction (Anthropic, Azure OpenAI, OpenAI)
 - **`avatarfactory/models/schemas.py`** - Pydantic models for all data structures
-- **`avatarfactory/adapters/`** - Platform-specific adapters (Xiaohongshu, Zhihu, Twitter)
+- **`avatarfactory/adapters/`** - Platform-specific content adapters (Xiaohongshu, Twitter)
+- **`avatarfactory/service/app.py`** - FastAPI REST API
+- **`avatarfactory/scheduler/`** - APScheduler-based task automation
+- **`avatarfactory/video/`** - Video generation (Azure TTS, Edge TTS, Azure Avatar)
 - **`avatarfactory/cli.py`** - Typer CLI with Rich terminal UI
 
 ### Review Scoring Dimensions
@@ -88,6 +117,27 @@ class CustomAgent(BaseAgent):
         # Agent logic here
 ```
 
+### Adding a Platform Connector
+
+```python
+from avatarfactory.connectors.base import BasePlatformConnector
+from avatarfactory.connectors.registry import ConnectorRegistry
+
+@ConnectorRegistry.register_decorator("new_platform")
+class NewPlatformConnector(BasePlatformConnector):
+    async def connect(self) -> bool:
+        # Connection logic
+        pass
+
+    async def publish(self, content: Content) -> Dict[str, Any]:
+        # Publish logic
+        pass
+
+    async def fetch_posts(self, limit: int = 20) -> List[Dict]:
+        # Fetch posts logic
+        pass
+```
+
 ### Adding a Platform Adapter
 
 ```python
@@ -107,10 +157,26 @@ class NewPlatformAdapter(BasePlatformAdapter):
 ## Configuration
 
 Environment variables (see `.env.example`):
+
+### LLM Provider
 - `AVATARFACTORY_LLM_PROVIDER` - anthropic | azure_openai | openai
 - `AVATARFACTORY_MODEL` - model name (e.g., claude-3-5-sonnet-20241022)
-- `AVATARFACTORY_KB_PATH` - knowledge base directory (default: ./knowledge_base)
+- `AVATARFACTORY_KB_PATH` - knowledge base directory (default: ./knowledges)
 - Provider-specific API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, AZURE_OPENAI_*)
+
+### Platform Connectors
+- `BLUESKY_USERNAME`, `BLUESKY_PASSWORD` - Bluesky credentials
+- `TWITTER_API_KEY`, `TWITTER_API_SECRET`, etc. - Twitter API v2
+- `XIAOHONGSHU_COOKIE`, `XIAOHONGSHU_USER_ID` - Xiaohongshu auth
+
+### Notifications
+- `AVATARFACTORY_WEBHOOK_URL` - Webhook URL
+- `AVATARFACTORY_WEBHOOK_FORMAT` - slack | discord | feishu | wecom | generic
+
+### Video Generation
+- `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` - Azure Speech Service
+- `AVATARFACTORY_VIDEO_PROVIDER` - auto | azure | edge
+- `AVATARFACTORY_DEFAULT_VOICE` - Default TTS voice
 
 ## Code Standards
 

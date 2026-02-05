@@ -37,7 +37,7 @@ env/
 .env
 
 # Knowledge Base (user data)
-knowledge_base/
+knowledges/
 
 # Test coverage
 .coverage

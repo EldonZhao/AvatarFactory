@@ -79,7 +79,7 @@ def check_avatarfactory_package():
 
         # Check core modules
         modules = [
-            'avatarfactory.core.knowledge_base',
+            'avatarfactory.core.knowledges',
             'avatarfactory.core.llm_provider',
             'avatarfactory.agents.base',
             'avatarfactory.agents.orchestrator',
@@ -193,7 +193,7 @@ def check_knowledge_base():
     from pathlib import Path
     import os
 
-    kb_path = Path(os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"))
+    kb_path = Path(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"))
 
     if kb_path.exists():
         print(f"✅ Knowledge base directory found: {kb_path}")

@@ -23,7 +23,7 @@ class SchedulerConfig(BaseModel):
     """Scheduler configuration."""
 
     # Persistence
-    data_dir: str = Field(default="./knowledge_base/scheduler")
+    data_dir: str = Field(default="./knowledges/scheduler")
 
     # Default schedules (cron expressions)
     discovery_schedule: str = Field(

@@ -106,6 +106,31 @@ class Boundaries(BaseModel):
     )
 
 
+class NotificationConfig(BaseModel):
+    """Notification connector configuration for a persona"""
+
+    enabled: bool = Field(default=False, description="Whether notifications are enabled")
+    connector_type: str = Field(
+        default="wecom",
+        description="Connector type: wecom, slack, telegram, etc."
+    )
+    webhook_url: Optional[str] = Field(
+        None, description="Webhook URL for the notification connector"
+    )
+    webhook_key: Optional[str] = Field(
+        None, description="Webhook key (alternative to full URL)"
+    )
+    notify_on_content: bool = Field(
+        default=True, description="Notify when content is generated"
+    )
+    notify_on_review: bool = Field(
+        default=True, description="Include review results in notification"
+    )
+    extra: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional connector-specific config"
+    )
+
+
 class Persona(BaseModel):
     """Complete persona configuration"""
 
@@ -122,6 +147,11 @@ class Persona(BaseModel):
 
     platforms: List[PlatformType] = Field(
         default_factory=list, description="Target platforms"
+    )
+
+    # Notification settings
+    notification: Optional[NotificationConfig] = Field(
+        None, description="Notification connector configuration"
     )
 
     metadata: Dict[str, Any] = Field(

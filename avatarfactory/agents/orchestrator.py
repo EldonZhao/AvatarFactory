@@ -6,8 +6,8 @@ import json
 from typing import Any, Dict, List, Optional
 
 from avatarfactory.agents.base import BaseAgent
-from avatarfactory.agents.content_lab import ContentLabAgent
-from avatarfactory.agents.persona_lab import PersonaLabAgent
+from avatarfactory.agents.content import ContentAgent
+from avatarfactory.agents.persona import PersonaAgent
 from avatarfactory.agents.review import ReviewAgent
 from avatarfactory.models.schemas import (
     AgentMessage,
@@ -26,11 +26,11 @@ class OrchestratorAgent(BaseAgent):
         super().__init__(agent_id="orchestrator", *args, **kwargs)
 
         # Initialize sub-agents
-        self.persona_lab = PersonaLabAgent(
+        self.persona_agent = PersonaAgent(
             knowledge_base=self.kb,
             llm_provider=self.llm_provider,
         )
-        self.content_lab = ContentLabAgent(
+        self.content_agent = ContentAgent(
             knowledge_base=self.kb,
             llm_provider=self.llm_provider,
         )
@@ -38,6 +38,10 @@ class OrchestratorAgent(BaseAgent):
             knowledge_base=self.kb,
             llm_provider=self.llm_provider,
         )
+
+        # Deprecated aliases for backward compatibility
+        self.persona_lab = self.persona_agent
+        self.content_lab = self.content_agent
 
     async def process(self, message: AgentMessage) -> Any:
         """Process user request by coordinating sub-agents"""
@@ -132,10 +136,10 @@ Output MUST be valid JSON:
 
         self.log("INFO", "Starting persona creation workflow")
 
-        # Step 1: Create persona via Persona Lab Agent
+        # Step 1: Create persona via Persona Agent
         message = AgentMessage(
             sender="orchestrator",
-            receiver="persona_lab",
+            receiver="persona",
             task_type=TaskType.CREATE_PERSONA,
             payload={
                 "user_description": parameters.get("user_description", original_input),
@@ -144,10 +148,10 @@ Output MUST be valid JSON:
             context={},
         )
 
-        persona = await self.persona_lab.process(message)
+        persona = await self.persona_agent.process(message)
 
         # Step 2: Validate persona
-        validation = await self.persona_lab.validate_persona(persona)
+        validation = await self.persona_agent.validate_persona(persona)
 
         # Step 3: Generate sample content (1 piece)
         try:
@@ -158,7 +162,7 @@ Output MUST be valid JSON:
 
                 content_message = AgentMessage(
                     sender="orchestrator",
-                    receiver="content_lab",
+                    receiver="content",
                     task_type=TaskType.GENERATE_CONTENT,
                     payload={
                         "persona_id": persona.id,
@@ -168,7 +172,7 @@ Output MUST be valid JSON:
                     context={},
                 )
 
-                sample_content = await self.content_lab.process(content_message)
+                sample_content = await self.content_agent.process(content_message)
 
                 # Step 4: Review the sample content
                 review_message = AgentMessage(
@@ -242,7 +246,7 @@ Output MUST be valid JSON:
         # Generate content
         content_message = AgentMessage(
             sender="orchestrator",
-            receiver="content_lab",
+            receiver="content",
             task_type=TaskType.GENERATE_CONTENT,
             payload={
                 "persona_id": persona_id,
@@ -253,7 +257,7 @@ Output MUST be valid JSON:
             context={},
         )
 
-        content = await self.content_lab.process(content_message)
+        content = await self.content_agent.process(content_message)
 
         # Review content
         review_message = AgentMessage(
@@ -340,7 +344,7 @@ Output MUST be valid JSON:
             trend_data["content_by_pillar"][pillar] += 1
 
         # Get optimization suggestions
-        suggestions = await self.persona_lab.suggest_optimizations(persona_id, trend_data)
+        suggestions = await self.persona_agent.suggest_optimizations(persona_id, trend_data)
 
         return {
             "suggestions": suggestions,

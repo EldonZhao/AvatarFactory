@@ -27,6 +27,7 @@ from avatarfactory.connectors.base import (
     FetchResult,
     PublishResult,
 )
+from avatarfactory.connectors.registry import ConnectorRegistry
 
 
 class CookieExpiredError(Exception):
@@ -39,6 +40,8 @@ class CookieExpiringWarning(Warning):
     pass
 
 
+@ConnectorRegistry.register_decorator("xiaohongshu")
+@ConnectorRegistry.register_decorator("xhs")
 class XiaohongshuConnector(BasePlatformConnector):
     """
     Xiaohongshu platform connector using xhs library with Playwright signing.

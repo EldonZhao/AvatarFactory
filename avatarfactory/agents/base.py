@@ -4,11 +4,22 @@ Base Agent class and utilities for all AvatarFactory agents.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
-from avatarfactory.core.knowledge_base import KnowledgeBase
+from avatarfactory.core.knowledges import KnowledgeBase
 from avatarfactory.core.llm_provider import BaseLLMProvider, LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
+
+
+@dataclass
+class PublishResult:
+    """Result of a multi-platform publish operation."""
+    platform: str
+    success: bool
+    post_id: Optional[str] = None
+    post_url: Optional[str] = None
+    error: Optional[str] = None
 
 
 class BaseAgent(ABC):
@@ -34,6 +45,9 @@ class BaseAgent(ABC):
             self.llm_provider = LLMProviderFactory.from_env()
 
         self.logger = logging.getLogger(f"avatarfactory.agents.{agent_id}")
+
+        # Multi-connector support
+        self._connectors: Dict[str, Any] = {}
 
     @abstractmethod
     async def process(self, message: AgentMessage) -> Any:
@@ -122,3 +136,116 @@ class BaseAgent(ABC):
                 f"Message intended for {message.receiver}, but received by {self.agent_id}"
             )
         return True
+
+    # =========================================================================
+    # Multi-Connector Support
+    # =========================================================================
+
+    def add_connector(self, name: str, connector: Any) -> None:
+        """
+        Add a platform connector to this agent.
+
+        Args:
+            name: Connector name/identifier
+            connector: BasePlatformConnector instance
+        """
+        self._connectors[name.lower()] = connector
+        self.log("DEBUG", f"Added connector: {name}")
+
+    def get_connector(self, name: str) -> Optional[Any]:
+        """
+        Get a connector by name.
+
+        Args:
+            name: Connector name
+
+        Returns:
+            Connector instance or None
+        """
+        return self._connectors.get(name.lower())
+
+    def list_connectors(self) -> List[str]:
+        """
+        List all registered connector names.
+
+        Returns:
+            List of connector names
+        """
+        return list(self._connectors.keys())
+
+    def remove_connector(self, name: str) -> bool:
+        """
+        Remove a connector by name.
+
+        Args:
+            name: Connector name
+
+        Returns:
+            True if removed, False if not found
+        """
+        if name.lower() in self._connectors:
+            del self._connectors[name.lower()]
+            return True
+        return False
+
+    async def publish_to_platforms(
+        self,
+        content: str,
+        platforms: List[str],
+        title: Optional[str] = None,
+        images: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+    ) -> Dict[str, "PublishResult"]:
+        """
+        Publish content to multiple platforms.
+
+        Args:
+            content: Content text to publish
+            platforms: List of platform names to publish to
+            title: Optional title (for platforms that support it)
+            images: Optional list of image paths
+            tags: Optional list of tags/hashtags
+
+        Returns:
+            Dict mapping platform name to PublishResult
+        """
+        results: Dict[str, PublishResult] = {}
+
+        for platform in platforms:
+            connector = self.get_connector(platform)
+            if not connector:
+                results[platform] = PublishResult(
+                    platform=platform,
+                    success=False,
+                    error=f"No connector registered for platform: {platform}",
+                )
+                continue
+
+            try:
+                if not connector.is_connected():
+                    await connector.connect()
+
+                result = await connector.publish(
+                    content=content,
+                    title=title,
+                    images=images,
+                    tags=tags,
+                )
+
+                results[platform] = PublishResult(
+                    platform=platform,
+                    success=result.success,
+                    post_id=result.post_id,
+                    post_url=result.post_url,
+                    error=result.error,
+                )
+
+            except Exception as e:
+                self.log("ERROR", f"Failed to publish to {platform}: {e}")
+                results[platform] = PublishResult(
+                    platform=platform,
+                    success=False,
+                    error=str(e),
+                )
+
+        return results

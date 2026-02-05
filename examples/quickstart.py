@@ -6,7 +6,7 @@ Quick Start Guide for AvatarFactory
 import asyncio
 import os
 from anthropic import Anthropic
-from avatarfactory.core.knowledge_base import KnowledgeBase
+from avatarfactory.core.knowledges import KnowledgeBase
 from avatarfactory.agents.orchestrator import OrchestratorAgent
 from avatarfactory.models.schemas import AgentMessage
 
@@ -18,7 +18,7 @@ async def main():
         print("Please set ANTHROPIC_API_KEY environment variable")
         return
 
-    kb = KnowledgeBase("./knowledge_base")
+    kb = KnowledgeBase("./knowledge")
     client = Anthropic(api_key=api_key)
     orchestrator = OrchestratorAgent(
         knowledge_base=kb,

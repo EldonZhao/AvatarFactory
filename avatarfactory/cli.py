@@ -26,7 +26,7 @@ from rich.table import Table
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
 from avatarfactory.agents.discovery import DiscoveryAgent
-from avatarfactory.core.knowledge_base import KnowledgeBase
+from avatarfactory.core.knowledges import KnowledgeBase
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
 from avatarfactory.connectors import get_connector, ConnectorConfig
@@ -43,7 +43,7 @@ console = Console(force_terminal=True)
 
 def get_orchestrator() -> OrchestratorAgent:
     """Initialize orchestrator agent with LLM provider from environment"""
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
 
     try:
         provider = LLMProviderFactory.from_env()
@@ -256,7 +256,7 @@ def generate(
 @app.command()
 def list_personas():
     """List all personas in the knowledge base."""
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     personas = kb.list_personas()
@@ -290,7 +290,7 @@ def list_content(
     status: str = typer.Option("draft", "--status", "-s", help="draft or published"),
 ):
     """List content in the knowledge base."""
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     contents = kb.list_content(persona_id=persona_id, status=status)
@@ -329,7 +329,7 @@ def show_content(
     Example:
         avatarfactory show-content content_178b3925
     """
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     content = kb.load_content(content_id)
@@ -423,7 +423,7 @@ def publish_draft(
     """
     from avatarfactory.connectors.adapters import get_adapter, get_platform_limits
 
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     content = kb.load_content(content_id)
@@ -587,7 +587,7 @@ def publish_draft(
 @app.command()
 def stats():
     """Show knowledge base statistics."""
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     stats = kb.get_storage_stats()
@@ -837,7 +837,7 @@ def publish(
 
 def get_discovery_agent() -> DiscoveryAgent:
     """Initialize discovery agent with LLM provider from environment."""
-    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base")
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     try:
@@ -1038,14 +1038,14 @@ def daemon(
     from avatarfactory.scheduler import Scheduler, SchedulerConfig
 
     pid_file = os.path.join(
-        os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+        os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
         "scheduler",
         "daemon.pid"
     )
 
     config = SchedulerConfig(
         data_dir=os.path.join(
-            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
             "scheduler"
         )
     )
@@ -1196,6 +1196,37 @@ def daemon(
 
 
 @app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port to listen on"),
+    reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload for development"),
+):
+    """
+    Start the AvatarFactory API server.
+
+    Runs the full FastAPI service with integrated scheduler.
+
+    Example:
+        avatarfactory serve                    # Start on default port 8000
+        avatarfactory serve --port 3000        # Custom port
+        avatarfactory serve --reload           # Development mode with auto-reload
+    """
+    from avatarfactory.daemon_runner import run_full_service
+
+    console.print(Panel.fit(
+        f"[bold cyan]AvatarFactory API Server[/bold cyan]\n\n"
+        f"Host: {host}\n"
+        f"Port: {port}\n"
+        f"Reload: {'enabled' if reload else 'disabled'}\n\n"
+        f"API Docs: http://{host if host != '0.0.0.0' else 'localhost'}:{port}/docs\n"
+        f"Health: http://{host if host != '0.0.0.0' else 'localhost'}:{port}/health",
+        title="Starting Service",
+    ))
+
+    run_full_service(host=host, port=port, reload=reload)
+
+
+@app.command()
 def schedule(
     action: str = typer.Argument(..., help="Action: add, remove, list, enable, disable"),
     task_type: Optional[str] = typer.Option(None, "--type", "-t", help="Task type: discovery, content, publish, report"),
@@ -1219,7 +1250,7 @@ def schedule(
 
     config = SchedulerConfig(
         data_dir=os.path.join(
-            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
             "scheduler"
         )
     )
@@ -1368,7 +1399,7 @@ def queue(
 
     config = SchedulerConfig(
         data_dir=os.path.join(
-            os.getenv("AVATARFACTORY_KB_PATH", "./knowledge_base"),
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
             "scheduler"
         )
     )
@@ -1447,6 +1478,226 @@ def queue(
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print("Available: add, remove, list")
+        raise typer.Exit(1)
+
+
+# =============================================================================
+# Video Generation Commands
+# =============================================================================
+
+@app.command()
+def video(
+    action: str = typer.Argument(..., help="Action: generate, list-voices, list-avatars, info"),
+    content_id: Optional[str] = typer.Option(None, "--content", "-c", help="Content ID to generate video from"),
+    video_type: str = typer.Option("slideshow", "--type", "-t", help="Video type: slideshow or avatar"),
+    provider: str = typer.Option("auto", "--provider", "-P", help="TTS provider: auto, azure, edge"),
+    voice: str = typer.Option("zh-CN-XiaoxuanNeural", "--voice", "-v", help="Voice ID for TTS"),
+    avatar: Optional[str] = typer.Option(None, "--avatar", "-a", help="Avatar character (lisa, grace, harry, max)"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
+    images: Optional[str] = typer.Option(None, "--images", "-i", help="Comma-separated image paths for slideshow"),
+    locale: Optional[str] = typer.Option(None, "--locale", "-l", help="Filter voices by locale (e.g., zh-CN)"),
+):
+    """
+    Generate videos from content using TTS.
+
+    Actions:
+      generate      - Generate video from content
+      list-voices   - List available TTS voices
+      list-avatars  - List available avatar characters
+      info          - Show provider information
+
+    Examples:
+        avatarfactory video generate --content content_7a86a064
+        avatarfactory video generate -c content_xxx --type avatar --avatar lisa
+        avatarfactory video generate -c content_xxx --provider edge
+        avatarfactory video list-voices --locale zh-CN
+        avatarfactory video list-avatars
+        avatarfactory video info
+    """
+    from avatarfactory.video import VideoGenerator, VideoConfig
+    from avatarfactory.video.base import VideoType
+
+    if action == "generate":
+        if not content_id:
+            console.print("[red]--content required for generate action[/red]")
+            raise typer.Exit(1)
+
+        kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+        kb = KnowledgeBase(kb_path)
+
+        content = kb.load_content(content_id)
+        if not content:
+            console.print(f"[red]Content not found: {content_id}[/red]")
+            raise typer.Exit(1)
+
+        # Parse images
+        image_list = None
+        if images:
+            image_list = [Path(img.strip()) for img in images.split(",")]
+
+        # Build config
+        config = VideoConfig(
+            video_type=VideoType.AVATAR if video_type == "avatar" else VideoType.SLIDESHOW,
+            voice=voice,
+            avatar_character=avatar,
+            output_path=Path(output) if output else None,
+        )
+
+        console.print(Panel.fit(
+            f"[bold cyan]Generating Video[/bold cyan]\n\n"
+            f"[cyan]Content:[/cyan] {content_id}\n"
+            f"[cyan]Type:[/cyan] {video_type}\n"
+            f"[cyan]Provider:[/cyan] {provider}\n"
+            f"[cyan]Voice:[/cyan] {voice}"
+            + (f"\n[cyan]Avatar:[/cyan] {avatar}" if avatar else ""),
+            border_style="cyan",
+        ))
+
+        generator = VideoGenerator(tts_provider=provider)
+
+        # Check provider availability
+        info = generator.get_provider_info()
+        if not info["tts_available"]:
+            console.print("[red]No TTS provider available![/red]")
+            console.print("Install edge-tts (free): pip install edge-tts")
+            console.print("Or configure Azure: set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION")
+            raise typer.Exit(1)
+
+        if video_type == "avatar" and not info["avatar_available"]:
+            console.print("[red]Azure Avatar not available![/red]")
+            console.print("Configure Azure: set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION")
+            console.print("Region must support avatars (westus2, westeurope, southeastasia)")
+            raise typer.Exit(1)
+
+        # Get text from content
+        text = content.body
+        if content.title:
+            text = f"{content.title}\n\n{text}"
+
+        async def do_generate():
+            return await generator.generate(
+                content_id=content_id,
+                text=text,
+                config=config,
+                images=image_list,
+            )
+
+        with console.status(
+            f"[bold cyan]Generating {video_type} video...",
+            spinner="dots"
+        ):
+            result = asyncio.run(do_generate())
+
+        if result.success:
+            console.print(f"\n[green]✅ Video generated successfully![/green]")
+            console.print(f"[bold]Video:[/bold] {result.video_path}")
+            if result.audio_path:
+                console.print(f"[bold]Audio:[/bold] {result.audio_path}")
+            console.print(f"[bold]Duration:[/bold] {result.duration_formatted}")
+            console.print(f"\n[dim]Metadata saved to video directory[/dim]")
+        else:
+            console.print(f"\n[red]❌ Video generation failed: {result.error}[/red]")
+            raise typer.Exit(1)
+
+    elif action == "list-voices":
+        generator = VideoGenerator(tts_provider=provider)
+
+        async def do_list():
+            return await generator.list_voices(
+                locale=locale,
+                provider=provider if provider != "auto" else None,
+            )
+
+        with console.status("[bold cyan]Fetching voices...", spinner="dots"):
+            voices = asyncio.run(do_list())
+
+        if not voices:
+            console.print("[yellow]No voices found.[/yellow]")
+            return
+
+        table = Table(title=f"Available Voices ({len(voices)})")
+        table.add_column("Voice ID", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Gender", style="yellow")
+        table.add_column("Locale", style="white")
+        table.add_column("Provider", style="dim")
+
+        # Group by locale for better display
+        for v in voices[:50]:  # Limit to 50 for readability
+            table.add_row(v.id, v.name, v.gender, v.locale, v.provider)
+
+        console.print(table)
+
+        if len(voices) > 50:
+            console.print(f"\n[dim]Showing 50 of {len(voices)} voices. Use --locale to filter.[/dim]")
+
+        # Show recommended Chinese voices
+        console.print("\n[bold]Recommended Chinese Voices:[/bold]")
+        console.print("  zh-CN-XiaoxuanNeural  (Female, bright/活泼)")
+        console.print("  zh-CN-YunxiNeural     (Male, professional)")
+        console.print("  zh-CN-XiaohanNeural   (Female, warm)")
+        console.print("  zh-CN-YunyangNeural   (Male, energetic)")
+
+    elif action == "list-avatars":
+        generator = VideoGenerator(tts_provider=provider)
+
+        async def do_list():
+            return await generator.list_avatars()
+
+        avatars = asyncio.run(do_list())
+
+        if not avatars:
+            console.print("[yellow]No avatars available.[/yellow]")
+            console.print("Azure Avatar requires AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.")
+            return
+
+        table = Table(title="Available Avatar Characters")
+        table.add_column("ID", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Description", style="white")
+
+        for a in avatars:
+            table.add_row(a["id"], a["name"], a["description"])
+
+        console.print(table)
+
+    elif action == "info":
+        generator = VideoGenerator(tts_provider=provider)
+        info = generator.get_provider_info()
+
+        table = Table(title="Video Generation Providers")
+        table.add_column("Provider", style="cyan")
+        table.add_column("Status", style="green")
+
+        table.add_row(
+            "Active TTS Provider",
+            info["tts_provider"] or "[red]None[/red]"
+        )
+        table.add_row(
+            "Edge TTS (Free)",
+            "[green]Available[/green]" if info["edge_available"] else "[red]Not installed[/red]"
+        )
+        table.add_row(
+            "Azure TTS",
+            "[green]Available[/green]" if info["azure_available"] else "[yellow]Not configured[/yellow]"
+        )
+        table.add_row(
+            "Azure Avatar",
+            "[green]Available[/green]" if info["avatar_available"] else "[yellow]Not configured[/yellow]"
+        )
+
+        console.print(table)
+
+        if not info["tts_available"]:
+            console.print("\n[yellow]To enable video generation:[/yellow]")
+            console.print("  1. Install edge-tts (free): pip install edge-tts")
+            console.print("  2. Or configure Azure TTS:")
+            console.print("     - Set AZURE_SPEECH_KEY=your_key")
+            console.print("     - Set AZURE_SPEECH_REGION=eastasia")
+
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("Available: generate, list-voices, list-avatars, info")
         raise typer.Exit(1)
 
 

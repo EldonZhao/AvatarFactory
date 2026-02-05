@@ -1,0 +1,341 @@
+"""
+Proactive Orchestrator Agent for AvatarFactory.
+
+Extends OrchestratorAgent with proactive task scheduling and
+automated discovery/content generation workflows.
+"""
+
+from typing import Any, Dict, List, Optional
+
+from avatarfactory.agents.orchestrator import OrchestratorAgent
+from avatarfactory.agents.discovery import DiscoveryAgent
+from avatarfactory.models.schemas import AgentMessage, TaskType
+
+
+class ProactiveOrchestrator(OrchestratorAgent):
+    """
+    Enhanced orchestrator with proactive task scheduling capabilities.
+
+    Extends OrchestratorAgent to support:
+    - Scheduled discovery and content generation tasks
+    - Automated persona optimization suggestions
+    - Proactive content planning
+    """
+
+    def __init__(self, *args: Any, scheduler: Optional[Any] = None, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._scheduler = scheduler
+        self._discovery_agent: Optional[DiscoveryAgent] = None
+
+    @property
+    def discovery_agent(self) -> DiscoveryAgent:
+        """Lazily initialize and return DiscoveryAgent."""
+        if self._discovery_agent is None:
+            self._discovery_agent = DiscoveryAgent(
+                knowledge_base=self.kb,
+                llm_provider=self.llm_provider,
+            )
+        return self._discovery_agent
+
+    @property
+    def scheduler(self) -> Optional[Any]:
+        """Get the scheduler instance."""
+        return self._scheduler
+
+    def set_scheduler(self, scheduler: Any) -> None:
+        """Set the scheduler instance."""
+        self._scheduler = scheduler
+
+    # =========================================================================
+    # Proactive Task Management
+    # =========================================================================
+
+    async def setup_persona_tasks(
+        self,
+        persona_id: str,
+        platforms: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Set up proactive scheduled tasks for a persona.
+
+        Creates:
+        - Trending scan every 6 hours
+        - Content suggestions daily at 9 AM
+        - Persona optimization weekly on Fridays
+
+        Args:
+            persona_id: Persona ID to set up tasks for
+            platforms: Platforms to monitor (defaults to ["bluesky"])
+
+        Returns:
+            List of created task configurations
+        """
+        if not self._scheduler:
+            self.log("WARNING", "No scheduler configured, cannot set up persona tasks")
+            return []
+
+        platforms = platforms or ["bluesky"]
+        tasks = []
+
+        # Trending scan task (every 6 hours)
+        trending_task = {
+            "id": f"trending_{persona_id}",
+            "name": f"热点扫描",
+            "task_type": "proactive_trending",
+            "schedule": "0 */6 * * *",
+            "persona_id": persona_id,
+            "extra_params": {"platforms": platforms},
+        }
+        tasks.append(trending_task)
+
+        # Content suggestions task (daily at 9 AM)
+        content_task = {
+            "id": f"content_suggest_{persona_id}",
+            "name": f"内容建议",
+            "task_type": "proactive_content",
+            "schedule": "0 9 * * *",
+            "persona_id": persona_id,
+            "extra_params": {"count": 3},
+        }
+        tasks.append(content_task)
+
+        # Persona optimization task (weekly on Fridays at 6 PM)
+        optimize_task = {
+            "id": f"optimize_{persona_id}",
+            "name": f"人设优化",
+            "task_type": "proactive_optimize",
+            "schedule": "0 18 * * 5",
+            "persona_id": persona_id,
+            "extra_params": {},
+        }
+        tasks.append(optimize_task)
+
+        # Add tasks to scheduler
+        for task in tasks:
+            try:
+                self._scheduler.add_task_from_dict(task)
+                self.log("INFO", f"Added proactive task: {task['name']} for {persona_id}")
+            except Exception as e:
+                self.log("ERROR", f"Failed to add task {task['name']}: {e}")
+
+        return tasks
+
+    async def remove_persona_tasks(self, persona_id: str) -> int:
+        """
+        Remove all proactive tasks for a persona.
+
+        Args:
+            persona_id: Persona ID
+
+        Returns:
+            Number of tasks removed
+        """
+        if not self._scheduler:
+            return 0
+
+        task_ids = [
+            f"trending_{persona_id}",
+            f"content_suggest_{persona_id}",
+            f"optimize_{persona_id}",
+        ]
+
+        removed = 0
+        for task_id in task_ids:
+            try:
+                if self._scheduler.remove_task(task_id):
+                    removed += 1
+            except Exception:
+                pass
+
+        self.log("INFO", f"Removed {removed} proactive tasks for {persona_id}")
+        return removed
+
+    # =========================================================================
+    # Proactive Task Runners
+    # =========================================================================
+
+    async def run_trending_scan(
+        self,
+        persona_id: str,
+        platforms: List[str],
+    ) -> Dict[str, Any]:
+        """
+        Execute a trending scan for a persona.
+
+        Args:
+            persona_id: Persona ID
+            platforms: List of platforms to scan
+
+        Returns:
+            Dict with scan results
+        """
+        self.log("INFO", f"Running trending scan for {persona_id} on {platforms}")
+
+        results = {}
+        for platform in platforms:
+            try:
+                result = await self.discovery_agent.discover_and_analyze(
+                    persona_id=persona_id,
+                    platform=platform,
+                    limit=30,
+                )
+                results[platform] = {
+                    "status": result.get("status"),
+                    "trending_count": result.get("data", {}).get("trending_count", 0),
+                    "ideas_count": len(result.get("data", {}).get("ideas", [])),
+                }
+            except Exception as e:
+                self.log("ERROR", f"Trending scan failed for {platform}: {e}")
+                results[platform] = {"status": "error", "error": str(e)}
+
+        # Save results to knowledge base
+        try:
+            self.kb.save_discovery_results(persona_id, results)
+        except Exception as e:
+            self.log("WARNING", f"Failed to save discovery results: {e}")
+
+        return {
+            "status": "success",
+            "persona_id": persona_id,
+            "platforms": platforms,
+            "results": results,
+        }
+
+    async def generate_content_suggestions(
+        self,
+        persona_id: str,
+        count: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Generate content suggestions based on recent discoveries.
+
+        Args:
+            persona_id: Persona ID
+            count: Number of suggestions to generate
+
+        Returns:
+            Dict with content suggestions
+        """
+        self.log("INFO", f"Generating content suggestions for {persona_id}")
+
+        # Try to get latest discovery results
+        try:
+            trends = self.kb.get_latest_discovery(persona_id)
+        except Exception:
+            trends = None
+
+        if trends:
+            ideas = trends.get("ideas", [])[:count]
+            return {
+                "status": "success",
+                "persona_id": persona_id,
+                "suggestions": ideas,
+                "from_cache": True,
+            }
+
+        # If no cached results, run a fresh discovery
+        try:
+            result = await self.discovery_agent.discover_and_analyze(
+                persona_id=persona_id,
+                platform="bluesky",
+                limit=20,
+            )
+
+            if result.get("status") == "success":
+                ideas = result.get("data", {}).get("ideas", [])[:count]
+                return {
+                    "status": "success",
+                    "persona_id": persona_id,
+                    "suggestions": ideas,
+                    "from_cache": False,
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": result.get("message", "Discovery failed"),
+                }
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    async def run_persona_optimization(
+        self,
+        persona_id: str,
+        feedback: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate persona optimization suggestions.
+
+        Args:
+            persona_id: Persona ID
+            feedback: Optional user feedback to incorporate
+
+        Returns:
+            Dict with optimization suggestions
+        """
+        self.log("INFO", f"Running persona optimization for {persona_id}")
+
+        # Gather performance data
+        performance = self._gather_performance_data(persona_id)
+
+        # Get latest trends
+        try:
+            trends = self.kb.get_latest_discovery(persona_id)
+        except Exception:
+            trends = None
+
+        # Generate suggestions
+        try:
+            suggestions = await self.persona_agent.suggest_optimizations(
+                persona_id,
+                {
+                    "performance": performance,
+                    "trends": trends,
+                    "feedback": feedback or {},
+                },
+            )
+
+            return {
+                "status": "success",
+                "persona_id": persona_id,
+                "suggestions": suggestions,
+                "requires_human_review": True,
+            }
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _gather_performance_data(self, persona_id: str) -> Dict[str, Any]:
+        """Gather performance metrics for a persona."""
+        try:
+            published = self.kb.list_content(persona_id=persona_id, status="published")
+            drafts = self.kb.list_content(persona_id=persona_id, status="draft")
+
+            # Calculate basic metrics
+            total_published = len(published)
+            total_drafts = len(drafts)
+
+            # Content by pillar
+            pillar_counts: Dict[str, int] = {}
+            for content in published:
+                pillar = content.pillar
+                pillar_counts[pillar] = pillar_counts.get(pillar, 0) + 1
+
+            # Average review scores
+            reviewed_content = [c for c in drafts if c.review_score]
+            avg_score = (
+                sum(c.review_score for c in reviewed_content) / len(reviewed_content)
+                if reviewed_content
+                else 0
+            )
+
+            return {
+                "total_published": total_published,
+                "total_drafts": total_drafts,
+                "content_by_pillar": pillar_counts,
+                "avg_review_score": avg_score,
+            }
+
+        except Exception as e:
+            self.log("WARNING", f"Failed to gather performance data: {e}")
+            return {}

@@ -17,8 +17,8 @@ def sample_content():
     return Content(
         id="test_content_001",
         persona_id="test_persona_001",
-        title="How to Use Notion for Project Management",
-        body="Notion is a powerful productivity tool that combines notes, tasks, databases, and more into one workspace. In this guide, we'll explore how to use Notion effectively for project management...",
+        title="How to Use Notion for PM",
+        body="Notion is a powerful productivity tool that combines notes, tasks, databases, and more into one workspace. In this guide, we'll explore how to use Notion effectively for project management. Here are some tips to get started with Notion today!",
         pillar="Productivity Tools",
         platform=PlatformType.XIAOHONGSHU,
         tags=["notion", "productivity", "project-management"],

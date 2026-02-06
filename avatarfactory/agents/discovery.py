@@ -701,14 +701,10 @@ Return ONLY a JSON array of suggestion strings:
         try:
             from avatarfactory.connectors import ConnectorRegistry, ConnectorConfig
 
-            # Build connector config
+            # Build connector config using system-level settings
+            # Webhook URL is configured via AVATARFACTORY_WEBHOOK_URL env var
             config = ConnectorConfig(
-                api_key=persona.notification.webhook_key,
-                extra={
-                    "webhook_url": persona.notification.webhook_url,
-                    "webhook_key": persona.notification.webhook_key,
-                    **persona.notification.extra,
-                },
+                extra=persona.notification.extra,
             )
 
             # Create and connect

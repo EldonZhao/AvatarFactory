@@ -48,11 +48,25 @@ class WeComConnector(BasePlatformConnector):
         return "wecom"
 
     def _get_webhook_url(self) -> str:
-        """Get the full webhook URL."""
+        """
+        Get the full webhook URL.
+
+        Priority:
+        1. config.extra["webhook_url"] - explicit URL in config
+        2. AVATARFACTORY_WEBHOOK_URL environment variable (system-level config)
+        3. config.extra["webhook_key"] or config.api_key - key to build URL
+        """
+        import os
+
         # Check for full URL in extra config
         webhook_url = self.config.extra.get("webhook_url")
         if webhook_url:
             return webhook_url
+
+        # Check for system-level environment variable
+        env_webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
+        if env_webhook_url:
+            return env_webhook_url
 
         # Check for webhook key
         webhook_key = self.config.extra.get("webhook_key") or self.config.api_key
@@ -61,7 +75,8 @@ class WeComConnector(BasePlatformConnector):
 
         raise ValueError(
             "WeChat Work webhook configuration required. "
-            "Provide webhook_url or webhook_key in config.extra, or api_key"
+            "Set AVATARFACTORY_WEBHOOK_URL environment variable, "
+            "or provide webhook_url/webhook_key in config"
         )
 
     async def connect(self) -> bool:

@@ -84,9 +84,10 @@ class NotificationConfigRequest(BaseModel):
     """Notification configuration."""
     enabled: bool = Field(default=False, description="Enable notifications")
     connector_type: str = Field(default="wecom", description="Connector type: wecom, slack, discord")
-    webhook_url: Optional[str] = Field(None, description="Webhook URL")
+    # Note: webhook_url is configured at system level via AVATARFACTORY_WEBHOOK_URL env var
     notify_on_content: bool = Field(default=True, description="Notify on content generation")
     notify_on_review: bool = Field(default=True, description="Notify on review completion")
+    notify_on_discovery: bool = Field(default=True, description="Notify on discovery completion")
 
 
 class PersonaRequest(BaseModel):

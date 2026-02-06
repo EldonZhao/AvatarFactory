@@ -114,12 +114,7 @@ class NotificationConfig(BaseModel):
         default="wecom",
         description="Connector type: wecom, slack, telegram, etc."
     )
-    webhook_url: Optional[str] = Field(
-        None, description="Webhook URL for the notification connector"
-    )
-    webhook_key: Optional[str] = Field(
-        None, description="Webhook key (alternative to full URL)"
-    )
+    # Note: webhook_url is configured at system level via AVATARFACTORY_WEBHOOK_URL env var
     notify_on_content: bool = Field(
         default=True, description="Notify when content is generated"
     )

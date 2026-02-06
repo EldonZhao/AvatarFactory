@@ -169,8 +169,8 @@ Environment variables (see `.env.example`):
 - `TWITTER_API_KEY`, `TWITTER_API_SECRET`, etc. - Twitter API v2
 - `XIAOHONGSHU_COOKIE`, `XIAOHONGSHU_USER_ID` - Xiaohongshu auth
 
-### Notifications
-- `AVATARFACTORY_WEBHOOK_URL` - Webhook URL
+### Notifications (System-Level)
+- `AVATARFACTORY_WEBHOOK_URL` - WeChat Work webhook URL (system-level, used for all personas)
 - `AVATARFACTORY_WEBHOOK_FORMAT` - slack | discord | feishu | wecom | generic
 
 ### Video Generation

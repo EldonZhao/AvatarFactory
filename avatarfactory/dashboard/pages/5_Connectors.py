@@ -98,9 +98,9 @@ platform_info = {
     "wecom": {
         "name": "WeChat Work",
         "icon": "💬",
-        "description": "Enterprise WeChat webhook notifications",
+        "description": "Enterprise WeChat webhook notifications (system-level config)",
         "env_vars": {
-            "AVATARFACTORY_WEBHOOK_URL": "Webhook robot URL",
+            "AVATARFACTORY_WEBHOOK_URL": "Webhook robot URL (system-level, shared by all personas)",
         },
         "docs_url": "https://developer.work.weixin.qq.com/document/path/91770",
     },
@@ -192,7 +192,7 @@ with st.expander("How to configure connectors"):
     TWITTER_API_SECRET=your_api_secret
     TWITTER_ACCESS_TOKEN=your_access_token
 
-    # Notifications
+    # Notifications (system-level, shared by all personas)
     AVATARFACTORY_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
     ```
     """)

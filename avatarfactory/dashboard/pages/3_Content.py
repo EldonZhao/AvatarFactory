@@ -117,6 +117,25 @@ with st.sidebar:
     if st.button("🔄 Refresh", key="refresh_content"):
         st.rerun()
 
+    st.markdown("---")
+    st.markdown("### Bulk Actions")
+
+    if st.button("🗑️ Delete Selected", key="delete_selected_content_btn", type="secondary"):
+        if "selected_contents" in st.session_state and st.session_state.selected_contents:
+            deleted_count = 0
+            for content_id in st.session_state.selected_contents:
+                if provider.delete_content(content_id):
+                    deleted_count += 1
+            st.success(f"Deleted {deleted_count} content(s)")
+            st.session_state.selected_contents = []
+            st.rerun()
+        else:
+            st.warning("No items selected")
+
+# Initialize session state for selections
+if "selected_contents" not in st.session_state:
+    st.session_state.selected_contents = []
+
 # Get content
 contents = provider.get_content_list(
     persona_id=selected_persona,
@@ -212,6 +231,17 @@ if st.session_state.selected_content_id:
                 for issue in issues[:5]:
                     st.caption(f"⚠️ {issue}")
 
+            st.markdown("---")
+
+            # Delete button for single content
+            if st.button("🗑️ Delete", key="delete_this_content", type="secondary"):
+                if provider.delete_content(st.session_state.selected_content_id):
+                    st.success("Deleted!")
+                    st.session_state.selected_content_id = None
+                    st.rerun()
+                else:
+                    st.error("Failed to delete")
+
         st.divider()
     else:
         st.error(f"Content not found: {st.session_state.selected_content_id}")
@@ -240,7 +270,24 @@ else:
     # Create a table view
     for content in contents:
         with st.container():
-            col1, col2, col3, col4, col5 = st.columns([3, 2, 1, 1, 1])
+            col0, col1, col2, col3, col4, col5 = st.columns([0.5, 3, 2, 1, 1, 1])
+
+            with col0:
+                # Checkbox for selection
+                content_id = content["id"]
+                is_selected = content_id in st.session_state.selected_contents
+
+                if st.checkbox(
+                    "",
+                    value=is_selected,
+                    key=f"select_content_{content_id}",
+                    label_visibility="collapsed"
+                ):
+                    if content_id not in st.session_state.selected_contents:
+                        st.session_state.selected_contents.append(content_id)
+                else:
+                    if content_id in st.session_state.selected_contents:
+                        st.session_state.selected_contents.remove(content_id)
 
             with col1:
                 title = content.get("title", "Untitled")
@@ -273,9 +320,12 @@ else:
 
             with col5:
                 # Use button to select content for detail view
-                content_id = content["id"]
                 if st.button("👁️", key=f"view_{content_id}", help="View details"):
                     st.session_state.selected_content_id = content_id
                     st.rerun()
 
             st.divider()
+
+    # Show selection count
+    if st.session_state.selected_contents:
+        st.info(f"Selected {len(st.session_state.selected_contents)} item(s) for deletion")

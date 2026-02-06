@@ -255,6 +255,20 @@ class Scheduler:
         if self._running and self._scheduler:
             self._schedule_task(task)
 
+    def add_task_from_dict(self, task_dict: Dict[str, Any]) -> ScheduledTask:
+        """
+        Add a scheduled task from a dictionary.
+
+        Args:
+            task_dict: Dictionary with task properties (id, name, task_type, schedule, etc.)
+
+        Returns:
+            The created ScheduledTask
+        """
+        task = ScheduledTask(**task_dict)
+        self.add_task(task)
+        return task
+
     def remove_task(self, task_id: str) -> bool:
         """Remove a scheduled task."""
         if task_id in self._tasks:

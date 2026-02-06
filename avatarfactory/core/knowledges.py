@@ -321,6 +321,42 @@ class KnowledgeBase:
 
         return True
 
+    def delete_content(self, content_id: str, status: str = "draft") -> bool:
+        """
+        Delete content by ID.
+
+        Args:
+            content_id: Content ID to delete
+            status: Content status ("draft" or "published")
+
+        Returns:
+            True if content was deleted, False if not found
+        """
+        deleted = False
+
+        # Search in persona directories (new structure)
+        personas_dir = self.base_path / "personas"
+        if personas_dir.exists():
+            for persona_dir in personas_dir.iterdir():
+                if not persona_dir.is_dir():
+                    continue
+                folder = "drafts" if status == "draft" else "published"
+                content_dir = persona_dir / "content" / folder
+                if content_dir.exists():
+                    for file_path in content_dir.glob(f"*_{content_id}.json"):
+                        file_path.unlink()
+                        deleted = True
+
+        # Also check legacy location
+        folder = "drafts" if status == "draft" else "published"
+        legacy_dir = self.base_path / "content_library" / folder
+        if legacy_dir.exists():
+            for file_path in legacy_dir.glob(f"*_{content_id}.json"):
+                file_path.unlink()
+                deleted = True
+
+        return deleted
+
     # ========================================================================
     # Review Reports
     # ========================================================================

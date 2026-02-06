@@ -330,3 +330,64 @@ class DashboardDataProvider:
                 for e in edges
             ],
         }
+
+    # ========================================================================
+    # Discovery / Topics
+    # ========================================================================
+
+    def get_discovery_history(
+        self,
+        persona_id: Optional[str] = None,
+        platform: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Get discovery history (topics/ideas) across personas."""
+        results = []
+
+        # If persona_id specified, get only that persona's history
+        if persona_id:
+            persona_ids = [persona_id]
+        else:
+            persona_ids = self.kb.list_personas()
+
+        for pid in persona_ids:
+            history = self.kb.list_discovery_history(pid, platform=platform, limit=limit)
+            for item in history:
+                item["persona_id"] = pid
+                # Get persona name for display
+                persona = self.kb.load_persona(pid)
+                if persona:
+                    item["persona_name"] = persona.identity.name
+                results.append(item)
+
+        # Sort by created_at descending
+        results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return results[:limit]
+
+    def get_discovery_details(self, persona_id: str, filename: str) -> Optional[Dict[str, Any]]:
+        """Get full discovery details by filename."""
+        persona_dir = Path(self.kb_path) / "personas" / persona_id / "discovery"
+        file_path = persona_dir / filename
+
+        if not file_path.exists():
+            return None
+
+        import json
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["_filepath"] = str(file_path)
+        return data
+
+    def delete_discovery(self, persona_id: str, filename: str) -> bool:
+        """Delete a discovery file."""
+        persona_dir = Path(self.kb_path) / "personas" / persona_id / "discovery"
+        file_path = persona_dir / filename
+
+        if file_path.exists():
+            file_path.unlink()
+            return True
+        return False
+
+    def delete_content(self, content_id: str) -> bool:
+        """Delete a content item."""
+        return self.kb.delete_content(content_id)

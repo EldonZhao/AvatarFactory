@@ -54,18 +54,22 @@ class ProactiveOrchestrator(OrchestratorAgent):
         self,
         persona_id: str,
         platforms: Optional[List[str]] = None,
+        discovery_schedule: Optional[str] = None,
+        content_schedule: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Set up proactive scheduled tasks for a persona.
 
         Creates:
-        - Trending scan every 6 hours
-        - Content suggestions daily at 9 AM
+        - Trending scan (default: every 6 hours)
+        - Content suggestions (default: daily at 9 AM)
         - Persona optimization weekly on Fridays
 
         Args:
             persona_id: Persona ID to set up tasks for
             platforms: Platforms to monitor (defaults to ["bluesky"])
+            discovery_schedule: Custom cron schedule for discovery (default: "0 */6 * * *")
+            content_schedule: Custom cron schedule for content generation (default: "0 9 * * *")
 
         Returns:
             List of created task configurations
@@ -75,25 +79,27 @@ class ProactiveOrchestrator(OrchestratorAgent):
             return []
 
         platforms = platforms or ["bluesky"]
+        discovery_schedule = discovery_schedule or "0 */6 * * *"
+        content_schedule = content_schedule or "0 9 * * *"
         tasks = []
 
-        # Trending scan task (every 6 hours)
+        # Trending scan task
         trending_task = {
             "id": f"trending_{persona_id}",
             "name": f"热点扫描",
             "task_type": "proactive_trending",
-            "schedule": "0 */6 * * *",
+            "schedule": discovery_schedule,
             "persona_id": persona_id,
             "extra_params": {"platforms": platforms},
         }
         tasks.append(trending_task)
 
-        # Content suggestions task (daily at 9 AM)
+        # Content suggestions task
         content_task = {
             "id": f"content_suggest_{persona_id}",
             "name": f"内容建议",
             "task_type": "proactive_content",
-            "schedule": "0 9 * * *",
+            "schedule": content_schedule,
             "persona_id": persona_id,
             "extra_params": {"count": 3},
         }

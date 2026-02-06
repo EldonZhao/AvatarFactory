@@ -62,9 +62,8 @@ class ProactiveOrchestrator(OrchestratorAgent):
         Set up proactive scheduled tasks for a persona.
 
         Creates:
-        - Trending scan (default: every 6 hours)
-        - Content suggestions (default: daily at 9 AM)
-        - Persona optimization weekly on Fridays
+        - Discovery task: scan for trending topics
+        - Content task: generate content suggestions
 
         Args:
             persona_id: Persona ID to set up tasks for
@@ -86,46 +85,35 @@ class ProactiveOrchestrator(OrchestratorAgent):
         content_schedule = content_schedule or "0 9 * * *"
         tasks = []
 
-        # Trending scan task (only if discovery platforms specified)
+        # Discovery task (only if discovery platforms specified)
         if discovery_platforms:
-            trending_task = {
-                "id": f"trending_{persona_id}",
+            discovery_task = {
+                "id": f"discovery_{persona_id}",
                 "name": f"热点扫描",
-                "task_type": "proactive_trending",
+                "task_type": "discovery",
                 "schedule": discovery_schedule,
                 "persona_id": persona_id,
                 "extra_params": {"platforms": discovery_platforms},
             }
-            tasks.append(trending_task)
+            tasks.append(discovery_task)
 
-        # Content suggestions task (only if content platforms specified)
+        # Content task (only if content platforms specified)
         if content_platforms:
             content_task = {
-                "id": f"content_suggest_{persona_id}",
-                "name": f"内容建议",
-                "task_type": "proactive_content",
+                "id": f"content_{persona_id}",
+                "name": f"内容生成",
+                "task_type": "content",
                 "schedule": content_schedule,
                 "persona_id": persona_id,
                 "extra_params": {"count": 3, "platforms": content_platforms},
             }
             tasks.append(content_task)
 
-        # Persona optimization task (weekly on Fridays at 6 PM)
-        optimize_task = {
-            "id": f"optimize_{persona_id}",
-            "name": f"人设优化",
-            "task_type": "proactive_optimize",
-            "schedule": "0 18 * * 5",
-            "persona_id": persona_id,
-            "extra_params": {},
-        }
-        tasks.append(optimize_task)
-
         # Add tasks to scheduler
         for task in tasks:
             try:
                 self._scheduler.add_task_from_dict(task)
-                self.log("INFO", f"Added proactive task: {task['name']} for {persona_id}")
+                self.log("INFO", f"Added task: {task['name']} for {persona_id}")
             except Exception as e:
                 self.log("ERROR", f"Failed to add task {task['name']}: {e}")
 
@@ -145,6 +133,9 @@ class ProactiveOrchestrator(OrchestratorAgent):
             return 0
 
         task_ids = [
+            f"discovery_{persona_id}",
+            f"content_{persona_id}",
+            # Also try old task IDs for backward compatibility
             f"trending_{persona_id}",
             f"content_suggest_{persona_id}",
             f"optimize_{persona_id}",

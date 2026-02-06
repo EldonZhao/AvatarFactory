@@ -167,6 +167,10 @@ class DashboardDataProvider:
         """Get next scheduled run times."""
         return self.scheduler.get_next_runs()
 
+    def delete_task(self, task_id: str) -> bool:
+        """Delete a scheduled task."""
+        return self.scheduler.remove_task(task_id)
+
     def get_connector_statuses(self) -> List[ConnectorStatus]:
         """Get status of all connectors."""
         # Define expected configuration for each platform

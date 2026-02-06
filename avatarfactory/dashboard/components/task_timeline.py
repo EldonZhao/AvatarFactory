@@ -13,22 +13,24 @@ import streamlit as st
 def render_task_timeline(
     tasks: List[Dict[str, Any]],
     show_disabled: bool = True,
-) -> Optional[str]:
+    on_delete: bool = False,
+) -> Optional[Dict[str, Any]]:
     """
     Render a timeline of scheduled tasks.
 
     Args:
         tasks: List of task dictionaries
         show_disabled: Whether to show disabled tasks
+        on_delete: Whether to show delete buttons
 
     Returns:
-        Task ID if an action was taken, None otherwise
+        Dict with action type and task_id if an action was taken, None otherwise
     """
     if not tasks:
-        st.info("No scheduled tasks. Create one from the CLI.")
+        st.info("No scheduled tasks. Create one from the sidebar.")
         return None
 
-    selected_task = None
+    action_result = None
 
     # Filter tasks
     if not show_disabled:
@@ -48,11 +50,14 @@ def render_task_timeline(
         "content": "📝",
         "publish": "📤",
         "report": "📊",
+        "proactive_trending": "🔍",
+        "proactive_content": "📝",
+        "proactive_optimize": "⚙️",
     }
 
     for task_type, type_tasks in task_types.items():
         icon = type_icons.get(task_type, "📌")
-        st.markdown(f"### {icon} {task_type.capitalize()} Tasks")
+        st.markdown(f"### {icon} {task_type.replace('proactive_', '').capitalize()} Tasks")
 
         for task in type_tasks:
             task_id = task["id"]
@@ -86,7 +91,7 @@ def render_task_timeline(
                 last_run_str = "Never"
 
             with st.container():
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 0.5, 0.5])
 
                 with col1:
                     st.markdown(f"""
@@ -112,11 +117,15 @@ def render_task_timeline(
 
                 with col4:
                     if st.button("▶️", key=f"run_{task_id}", help="Run now"):
-                        selected_task = task_id
+                        action_result = {"action": "run", "task_id": task_id}
+
+                with col5:
+                    if st.button("🗑️", key=f"delete_{task_id}", help="Delete task"):
+                        action_result = {"action": "delete", "task_id": task_id}
 
             st.divider()
 
-    return selected_task
+    return action_result
 
 
 def render_next_runs(next_runs: List[Dict[str, Any]]) -> None:

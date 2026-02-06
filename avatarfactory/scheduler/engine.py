@@ -102,6 +102,10 @@ class Scheduler:
         self._publish_queue: List[PublishQueueItem] = []
         self._event_handlers: Dict[str, List[Callable]] = {}
 
+        # Track file modification times to detect external changes
+        self._tasks_file_mtime: Optional[float] = None
+        self._queue_file_mtime: Optional[float] = None
+
         # Ensure data directory exists
         self._data_dir = Path(self.config.data_dir)
         self._data_dir.mkdir(parents=True, exist_ok=True)
@@ -116,6 +120,9 @@ class Scheduler:
 
         if tasks_file.exists():
             try:
+                # Track file modification time
+                self._tasks_file_mtime = tasks_file.stat().st_mtime
+
                 with open(tasks_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     for task_data in data:
@@ -126,6 +133,9 @@ class Scheduler:
 
         if queue_file.exists():
             try:
+                # Track file modification time
+                self._queue_file_mtime = queue_file.stat().st_mtime
+
                 with open(queue_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self._publish_queue = [PublishQueueItem(**item) for item in data]
@@ -133,18 +143,109 @@ class Scheduler:
                 logger.warning(f"Failed to load publish queue: {e}")
 
     def _save_state(self) -> None:
-        """Persist scheduler state."""
+        """
+        Persist scheduler state with external modification detection.
+
+        If the tasks file was modified externally since we loaded it,
+        we merge changes instead of blindly overwriting:
+        - Keep tasks from file that we don't have in memory (new tasks added externally)
+        - Remove tasks from memory that were deleted from file externally
+        - For tasks that exist in both, prefer memory state (has runtime updates like last_run)
+        """
         tasks_file = self._data_dir / "tasks.json"
         queue_file = self._data_dir / "publish_queue.json"
 
         try:
-            with open(tasks_file, "w", encoding="utf-8") as f:
-                json.dump([t.model_dump(mode='json') for t in self._tasks.values()], f, indent=2, default=str)
+            # Check if tasks file was modified externally
+            if tasks_file.exists() and self._tasks_file_mtime is not None:
+                current_mtime = tasks_file.stat().st_mtime
+                if current_mtime > self._tasks_file_mtime:
+                    logger.info("Detected external modification to tasks.json, merging changes...")
+                    self._merge_external_task_changes(tasks_file)
 
+            # Save tasks
+            with open(tasks_file, "w", encoding="utf-8") as f:
+                json.dump([t.model_dump(mode='json') for t in self._tasks.values()], f, indent=2, default=str, ensure_ascii=False)
+
+            # Update tracked mtime
+            self._tasks_file_mtime = tasks_file.stat().st_mtime
+
+            # Save publish queue
             with open(queue_file, "w", encoding="utf-8") as f:
-                json.dump([q.model_dump(mode='json') for q in self._publish_queue], f, indent=2, default=str)
+                json.dump([q.model_dump(mode='json') for q in self._publish_queue], f, indent=2, default=str, ensure_ascii=False)
+
+            if queue_file.exists():
+                self._queue_file_mtime = queue_file.stat().st_mtime
+
         except Exception as e:
             logger.error(f"Failed to save state: {e}")
+
+    def _merge_external_task_changes(self, tasks_file: Path) -> None:
+        """
+        Merge external changes to tasks.json with in-memory state.
+
+        Strategy:
+        - Tasks deleted from file externally -> remove from memory
+        - Tasks added to file externally -> add to memory
+        - Tasks modified in file -> keep memory version (has runtime state)
+          but update static config (schedule, enabled, extra_params) from file
+        """
+        try:
+            with open(tasks_file, "r", encoding="utf-8") as f:
+                file_data = json.load(f)
+
+            file_tasks = {t["id"]: t for t in file_data}
+            file_task_ids = set(file_tasks.keys())
+            memory_task_ids = set(self._tasks.keys())
+
+            # Tasks deleted externally (in memory but not in file)
+            deleted_ids = memory_task_ids - file_task_ids
+            for task_id in deleted_ids:
+                logger.info(f"Task {task_id} was deleted externally, removing from memory")
+                del self._tasks[task_id]
+                # Also remove from APScheduler if running
+                if self._running and self._scheduler:
+                    try:
+                        self._scheduler.remove_job(task_id)
+                    except Exception:
+                        pass
+
+            # Tasks added externally (in file but not in memory)
+            added_ids = file_task_ids - memory_task_ids
+            for task_id in added_ids:
+                logger.info(f"Task {task_id} was added externally, loading into memory")
+                task = ScheduledTask(**file_tasks[task_id])
+                self._tasks[task_id] = task
+                # Schedule if running
+                if self._running and self._scheduler:
+                    self._schedule_task(task)
+
+            # Tasks in both - merge config changes but keep runtime state
+            common_ids = memory_task_ids & file_task_ids
+            for task_id in common_ids:
+                file_task = file_tasks[task_id]
+                memory_task = self._tasks[task_id]
+
+                # Update static config from file
+                updated = False
+                for field in ["name", "schedule", "enabled", "platform", "extra_params"]:
+                    if field in file_task and getattr(memory_task, field) != file_task.get(field):
+                        setattr(memory_task, field, file_task[field])
+                        updated = True
+
+                if updated:
+                    logger.info(f"Task {task_id} config updated from external changes")
+                    # Reschedule if running and schedule changed
+                    if self._running and self._scheduler:
+                        try:
+                            self._scheduler.remove_job(task_id)
+                        except Exception:
+                            pass
+                        if memory_task.enabled:
+                            self._schedule_task(memory_task)
+
+        except Exception as e:
+            logger.warning(f"Failed to merge external task changes: {e}")
 
     def add_task(self, task: ScheduledTask) -> None:
         """Add a scheduled task."""

@@ -53,7 +53,8 @@ class ProactiveOrchestrator(OrchestratorAgent):
     async def setup_persona_tasks(
         self,
         persona_id: str,
-        platforms: Optional[List[str]] = None,
+        discovery_platforms: Optional[List[str]] = None,
+        content_platforms: Optional[List[str]] = None,
         discovery_schedule: Optional[str] = None,
         content_schedule: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
@@ -67,7 +68,8 @@ class ProactiveOrchestrator(OrchestratorAgent):
 
         Args:
             persona_id: Persona ID to set up tasks for
-            platforms: Platforms to monitor (defaults to ["bluesky"])
+            discovery_platforms: Platforms for discovery/trending scan (defaults to ["bluesky"])
+            content_platforms: Platforms for content generation (defaults to ["xiaohongshu"])
             discovery_schedule: Custom cron schedule for discovery (default: "0 */6 * * *")
             content_schedule: Custom cron schedule for content generation (default: "0 9 * * *")
 
@@ -78,32 +80,35 @@ class ProactiveOrchestrator(OrchestratorAgent):
             self.log("WARNING", "No scheduler configured, cannot set up persona tasks")
             return []
 
-        platforms = platforms or ["bluesky"]
+        discovery_platforms = discovery_platforms or ["bluesky"]
+        content_platforms = content_platforms or ["xiaohongshu"]
         discovery_schedule = discovery_schedule or "0 */6 * * *"
         content_schedule = content_schedule or "0 9 * * *"
         tasks = []
 
-        # Trending scan task
-        trending_task = {
-            "id": f"trending_{persona_id}",
-            "name": f"热点扫描",
-            "task_type": "proactive_trending",
-            "schedule": discovery_schedule,
-            "persona_id": persona_id,
-            "extra_params": {"platforms": platforms},
-        }
-        tasks.append(trending_task)
+        # Trending scan task (only if discovery platforms specified)
+        if discovery_platforms:
+            trending_task = {
+                "id": f"trending_{persona_id}",
+                "name": f"热点扫描",
+                "task_type": "proactive_trending",
+                "schedule": discovery_schedule,
+                "persona_id": persona_id,
+                "extra_params": {"platforms": discovery_platforms},
+            }
+            tasks.append(trending_task)
 
-        # Content suggestions task
-        content_task = {
-            "id": f"content_suggest_{persona_id}",
-            "name": f"内容建议",
-            "task_type": "proactive_content",
-            "schedule": content_schedule,
-            "persona_id": persona_id,
-            "extra_params": {"count": 3},
-        }
-        tasks.append(content_task)
+        # Content suggestions task (only if content platforms specified)
+        if content_platforms:
+            content_task = {
+                "id": f"content_suggest_{persona_id}",
+                "name": f"内容建议",
+                "task_type": "proactive_content",
+                "schedule": content_schedule,
+                "persona_id": persona_id,
+                "extra_params": {"count": 3, "platforms": content_platforms},
+            }
+            tasks.append(content_task)
 
         # Persona optimization task (weekly on Fridays at 6 PM)
         optimize_task = {

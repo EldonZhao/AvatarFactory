@@ -53,14 +53,15 @@ with st.sidebar:
             )
             task_persona_id = persona_opts[task_persona_label]
 
-            task_platforms = st.multiselect(
-                "Platforms",
+            st.markdown("**Discovery Settings**")
+
+            discovery_platforms = st.multiselect(
+                "Discovery Platforms",
                 ["bluesky", "xiaohongshu", "twitter"],
                 default=["bluesky"],
-                key="task_platforms_select"
+                key="discovery_platforms_select",
+                help="Platforms to scan for trending topics"
             )
-
-            st.markdown("**Schedule Settings**")
 
             # Discovery schedule options
             discovery_schedule_opts = {
@@ -77,6 +78,16 @@ with st.sidebar:
             )
             discovery_schedule = discovery_schedule_opts[discovery_schedule_label]
 
+            st.markdown("**Content Generation Settings**")
+
+            content_platforms = st.multiselect(
+                "Content Platforms",
+                ["bluesky", "xiaohongshu", "twitter"],
+                default=["xiaohongshu"],
+                key="content_platforms_select",
+                help="Platforms to generate content for"
+            )
+
             # Content generation schedule options
             content_schedule_opts = {
                 "Daily at 10 AM": "0 10 * * *",
@@ -92,17 +103,18 @@ with st.sidebar:
             )
             content_schedule = content_schedule_opts[content_schedule_label]
 
-            st.caption("This will create discovery and content generation tasks for the selected platforms.")
+            st.caption("This will create discovery and content generation tasks with the selected settings.")
 
             if st.button("Setup Tasks", key="create_task_btn", type="primary"):
-                if task_platforms:
+                if discovery_platforms or content_platforms:
                     with st.spinner("Setting up tasks..."):
                         try:
                             with httpx.Client(timeout=30) as client:
                                 response = client.post(
                                     f"{api_url}/scheduler/tasks/{task_persona_id}/setup",
                                     json={
-                                        "platforms": task_platforms,
+                                        "discovery_platforms": discovery_platforms,
+                                        "content_platforms": content_platforms,
                                         "discovery_schedule": discovery_schedule,
                                         "content_schedule": content_schedule,
                                     }

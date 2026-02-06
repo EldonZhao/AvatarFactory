@@ -153,7 +153,9 @@ class SchedulerStatusResponse(BaseModel):
 
 class SetupTasksRequest(BaseModel):
     """Request to set up proactive tasks."""
-    platforms: List[str] = Field(default=["bluesky"], description="Platforms to monitor")
+    platforms: List[str] = Field(default=["bluesky"], description="Platforms to monitor (deprecated, use discovery_platforms)")
+    discovery_platforms: Optional[List[str]] = Field(default=None, description="Platforms for discovery/trending scan")
+    content_platforms: Optional[List[str]] = Field(default=None, description="Platforms for content generation")
     discovery_schedule: Optional[str] = Field(default=None, description="Cron schedule for discovery (default: 0 */6 * * *)")
     content_schedule: Optional[str] = Field(default=None, description="Cron schedule for content generation (default: 0 9 * * *)")
 
@@ -867,9 +869,14 @@ def register_routes(app: FastAPI):
                 detail=f"Persona {persona_id} not found",
             )
 
+        # Use new separate platforms or fall back to legacy 'platforms' field
+        discovery_platforms = request.discovery_platforms or request.platforms
+        content_platforms = request.content_platforms or request.platforms
+
         tasks = await orchestrator.setup_persona_tasks(
             persona_id,
-            request.platforms,
+            discovery_platforms=discovery_platforms,
+            content_platforms=content_platforms,
             discovery_schedule=request.discovery_schedule,
             content_schedule=request.content_schedule,
         )

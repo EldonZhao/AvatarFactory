@@ -18,6 +18,8 @@ def render_persona_card(
     draft_count: int = 0,
     published_count: int = 0,
     created_at: Optional[str] = None,
+    notification_enabled: bool = False,
+    notification_type: str = "",
     show_actions: bool = True,
 ) -> Optional[str]:
     """
@@ -32,6 +34,8 @@ def render_persona_card(
         draft_count: Number of draft content items
         published_count: Number of published content items
         created_at: Creation timestamp
+        notification_enabled: Whether notifications are enabled
+        notification_type: Type of notification connector
         show_actions: Whether to show action buttons
 
     Returns:
@@ -48,10 +52,26 @@ def render_persona_card(
         "douyin": "🎵",
     }
 
+    # Notification type emoji mapping
+    notification_emojis = {
+        "wecom": "💬",
+        "slack": "💼",
+        "discord": "🎮",
+        "telegram": "📨",
+        "feishu": "🪶",
+    }
+
     platform_badges = " ".join(
         platform_emojis.get(p.lower(), "📱") + " " + p
         for p in platforms
     )
+
+    # Build notification badge
+    if notification_enabled and notification_type:
+        notif_emoji = notification_emojis.get(notification_type, "🔔")
+        notification_badge = f'<span style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 8px;">{notif_emoji} {notification_type}</span>'
+    else:
+        notification_badge = '<span style="background: #f5f5f5; color: #999; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 8px;">🔕 notifications off</span>'
 
     with st.container():
         st.markdown(f"""
@@ -74,6 +94,7 @@ def render_persona_card(
                     margin-right: 8px;
                 ">{version}</span>
                 <span style="font-size: 13px;">{platform_badges}</span>
+                {notification_badge}
             </div>
             <div style="display: flex; gap: 16px; font-size: 13px; color: #666;">
                 <span>📝 {draft_count} drafts</span>

@@ -38,8 +38,13 @@ with st.sidebar:
     )
 
     personas = provider.get_personas()
-    persona_options = ["All"] + [p.id for p in personas]
-    persona_filter = st.selectbox("Persona", persona_options)
+    # Create persona options with readable names
+    persona_options = {"All": None}
+    for p in personas:
+        persona_options[f"{p.name} ({p.id[:12]}...)"] = p.id
+
+    persona_filter_label = st.selectbox("Persona", list(persona_options.keys()))
+    selected_persona = persona_options[persona_filter_label]
 
     limit = st.slider("Max items", 10, 100, 50)
 
@@ -47,7 +52,6 @@ with st.sidebar:
         st.rerun()
 
 # Get content
-selected_persona = None if persona_filter == "All" else persona_filter
 contents = provider.get_content_list(
     persona_id=selected_persona,
     status=status_filter,
@@ -67,6 +71,9 @@ with col3:
 
 st.divider()
 
+# Build persona ID to name mapping
+persona_name_map = {p.id: p.name for p in personas}
+
 # Session state for selected content
 if "selected_content" not in st.session_state:
     st.session_state.selected_content = None
@@ -81,6 +88,13 @@ if not contents:
         "```"
     )
 else:
+    # Platform emoji mapping
+    platform_emojis = {
+        "xiaohongshu": "📕",
+        "bluesky": "🦋",
+        "twitter": "𝕏",
+    }
+
     # Create a table view
     for content in contents:
         with st.container():
@@ -94,15 +108,10 @@ else:
 
             with col2:
                 persona_id = content.get("persona_id", "Unknown")
+                persona_name = persona_name_map.get(persona_id, persona_id[:12] + "...")
                 platform = content.get("platform", "unknown")
-                # Platform emoji
-                platform_emojis = {
-                    "xiaohongshu": "📕",
-                    "bluesky": "🦋",
-                    "twitter": "𝕏",
-                }
                 emoji = platform_emojis.get(platform, "📱")
-                st.caption(f"{emoji} {platform} | {persona_id[:15]}...")
+                st.caption(f"{emoji} {platform} | {persona_name}")
 
             with col3:
                 pillar = content.get("pillar", "N/A")
@@ -123,6 +132,7 @@ else:
             with col5:
                 if st.button("👁️", key=f"view_{content['id']}", help="View details"):
                     st.session_state.selected_content = content["id"]
+                    st.rerun()
 
             st.divider()
 

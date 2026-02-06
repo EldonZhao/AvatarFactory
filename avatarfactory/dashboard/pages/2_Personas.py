@@ -101,6 +101,8 @@ else:
                         draft_count=persona.draft_count,
                         published_count=persona.published_count,
                         created_at=persona.created_at.isoformat() if persona.created_at else None,
+                        notification_enabled=persona.notification_enabled,
+                        notification_type=persona.notification_type,
                     )
 
                     if action == "view":

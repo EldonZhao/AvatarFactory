@@ -47,6 +47,8 @@ class PersonaSummary:
     created_at: Optional[datetime]
     draft_count: int = 0
     published_count: int = 0
+    notification_enabled: bool = False
+    notification_type: str = ""
 
 
 @dataclass
@@ -83,6 +85,13 @@ class DashboardDataProvider:
                 draft_count = len(self.kb.list_content(persona_id, status="draft"))
                 published_count = len(self.kb.list_content(persona_id, status="published"))
 
+                # Get notification config
+                notification_enabled = False
+                notification_type = ""
+                if persona.notification:
+                    notification_enabled = persona.notification.enabled
+                    notification_type = persona.notification.connector_type if notification_enabled else ""
+
                 personas.append(PersonaSummary(
                     id=persona.id,
                     name=persona.identity.name,
@@ -92,6 +101,8 @@ class DashboardDataProvider:
                     created_at=persona.created_at,
                     draft_count=draft_count,
                     published_count=published_count,
+                    notification_enabled=notification_enabled,
+                    notification_type=notification_type,
                 ))
         return personas
 

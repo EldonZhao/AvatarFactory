@@ -222,12 +222,22 @@ else:
             st.markdown("---")
             st.markdown("#### 📊 Data Flow Overview")
 
+            # Get discovery platforms from tasks (source) vs persona platforms (target)
+            discovery_platforms = set()
+            for task in persona_tasks:
+                if task.get("task_type") == "discovery" and task.get("platform"):
+                    discovery_platforms.add(task.get("platform"))
+
+            # If no discovery tasks, default to bluesky as common source
+            if not discovery_platforms:
+                discovery_platforms = {"bluesky"}
+
             # Build flow diagram
             flow_cols = st.columns([1, 1, 1, 1, 1])
 
             with flow_cols[0]:
                 st.markdown("**📥 Sources**")
-                for p in persona.platforms:
+                for p in discovery_platforms:
                     icon = CONNECTOR_ICONS.get(p, "📱")
                     configured = any(c.platform == p and c.configured for c in connectors)
                     status = "✅" if configured else "⚠️"
@@ -250,7 +260,16 @@ else:
 
             with flow_cols[4]:
                 st.markdown("**📤 Targets**")
-                for p in persona.platforms:
+                # Get target platforms from content tasks
+                content_platforms = set()
+                for task in persona_tasks:
+                    if task.get("task_type") == "content" and task.get("platform"):
+                        content_platforms.add(task.get("platform"))
+
+                # Fallback to persona.platforms if no content tasks
+                target_platforms = content_platforms or set(persona.platforms)
+
+                for p in target_platforms:
                     icon = CONNECTOR_ICONS.get(p, "📱")
                     configured = any(c.platform == p and c.configured for c in connectors)
                     status = "✅" if configured else "⚠️"

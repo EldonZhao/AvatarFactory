@@ -283,6 +283,80 @@ def list_personas():
 
 
 @app.command()
+def delete_persona(
+    persona_id: str = typer.Argument(..., help="Persona ID to delete"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+    keep_content: bool = typer.Option(False, "--keep-content", help="Keep content files"),
+):
+    """
+    Delete a persona and all associated data.
+
+    This will remove:
+    - Persona configuration and versions
+    - All content created by this persona (unless --keep-content)
+    - Discovery data
+    - Scheduled tasks for this persona
+
+    Example:
+        avatarfactory delete-persona persona_abc123
+        avatarfactory delete-persona persona_abc123 --force
+        avatarfactory delete-persona persona_abc123 --keep-content
+    """
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+
+    # Check if persona exists
+    persona = kb.load_persona(persona_id)
+    if not persona:
+        console.print(f"[red]Error: Persona {persona_id} not found[/red]")
+        raise typer.Exit(1)
+
+    # Show persona info
+    console.print(f"\n[bold]Persona to delete:[/bold]")
+    console.print(f"  ID: {persona_id}")
+    console.print(f"  Name: {persona.identity.name}")
+    console.print(f"  Tagline: {persona.identity.tagline}")
+
+    # Count associated content
+    draft_count = len(kb.list_content(persona_id, status="draft"))
+    published_count = len(kb.list_content(persona_id, status="published"))
+    console.print(f"\n[bold]Associated data:[/bold]")
+    console.print(f"  Drafts: {draft_count}")
+    console.print(f"  Published: {published_count}")
+
+    # Confirm deletion
+    if not force:
+        console.print("\n[yellow]⚠️  This action cannot be undone![/yellow]")
+        confirm = typer.confirm("Are you sure you want to delete this persona?")
+        if not confirm:
+            console.print("[dim]Cancelled[/dim]")
+            raise typer.Exit(0)
+
+    with console.status("[bold red]Deleting persona...", spinner="dots"):
+        # 1. Delete scheduled tasks
+        from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
+        scheduler = Scheduler(SchedulerConfig())
+        tasks_removed = scheduler.remove_tasks_for_persona(persona_id)
+
+        # 2. Delete persona and content
+        result = kb.delete_persona(persona_id, delete_content=not keep_content)
+
+    # Show results
+    console.print("\n[bold]Deletion complete:[/bold]")
+    console.print(f"  ✅ Persona deleted: {result['persona_deleted']}")
+    console.print(f"  ✅ Content files deleted: {result['content_deleted']}")
+    console.print(f"  ✅ Discovery data deleted: {result['discovery_deleted']}")
+    console.print(f"  ✅ Scheduled tasks removed: {tasks_removed}")
+
+    if result["errors"]:
+        console.print("\n[yellow]Warnings:[/yellow]")
+        for error in result["errors"]:
+            console.print(f"  ⚠️  {error}")
+
+    console.print(f"\n[green]✅ Persona {persona_id} has been deleted[/green]")
+
+
+@app.command()
 def list_content(
     persona_id: Optional[str] = typer.Option(
         None, "--persona", "-p", help="Filter by persona ID"

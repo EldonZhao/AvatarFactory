@@ -220,17 +220,18 @@ Output MUST be valid JSON:
 
         persona_id = parameters.get("persona_id")
         if not persona_id:
-            # Try to find the most recent persona
+            # Try to find the most recent persona (sorted by created_at desc)
             personas = self.kb.list_personas()
             if not personas:
                 return {"message": "No persona found. Please create a persona first."}
             persona_id = personas[0]
+            self.log("WARNING", f"No persona_id specified, using most recent: {persona_id}")
 
         persona = self.kb.load_persona(persona_id)
         if not persona:
             return {"message": f"Persona {persona_id} not found"}
 
-        self.log("INFO", f"Generating content for persona {persona_id}")
+        self.log("INFO", f"Generating content for persona {persona_id} ({persona.identity.name})")
 
         # Extract topic from parameters or use default
         topic = parameters.get("topic")

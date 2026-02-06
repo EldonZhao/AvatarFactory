@@ -77,12 +77,35 @@ class KnowledgeBase:
             data = yaml.safe_load(f)
         return Persona(**data)
 
-    def list_personas(self) -> List[str]:
-        """List all persona IDs"""
+    def list_personas(self, sort_by_created: bool = True) -> List[str]:
+        """List all persona IDs, optionally sorted by creation time (newest first)."""
         personas_dir = self.base_path / "personas"
         if not personas_dir.exists():
             return []
-        return [d.name for d in personas_dir.iterdir() if d.is_dir()]
+
+        persona_dirs = [d for d in personas_dir.iterdir() if d.is_dir()]
+
+        if not sort_by_created:
+            return [d.name for d in persona_dirs]
+
+        # Sort by creation time from config.yaml
+        def get_created_time(persona_dir):
+            config_path = persona_dir / "config.yaml"
+            if config_path.exists():
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                    created_at = data.get("created_at", "")
+                    if created_at:
+                        return created_at
+                except Exception:
+                    pass
+            # Fallback to directory modification time
+            return persona_dir.stat().st_mtime
+
+        # Sort by created_at descending (newest first)
+        sorted_dirs = sorted(persona_dirs, key=get_created_time, reverse=True)
+        return [d.name for d in sorted_dirs]
 
     def save_persona_version(self, persona_id: str, version_info: PersonaVersion) -> None:
         """Save persona version history record"""
@@ -111,6 +134,59 @@ class KnowledgeBase:
         with open(history_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return [PersonaVersion(**item) for item in data]
+
+    def delete_persona(self, persona_id: str, delete_content: bool = True) -> Dict[str, Any]:
+        """
+        Delete a persona and optionally all associated data.
+
+        Args:
+            persona_id: The persona ID to delete
+            delete_content: If True, also delete all content created by this persona
+
+        Returns:
+            Dict with deletion summary:
+            - persona_deleted: bool
+            - content_deleted: int (count of deleted content files)
+            - discovery_deleted: bool
+            - errors: List[str] (any errors encountered)
+        """
+        result = {
+            "persona_deleted": False,
+            "content_deleted": 0,
+            "discovery_deleted": False,
+            "errors": [],
+        }
+
+        # 1. Check if persona exists
+        persona_dir = self.base_path / "personas" / persona_id
+        if not persona_dir.exists():
+            result["errors"].append(f"Persona {persona_id} not found")
+            return result
+
+        # 2. Delete associated content (drafts and published)
+        if delete_content:
+            for folder in ["drafts", "published"]:
+                content_dir = self.base_path / "content_library" / folder
+                if content_dir.exists():
+                    for file_path in content_dir.glob("*.json"):
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            if data.get("persona_id") == persona_id:
+                                file_path.unlink()
+                                result["content_deleted"] += 1
+                        except Exception as e:
+                            result["errors"].append(f"Failed to delete {file_path}: {e}")
+
+        # 3. Delete persona directory (includes discovery data, reviews, versions)
+        try:
+            shutil.rmtree(persona_dir)
+            result["persona_deleted"] = True
+            result["discovery_deleted"] = True  # Discovery is inside persona dir
+        except Exception as e:
+            result["errors"].append(f"Failed to delete persona directory: {e}")
+
+        return result
 
     # ========================================================================
     # Content Management

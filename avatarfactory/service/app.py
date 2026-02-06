@@ -457,6 +457,44 @@ def register_routes(app: FastAPI):
                 detail=str(e),
             )
 
+    @app.delete("/personas/{persona_id}", tags=["Personas"])
+    async def delete_persona(persona_id: str, keep_content: bool = False):
+        """Delete a persona and all associated data.
+
+        This will remove:
+        - Persona configuration and versions
+        - All content created by this persona (unless keep_content=True)
+        - Discovery data
+        - Scheduled tasks for this persona
+        """
+        orchestrator = get_orchestrator()
+
+        # Check if persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Delete scheduled tasks
+        from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
+        scheduler = Scheduler(SchedulerConfig())
+        tasks_removed = scheduler.remove_tasks_for_persona(persona_id)
+
+        # Delete persona and content
+        result = orchestrator.kb.delete_persona(persona_id, delete_content=not keep_content)
+
+        return {
+            "status": "success",
+            "persona_id": persona_id,
+            "persona_deleted": result["persona_deleted"],
+            "content_deleted": result["content_deleted"],
+            "discovery_deleted": result["discovery_deleted"],
+            "tasks_removed": tasks_removed,
+            "errors": result["errors"],
+        }
+
     # -------------------------------------------------------------------------
     # Content
     # -------------------------------------------------------------------------

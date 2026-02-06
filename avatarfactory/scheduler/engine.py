@@ -176,6 +176,25 @@ class Scheduler:
         """List all scheduled tasks."""
         return list(self._tasks.values())
 
+    def remove_tasks_for_persona(self, persona_id: str) -> int:
+        """Remove all scheduled tasks for a specific persona.
+
+        Args:
+            persona_id: The persona ID to remove tasks for
+
+        Returns:
+            Number of tasks removed
+        """
+        tasks_to_remove = [
+            task_id for task_id, task in self._tasks.items()
+            if task.persona_id == persona_id
+        ]
+
+        for task_id in tasks_to_remove:
+            self.remove_task(task_id)
+
+        return len(tasks_to_remove)
+
     def enable_task(self, task_id: str) -> bool:
         """Enable a task."""
         if task_id in self._tasks:

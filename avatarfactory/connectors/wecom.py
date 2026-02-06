@@ -228,20 +228,88 @@ class WeComConnector(BasePlatformConnector):
         title: Optional[str] = None,
         tags: Optional[List[str]] = None,
     ) -> str:
-        """Build markdown formatted message for WeChat Work."""
+        """
+        Build markdown formatted message for WeChat Work.
+
+        Note: WeChat Work only supports limited markdown:
+        - Headers: # ## ###
+        - Bold: **text**
+        - Links: [text](url)
+        - Inline code: `code`
+        - Quote: > text
+        - Green text: <font color="info">text</font>
+        - Grey text: <font color="comment">text</font>
+        - Orange text: <font color="warning">text</font>
+
+        NOT supported:
+        - Italics, strikethrough
+        - Lists (-, *, 1.)
+        - Tables
+        - Code blocks (```)
+        - Images
+
+        Max length: 4096 bytes
+        """
         parts = []
 
         if title:
             parts.append(f"### {title}")
             parts.append("")
 
-        parts.append(content)
+        # Convert unsupported markdown to plain text
+        cleaned_content = self._clean_markdown_for_wecom(content)
+        parts.append(cleaned_content)
 
         if tags:
             parts.append("")
-            parts.append(" ".join(f"`#{tag}`" for tag in tags))
+            parts.append(" ".join(f"`#{tag}`" for tag in tags[:5]))  # Limit tags
 
-        return "\n".join(parts)
+        result = "\n".join(parts)
+
+        # Truncate to max 4096 bytes (with buffer for Chinese chars)
+        max_chars = 1200  # ~3600 bytes for Chinese
+        if len(result) > max_chars:
+            result = result[:max_chars] + "\n\n...(内容已截断)"
+
+        return result
+
+    def _clean_markdown_for_wecom(self, content: str) -> str:
+        """
+        Clean markdown content to be compatible with WeChat Work.
+
+        Converts unsupported markdown syntax to plain text or supported alternatives.
+        """
+        import re
+
+        lines = content.split("\n")
+        cleaned_lines = []
+
+        for line in lines:
+            # Convert list items to plain text with indicators
+            # - item -> • item
+            line = re.sub(r"^(\s*)[-*]\s+", r"\1• ", line)
+
+            # Convert numbered lists
+            # 1. item -> 1. item (keep as is, just ensure spacing)
+            line = re.sub(r"^(\s*)(\d+)\.\s+", r"\1\2. ", line)
+
+            # Remove code blocks markers (``` or ```python)
+            if line.strip().startswith("```"):
+                continue
+
+            # Convert **bold** to keep it (supported)
+            # But remove *italic* or _italic_ (not supported)
+            line = re.sub(r"(?<!\*)\*(?!\*)([^*]+)(?<!\*)\*(?!\*)", r"\1", line)
+            line = re.sub(r"_([^_]+)_", r"\1", line)
+
+            # Remove strikethrough ~~text~~
+            line = re.sub(r"~~([^~]+)~~", r"\1", line)
+
+            # Keep headers, bold, quotes, inline code (all supported)
+
+            cleaned_lines.append(line)
+
+        return "\n".join(cleaned_lines)
 
     async def send_content_notification(
         self,
@@ -260,6 +328,9 @@ class WeComConnector(BasePlatformConnector):
         This is a convenience method for the common use case of
         notifying users about newly generated content.
 
+        Note: WeChat Work has limited markdown support and 4096 byte limit.
+        This method formats the notification to work within those constraints.
+
         Args:
             content_title: Generated content title
             content_body: Generated content body (will be truncated)
@@ -273,58 +344,80 @@ class WeComConnector(BasePlatformConnector):
         Returns:
             PublishResult
         """
-        # Build notification content
+        # Build notification content (optimized for WeChat Work)
         parts = []
 
-        # Header
+        # Compact header
+        header_parts = []
         if persona_name:
-            parts.append(f"**人设**: {persona_name}")
+            header_parts.append(f"人设: {persona_name}")
         if platform:
-            parts.append(f"**目标平台**: {platform}")
+            header_parts.append(f"平台: {platform}")
         if content_id:
-            parts.append(f"**内容ID**: `{content_id}`")
+            header_parts.append(f"ID: {content_id}")
 
-        parts.append("")
-        parts.append("---")
-        parts.append("")
+        if header_parts:
+            parts.append(" | ".join(header_parts))
+            parts.append("")
 
-        # Content preview
-        parts.append("**内容预览**:")
-        parts.append("")
-        # Truncate body for notification
-        body_preview = content_body[:500]
-        if len(content_body) > 500:
+        # Review score (prominent)
+        if review_score is not None:
+            if review_score >= 80:
+                score_text = f"<font color=\"info\">评分: {review_score:.0f}/100 ✅</font>"
+            elif review_score >= 60:
+                score_text = f"<font color=\"warning\">评分: {review_score:.0f}/100 ⚠️</font>"
+            else:
+                score_text = f"<font color=\"warning\">评分: {review_score:.0f}/100 ❌</font>"
+            parts.append(score_text)
+            parts.append("")
+
+        # Content preview - very short for notification
+        # Strip markdown formatting for cleaner preview
+        body_clean = self._strip_markdown(content_body)
+        body_preview = body_clean[:300]
+        if len(body_clean) > 300:
             body_preview += "..."
+
         parts.append(f"> {body_preview}")
 
-        # Review results
-        if review_score is not None:
+        # Review summary (if any)
+        if review_summary:
             parts.append("")
-            parts.append("---")
-            parts.append("")
-            parts.append("**评估结果**:")
-
-            # Score with emoji indicator
-            if review_score >= 80:
-                score_indicator = "✅"
-            elif review_score >= 60:
-                score_indicator = "⚠️"
-            else:
-                score_indicator = "❌"
-
-            parts.append(f"- 综合评分: {score_indicator} **{review_score:.0f}**/100")
-
-            if review_summary:
-                parts.append(f"- 评估摘要: {review_summary}")
+            parts.append(f"<font color=\"comment\">审核备注: {review_summary[:100]}</font>")
 
         message = "\n".join(parts)
 
+        # Use text type for longer content with cleaner display
         return await self.publish(
             content=message,
-            title=f"📝 新内容创作完成: {content_title}",
-            tags=tags,
+            title=f"📝 {content_title[:30]}{'...' if len(content_title) > 30 else ''}",
+            tags=tags[:3] if tags else None,  # Limit tags
             message_type="markdown",
         )
+
+    def _strip_markdown(self, text: str) -> str:
+        """Strip markdown formatting for plain text preview."""
+        import re
+
+        # Remove headers
+        text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+        # Remove bold/italic
+        text = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", text)
+        text = re.sub(r"_{1,2}([^_]+)_{1,2}", r"\1", text)
+        # Remove inline code
+        text = re.sub(r"`([^`]+)`", r"\1", text)
+        # Remove links, keep text
+        text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+        # Remove images
+        text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+        # Remove blockquotes
+        text = re.sub(r"^>\s*", "", text, flags=re.MULTILINE)
+        # Remove horizontal rules
+        text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
+        # Collapse multiple newlines
+        text = re.sub(r"\n{3,}", "\n\n", text)
+
+        return text.strip()
 
     async def fetch_trending(
         self,

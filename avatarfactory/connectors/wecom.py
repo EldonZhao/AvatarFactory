@@ -433,6 +433,28 @@ class WeComConnector(BasePlatformConnector):
 
         return text.strip()
 
+    async def send_message(
+        self,
+        message: str,
+        message_type: str = "markdown",
+    ) -> PublishResult:
+        """
+        Send a simple text/markdown message.
+
+        This is a convenience method for sending simple notifications.
+
+        Args:
+            message: Message content
+            message_type: "text" or "markdown" (default: markdown)
+
+        Returns:
+            PublishResult
+        """
+        return await self.publish(
+            content=message,
+            message_type=message_type,
+        )
+
     async def fetch_trending(
         self,
         query: Optional[str] = None,

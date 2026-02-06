@@ -126,6 +126,9 @@ class NotificationConfig(BaseModel):
     notify_on_review: bool = Field(
         default=True, description="Include review results in notification"
     )
+    notify_on_discovery: bool = Field(
+        default=True, description="Notify when discovery analysis completes"
+    )
     extra: Dict[str, Any] = Field(
         default_factory=dict, description="Additional connector-specific config"
     )

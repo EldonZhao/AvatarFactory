@@ -1775,5 +1775,162 @@ def video(
         raise typer.Exit(1)
 
 
+@app.command()
+def migrate_storage(
+    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview changes without modifying files"),
+):
+    """
+    Migrate content and discovery data to new persona-based structure.
+
+    This command migrates:
+    - Content from knowledges/content_library/ to knowledges/personas/{id}/content/
+    - Discovery from old format to timestamped files
+
+    Example:
+        avatarfactory migrate-storage --dry-run    # Preview changes
+        avatarfactory migrate-storage --no-dry-run # Execute migration
+    """
+    import json
+    import shutil
+    from pathlib import Path
+    from datetime import datetime
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    base_path = Path(kb_path)
+
+    console.print(Panel.fit("Storage Migration Tool", border_style="cyan"))
+
+    if dry_run:
+        console.print("[yellow]DRY RUN - No files will be modified[/yellow]\n")
+
+    stats = {
+        "content_migrated": 0,
+        "discovery_migrated": 0,
+        "errors": [],
+    }
+
+    # 1. Migrate content from content_library to persona directories
+    console.print("[bold]1. Migrating content files...[/bold]")
+
+    for folder in ["drafts", "published"]:
+        legacy_dir = base_path / "content_library" / folder
+        if not legacy_dir.exists():
+            continue
+
+        for file_path in legacy_dir.glob("*.json"):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                persona_id = data.get("persona_id")
+                if not persona_id:
+                    console.print(f"  [yellow]Skipping {file_path.name} - no persona_id[/yellow]")
+                    continue
+
+                # Build new path
+                created_at_str = data.get("created_at", "")
+                if created_at_str:
+                    try:
+                        created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                        datetime_str = created_at.strftime("%Y-%m-%d_%H-%M")
+                    except Exception:
+                        datetime_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
+                else:
+                    datetime_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
+                content_id = data.get("id", "unknown")
+                new_filename = f"{datetime_str}_{content_id}.json"
+                new_dir = base_path / "personas" / persona_id / "content" / folder
+                new_path = new_dir / new_filename
+
+                console.print(f"  {file_path.name} -> personas/{persona_id}/content/{folder}/{new_filename}")
+
+                if not dry_run:
+                    new_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(file_path, new_path)
+                    file_path.unlink()
+
+                stats["content_migrated"] += 1
+
+            except Exception as e:
+                stats["errors"].append(f"Content {file_path.name}: {e}")
+                console.print(f"  [red]Error: {file_path.name} - {e}[/red]")
+
+    # 2. Migrate discovery files to timestamped format
+    console.print("\n[bold]2. Migrating discovery files...[/bold]")
+
+    personas_dir = base_path / "personas"
+    if personas_dir.exists():
+        for persona_dir in personas_dir.iterdir():
+            if not persona_dir.is_dir():
+                continue
+
+            discovery_dir = persona_dir / "discovery"
+            if not discovery_dir.exists():
+                continue
+
+            for file_path in discovery_dir.glob("*.json"):
+                # Check if already in new format (has datetime prefix)
+                name = file_path.stem
+                parts = name.split("_")
+
+                # New format: 2026-02-06_12-00_bluesky (at least 3 parts with date)
+                if len(parts) >= 3 and "-" in parts[0] and "-" in parts[1]:
+                    continue  # Already migrated
+
+                # Old format: bluesky.json
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+
+                    # Get timestamp from data or use file mtime
+                    updated_at = data.get("updated_at") or data.get("created_at")
+                    if updated_at:
+                        try:
+                            dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+                        except Exception:
+                            dt = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    else:
+                        dt = datetime.fromtimestamp(file_path.stat().st_mtime)
+
+                    datetime_str = dt.strftime("%Y-%m-%d_%H-%M")
+                    platform = name  # Old format uses platform as filename
+                    new_filename = f"{datetime_str}_{platform}.json"
+                    new_path = discovery_dir / new_filename
+
+                    console.print(f"  {persona_dir.name}/discovery/{name}.json -> {new_filename}")
+
+                    if not dry_run:
+                        # Update data with created_at field
+                        data["created_at"] = dt.isoformat()
+                        if "updated_at" in data:
+                            del data["updated_at"]  # Use created_at instead
+
+                        with open(new_path, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=2, ensure_ascii=False)
+                        file_path.unlink()
+
+                    stats["discovery_migrated"] += 1
+
+                except Exception as e:
+                    stats["errors"].append(f"Discovery {file_path.name}: {e}")
+                    console.print(f"  [red]Error: {file_path.name} - {e}[/red]")
+
+    # Summary
+    console.print("\n[bold]Migration Summary:[/bold]")
+    console.print(f"  Content files: {stats['content_migrated']}")
+    console.print(f"  Discovery files: {stats['discovery_migrated']}")
+
+    if stats["errors"]:
+        console.print(f"\n[yellow]Errors ({len(stats['errors'])}):[/yellow]")
+        for error in stats["errors"]:
+            console.print(f"  ⚠️  {error}")
+
+    if dry_run:
+        console.print("\n[yellow]This was a dry run. Use --no-dry-run to execute migration.[/yellow]")
+    else:
+        console.print("\n[green]✅ Migration complete![/green]")
+
+
 if __name__ == "__main__":
     app()

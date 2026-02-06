@@ -147,13 +147,13 @@ class KnowledgeBase:
             Dict with deletion summary:
             - persona_deleted: bool
             - content_deleted: int (count of deleted content files)
-            - discovery_deleted: bool
+            - discovery_deleted: int (count of deleted discovery files)
             - errors: List[str] (any errors encountered)
         """
         result = {
             "persona_deleted": False,
             "content_deleted": 0,
-            "discovery_deleted": False,
+            "discovery_deleted": 0,
             "errors": [],
         }
 
@@ -163,12 +163,19 @@ class KnowledgeBase:
             result["errors"].append(f"Persona {persona_id} not found")
             return result
 
-        # 2. Delete associated content (drafts and published)
+        # 2. Count content and discovery files before deletion
         if delete_content:
+            # Count content in persona directory (new structure)
             for folder in ["drafts", "published"]:
-                content_dir = self.base_path / "content_library" / folder
+                content_dir = persona_dir / "content" / folder
                 if content_dir.exists():
-                    for file_path in content_dir.glob("*.json"):
+                    result["content_deleted"] += len(list(content_dir.glob("*.json")))
+
+            # Also clean legacy content_library location
+            for folder in ["drafts", "published"]:
+                legacy_dir = self.base_path / "content_library" / folder
+                if legacy_dir.exists():
+                    for file_path in legacy_dir.glob("*.json"):
                         try:
                             with open(file_path, "r", encoding="utf-8") as f:
                                 data = json.load(f)
@@ -176,13 +183,17 @@ class KnowledgeBase:
                                 file_path.unlink()
                                 result["content_deleted"] += 1
                         except Exception as e:
-                            result["errors"].append(f"Failed to delete {file_path}: {e}")
+                            result["errors"].append(f"Failed to delete legacy content {file_path}: {e}")
 
-        # 3. Delete persona directory (includes discovery data, reviews, versions)
+        # Count discovery files
+        discovery_dir = persona_dir / "discovery"
+        if discovery_dir.exists():
+            result["discovery_deleted"] = len(list(discovery_dir.glob("*.json")))
+
+        # 3. Delete persona directory (includes content, discovery, reviews, versions)
         try:
             shutil.rmtree(persona_dir)
             result["persona_deleted"] = True
-            result["discovery_deleted"] = True  # Discovery is inside persona dir
         except Exception as e:
             result["errors"].append(f"Failed to delete persona directory: {e}")
 
@@ -192,62 +203,121 @@ class KnowledgeBase:
     # Content Management
     # ========================================================================
 
-    def save_content(self, content: Content, status: str = "draft") -> None:
-        """Save content (draft or published)"""
+    def _get_content_dir(self, persona_id: str, status: str = "draft") -> Path:
+        """Get content directory for a persona."""
         folder = "drafts" if status == "draft" else "published"
-        content_dir = self.base_path / "content_library" / folder
+        content_dir = self.base_path / "personas" / persona_id / "content" / folder
         content_dir.mkdir(parents=True, exist_ok=True)
+        return content_dir
 
-        # Filename: {date}_{id}.json
-        date_str = content.created_at.strftime("%Y-%m-%d")
-        filename = f"{date_str}_{content.id}.json"
+    def save_content(self, content: Content, status: str = "draft") -> None:
+        """Save content under persona directory with timestamp."""
+        persona_id = content.persona_id
+        if not persona_id:
+            raise ValueError("Content must have persona_id")
+
+        content_dir = self._get_content_dir(persona_id, status)
+
+        # Filename: {datetime}_{id}.json (e.g., 2026-02-06_12-04_content_xxx.json)
+        datetime_str = content.created_at.strftime("%Y-%m-%d_%H-%M")
+        filename = f"{datetime_str}_{content.id}.json"
         content_path = content_dir / filename
 
         with open(content_path, "w", encoding="utf-8") as f:
             json.dump(content.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
 
     def load_content(self, content_id: str, status: str = "draft") -> Optional[Content]:
-        """Load content by ID"""
-        folder = "drafts" if status == "draft" else "published"
-        content_dir = self.base_path / "content_library" / folder
+        """Load content by ID, searching across all personas."""
+        # First, try to find in persona directories (new structure)
+        personas_dir = self.base_path / "personas"
+        if personas_dir.exists():
+            for persona_dir in personas_dir.iterdir():
+                if not persona_dir.is_dir():
+                    continue
+                folder = "drafts" if status == "draft" else "published"
+                content_dir = persona_dir / "content" / folder
+                if content_dir.exists():
+                    for file_path in content_dir.glob(f"*_{content_id}.json"):
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        return Content(**data)
 
-        # Search for file containing content_id
-        for file_path in content_dir.glob(f"*_{content_id}.json"):
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return Content(**data)
+        # Fallback: try legacy content_library location
+        folder = "drafts" if status == "draft" else "published"
+        legacy_dir = self.base_path / "content_library" / folder
+        if legacy_dir.exists():
+            for file_path in legacy_dir.glob(f"*_{content_id}.json"):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return Content(**data)
+
         return None
 
     def list_content(
         self, persona_id: Optional[str] = None, status: str = "draft"
     ) -> List[Content]:
-        """List content, optionally filtered by persona_id"""
-        folder = "drafts" if status == "draft" else "published"
-        content_dir = self.base_path / "content_library" / folder
-
+        """List content, optionally filtered by persona_id."""
         contents = []
-        for file_path in content_dir.glob("*.json"):
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            content = Content(**data)
-            if persona_id is None or content.persona_id == persona_id:
-                contents.append(content)
+        folder = "drafts" if status == "draft" else "published"
+
+        if persona_id:
+            # Search only in specific persona's directory
+            content_dir = self.base_path / "personas" / persona_id / "content" / folder
+            if content_dir.exists():
+                for file_path in content_dir.glob("*.json"):
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    contents.append(Content(**data))
+        else:
+            # Search across all personas
+            personas_dir = self.base_path / "personas"
+            if personas_dir.exists():
+                for persona_dir in personas_dir.iterdir():
+                    if not persona_dir.is_dir():
+                        continue
+                    content_dir = persona_dir / "content" / folder
+                    if content_dir.exists():
+                        for file_path in content_dir.glob("*.json"):
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            contents.append(Content(**data))
+
+        # Also check legacy location for backwards compatibility
+        legacy_dir = self.base_path / "content_library" / folder
+        if legacy_dir.exists():
+            for file_path in legacy_dir.glob("*.json"):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                content = Content(**data)
+                # Filter by persona_id if specified
+                if persona_id is None or content.persona_id == persona_id:
+                    # Avoid duplicates
+                    if not any(c.id == content.id for c in contents):
+                        contents.append(content)
 
         return sorted(contents, key=lambda c: c.created_at, reverse=True)
 
     def move_to_published(self, content_id: str) -> bool:
-        """Move content from draft to published"""
+        """Move content from draft to published."""
         content = self.load_content(content_id, status="draft")
         if not content:
             return False
 
-        # Save to published
+        # Save to published (new location under persona)
         self.save_content(content, status="published")
 
-        # Delete from drafts
-        content_dir = self.base_path / "content_library" / "drafts"
-        for file_path in content_dir.glob(f"*_{content_id}.json"):
-            file_path.unlink()
+        # Delete from drafts (check both new and legacy locations)
+        # New location
+        if content.persona_id:
+            draft_dir = self._get_content_dir(content.persona_id, "draft")
+            for file_path in draft_dir.glob(f"*_{content_id}.json"):
+                file_path.unlink()
+
+        # Legacy location
+        legacy_dir = self.base_path / "content_library" / "drafts"
+        if legacy_dir.exists():
+            for file_path in legacy_dir.glob(f"*_{content_id}.json"):
+                file_path.unlink()
 
         return True
 
@@ -452,28 +522,40 @@ class KnowledgeBase:
         persona_id: str,
         platform: str,
         results: Dict[str, Any],
-    ) -> None:
+    ) -> str:
         """
-        Save discovery/trending results for a persona.
+        Save discovery/trending results for a persona with timestamp.
+
+        Results are saved as timestamped files for historical tracking.
+        Filename format: {datetime}_{platform}.json
 
         Args:
             persona_id: Persona ID
             platform: Platform name (e.g., "bluesky", "twitter")
             results: Discovery results including patterns and ideas
+
+        Returns:
+            Path to saved file
         """
         persona_dir = self.base_path / "personas" / persona_id
         discovery_dir = persona_dir / "discovery"
         discovery_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save platform-specific results
-        result_path = discovery_dir / f"{platform}.json"
+        # Filename with timestamp: 2026-02-06_12-00_bluesky.json
+        now = datetime.now()
+        datetime_str = now.strftime("%Y-%m-%d_%H-%M")
+        filename = f"{datetime_str}_{platform}.json"
+        result_path = discovery_dir / filename
+
         data = {
             "platform": platform,
-            "updated_at": datetime.now().isoformat(),
+            "created_at": now.isoformat(),
             **results,
         }
         with open(result_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return str(result_path)
 
     def get_latest_discovery(
         self,
@@ -483,9 +565,11 @@ class KnowledgeBase:
         """
         Get latest discovery results for a persona.
 
+        Finds the most recent discovery file by timestamp.
+
         Args:
             persona_id: Persona ID
-            platform: Platform name (optional, returns first available if not specified)
+            platform: Platform name (optional, returns most recent if not specified)
 
         Returns:
             Discovery results or None if not found
@@ -496,18 +580,68 @@ class KnowledgeBase:
         if not discovery_dir.exists():
             return None
 
+        # Find files matching pattern
         if platform:
-            result_path = discovery_dir / f"{platform}.json"
-            if result_path.exists():
-                with open(result_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            return None
+            pattern = f"*_{platform}.json"
         else:
-            # Return first available platform's results
-            for result_path in discovery_dir.glob("*.json"):
-                with open(result_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            pattern = "*.json"
+
+        # Get all matching files sorted by name (timestamp) descending
+        files = sorted(discovery_dir.glob(pattern), reverse=True)
+
+        if not files:
+            # Fallback: check legacy format (platform.json without timestamp)
+            if platform:
+                legacy_path = discovery_dir / f"{platform}.json"
+                if legacy_path.exists():
+                    with open(legacy_path, "r", encoding="utf-8") as f:
+                        return json.load(f)
             return None
+
+        # Return most recent file
+        with open(files[0], "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def list_discovery_history(
+        self,
+        persona_id: str,
+        platform: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        List discovery history for a persona.
+
+        Args:
+            persona_id: Persona ID
+            platform: Platform name (optional, filter by platform)
+            limit: Maximum number of results to return
+
+        Returns:
+            List of discovery results, newest first
+        """
+        persona_dir = self.base_path / "personas" / persona_id
+        discovery_dir = persona_dir / "discovery"
+
+        if not discovery_dir.exists():
+            return []
+
+        # Find files matching pattern
+        if platform:
+            pattern = f"*_{platform}.json"
+        else:
+            pattern = "*.json"
+
+        # Get all matching files sorted by name (timestamp) descending
+        files = sorted(discovery_dir.glob(pattern), reverse=True)[:limit]
+
+        results = []
+        for file_path in files:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["_filename"] = file_path.name
+            results.append(data)
+
+        return results
 
     def list_discovery_platforms(self, persona_id: str) -> List[str]:
         """
@@ -517,7 +651,7 @@ class KnowledgeBase:
             persona_id: Persona ID
 
         Returns:
-            List of platform names
+            List of unique platform names
         """
         persona_dir = self.base_path / "personas" / persona_id
         discovery_dir = persona_dir / "discovery"
@@ -525,4 +659,19 @@ class KnowledgeBase:
         if not discovery_dir.exists():
             return []
 
-        return [p.stem for p in discovery_dir.glob("*.json")]
+        # Extract platform names from filenames
+        # Format: {datetime}_{platform}.json or {platform}.json (legacy)
+        platforms = set()
+        for file_path in discovery_dir.glob("*.json"):
+            name = file_path.stem  # Remove .json
+            # Check if it's new format with timestamp
+            parts = name.split("_")
+            if len(parts) >= 3:
+                # New format: 2026-02-06_12-00_bluesky -> bluesky
+                platform = "_".join(parts[2:])
+            else:
+                # Legacy format: bluesky
+                platform = name
+            platforms.add(platform)
+
+        return list(platforms)

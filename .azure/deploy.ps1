@@ -20,10 +20,15 @@ param(
     [string]$ResourceGroup = "avatarfactory-rg",
     [string]$Location = "eastasia",
     [string]$AppName = "avatarfactory-app",
-    [string]$Sku = "B1"
+    [string]$Sku = "B1",
+    [switch]$Force = $false
 )
 
 $ErrorActionPreference = "Stop"
+
+# Set UTF-8 encoding to avoid Azure CLI output encoding issues
+$env:PYTHONIOENCODING = "utf-8"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Derived names (remove hyphens for Azure naming requirements)
 $AcrName = ($AppName -replace '-', '') + "acr"
@@ -44,11 +49,13 @@ Write-Host "SKU: $Sku"
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Confirm
-$confirm = Read-Host "Proceed with deployment? (y/N)"
-if ($confirm -ne "y" -and $confirm -ne "Y") {
-    Write-Host "Deployment cancelled."
-    exit 0
+# Confirm (skip with -Force)
+if (-not $Force) {
+    $confirm = Read-Host "Proceed with deployment? (y/N)"
+    if ($confirm -ne "y" -and $confirm -ne "Y") {
+        Write-Host "Deployment cancelled."
+        exit 0
+    }
 }
 
 Write-Host ""
@@ -120,10 +127,10 @@ az webapp create `
     --resource-group $ResourceGroup `
     --plan $AppServicePlan `
     --name $AppName `
-    --deployment-container-image-name "$AcrLoginServer/avatarfactory:latest" `
-    --docker-registry-server-url "https://$AcrLoginServer" `
-    --docker-registry-server-user $AcrUsername `
-    --docker-registry-server-password $AcrPassword `
+    --container-image-name "$AcrLoginServer/avatarfactory:latest" `
+    --container-registry-url "https://$AcrLoginServer" `
+    --container-registry-user $AcrUsername `
+    --container-registry-password $AcrPassword `
     --output none
 
 Write-Host "Step 8: Mounting Azure File Share..." -ForegroundColor Green
@@ -149,10 +156,11 @@ az webapp config appsettings set `
     --output none
 
 Write-Host "Step 10: Configuring Health Check..." -ForegroundColor Green
-az webapp config set `
-    --resource-group $ResourceGroup `
-    --name $AppName `
-    --health-check-path "/health" `
+# Use az resource update for health check path (az webapp config set --health-check-path is deprecated)
+$webappResourceId = az webapp show --resource-group $ResourceGroup --name $AppName --query id -o tsv
+az resource update `
+    --ids $webappResourceId/config/web `
+    --set properties.healthCheckPath="/health" `
     --output none
 
 Write-Host ""

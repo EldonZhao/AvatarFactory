@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv
+.venv
+ENV
+
+# IDE
+.idea/
+.vscode
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation
+docs
+
+# Local data (will be mounted from Azure File Share)
+knowledges
+
+# Azure deployment files
+.azure
+
+# Claude settings
+.claude
+
+# CopiNative
+.copinative
+
+# GitHub
+.github
+
+# Environment
+.env
+.env.local
+*.env
+
+# Misc
+*.log
+*.tmp
+nul
+tests
+examples

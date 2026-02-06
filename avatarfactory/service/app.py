@@ -253,7 +253,7 @@ def register_routes(app: FastAPI):
         message = AgentMessage(
             sender="user",
             receiver="orchestrator",
-            task_type=TaskType.ANALYZE_INPUT,
+            task_type=TaskType.CHAT,
             payload={
                 "user_input": request.message,
                 "persona_id": request.persona_id,
@@ -320,7 +320,7 @@ def register_routes(app: FastAPI):
         message = AgentMessage(
             sender="api",
             receiver="orchestrator",
-            task_type=TaskType.ANALYZE_INPUT,
+            task_type=TaskType.CREATE_PERSONA,
             payload={
                 "user_input": f"Create a persona: {request.description}",
                 "platform": request.platform,

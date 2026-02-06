@@ -29,6 +29,10 @@ apscheduler = ">=3.10.0"
 fastapi = { version = ">=0.109.0", optional = true }
 uvicorn = { version = ">=0.27.0", optional = true }
 
+# Dashboard (optional)
+streamlit = { version = ">=1.28.0", optional = true }
+streamlit-agraph = { version = ">=0.0.45", optional = true }
+
 # Video Generation (core)
 edge-tts = ">=6.1.0"
 moviepy = ">=1.0.3"
@@ -46,12 +50,15 @@ all-llm = ["openai"]
 # API Service
 service = ["fastapi", "uvicorn"]
 
+# Dashboard
+dashboard = ["streamlit", "streamlit-agraph"]
+
 # Video extras
 video-azure = ["azure-cognitiveservices-speech"]
 all-video = ["azure-cognitiveservices-speech"]
 
 # Full installation
-all = ["openai", "fastapi", "uvicorn", "azure-cognitiveservices-speech"]
+all = ["openai", "fastapi", "uvicorn", "streamlit", "streamlit-agraph", "azure-cognitiveservices-speech"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

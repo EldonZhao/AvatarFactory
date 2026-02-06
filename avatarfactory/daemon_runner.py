@@ -1,13 +1,15 @@
 """
 Background daemon runner for AvatarFactory.
 
-Supports two modes:
+Supports multiple modes:
 - scheduler: Run only the scheduler as a background daemon
 - full: Run the full FastAPI service with scheduler
+- all: Run API service + Dashboard together
 
 This module can be invoked by:
 - `avatarfactory daemon start --background` (scheduler mode)
 - `avatarfactory serve` (full mode)
+- `avatarfactory serve --dashboard` (all mode - API + Dashboard)
 """
 
 import argparse
@@ -15,7 +17,9 @@ import asyncio
 import logging
 import os
 import signal
+import subprocess
 import sys
+import threading
 from datetime import datetime
 
 
@@ -75,7 +79,13 @@ def run_scheduler_only():
         sys.exit(1)
 
 
-def run_full_service(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):
+def run_full_service(
+    host: str = "0.0.0.0",
+    port: int = 8000,
+    reload: bool = False,
+    with_dashboard: bool = False,
+    dashboard_port: int = 8501,
+):
     """
     Run the full FastAPI service with integrated scheduler.
 
@@ -83,14 +93,24 @@ def run_full_service(host: str = "0.0.0.0", port: int = 8000, reload: bool = Fal
         host: Host to bind to
         port: Port to listen on
         reload: Enable auto-reload for development
+        with_dashboard: Also start the Streamlit dashboard
+        dashboard_port: Port for the dashboard (default 8501)
     """
     logger = setup_logging("service")
     logger.info(f"Starting AvatarFactory service on {host}:{port}")
+
+    dashboard_process = None
+
+    if with_dashboard:
+        logger.info(f"Starting Dashboard on port {dashboard_port}")
+        dashboard_process = start_dashboard_process(host, dashboard_port)
 
     try:
         import uvicorn
     except ImportError:
         logger.error("uvicorn is required for the service. Install with: pip install uvicorn")
+        if dashboard_process:
+            dashboard_process.terminate()
         sys.exit(1)
 
     try:
@@ -106,6 +126,40 @@ def run_full_service(host: str = "0.0.0.0", port: int = 8000, reload: bool = Fal
     except Exception as e:
         logger.exception(f"Service error: {e}")
         sys.exit(1)
+    finally:
+        if dashboard_process:
+            logger.info("Stopping Dashboard...")
+            dashboard_process.terminate()
+            dashboard_process.wait()
+
+
+def start_dashboard_process(host: str = "localhost", port: int = 8501) -> subprocess.Popen:
+    """
+    Start the Streamlit dashboard as a subprocess.
+
+    Args:
+        host: Host to bind to
+        port: Port for the dashboard
+
+    Returns:
+        The subprocess.Popen object
+    """
+    from pathlib import Path
+
+    dashboard_path = Path(__file__).parent / "dashboard" / "app.py"
+
+    return subprocess.Popen(
+        [
+            sys.executable, "-m", "streamlit", "run",
+            str(dashboard_path),
+            "--server.port", str(port),
+            "--server.address", host,
+            "--server.headless", "true",
+            "--browser.gatherUsageStats", "false",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
 
 def main():
@@ -121,6 +175,7 @@ Modes:
 Examples:
   python -m avatarfactory.daemon_runner --mode scheduler
   python -m avatarfactory.daemon_runner --mode full --port 8000
+  python -m avatarfactory.daemon_runner --mode full --dashboard
         """
     )
     parser.add_argument(
@@ -145,13 +200,30 @@ Examples:
         action="store_true",
         help="Enable auto-reload for development (full mode only)"
     )
+    parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="Also start the Streamlit dashboard (full mode only)"
+    )
+    parser.add_argument(
+        "--dashboard-port",
+        type=int,
+        default=8501,
+        help="Port for the dashboard (default: 8501)"
+    )
 
     args = parser.parse_args()
 
     if args.mode == "scheduler":
         run_scheduler_only()
     else:
-        run_full_service(host=args.host, port=args.port, reload=args.reload)
+        run_full_service(
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+            with_dashboard=args.dashboard,
+            dashboard_port=args.dashboard_port,
+        )
 
 
 if __name__ == "__main__":

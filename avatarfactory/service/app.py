@@ -877,6 +877,185 @@ def register_routes(app: FastAPI):
         removed = await orchestrator.remove_persona_tasks(persona_id)
         return {"removed": removed}
 
+    # -------------------------------------------------------------------------
+    # Topology & System Info
+    # -------------------------------------------------------------------------
+
+    @app.get("/topology", tags=["System"])
+    async def get_topology():
+        """
+        Get system topology data for visualization.
+
+        Returns nodes and edges representing:
+        - Personas and their content
+        - Agents in the system
+        - Platform connectors
+        - Scheduled tasks
+        """
+        orchestrator = get_orchestrator()
+        kb = orchestrator.kb
+
+        nodes = []
+        edges = []
+
+        # Color scheme
+        colors = {
+            "persona": "#4A90D9",
+            "agent": "#7B68EE",
+            "connector": "#50C878",
+            "task": "#FFB347",
+        }
+
+        # Add agent nodes
+        agents = [
+            ("orchestrator", "Orchestrator"),
+            ("persona_agent", "Persona Agent"),
+            ("content_agent", "Content Agent"),
+            ("discovery_agent", "Discovery Agent"),
+            ("review_agent", "Review Agent"),
+        ]
+        for agent_id, agent_name in agents:
+            nodes.append({
+                "id": agent_id,
+                "label": agent_name,
+                "type": "agent",
+                "size": 30,
+                "color": colors["agent"],
+            })
+
+        # Orchestrator connects to all agents
+        for agent_id, _ in agents[1:]:
+            edges.append({
+                "source": "orchestrator",
+                "target": agent_id,
+                "label": "manages",
+            })
+
+        # Add persona nodes
+        for persona_id in kb.list_personas():
+            persona = kb.load_persona(persona_id)
+            if persona:
+                draft_count = len(kb.list_content(persona_id, status="draft"))
+                published_count = len(kb.list_content(persona_id, status="published"))
+
+                nodes.append({
+                    "id": f"persona_{persona_id}",
+                    "label": persona.identity.name,
+                    "type": "persona",
+                    "size": 35,
+                    "color": colors["persona"],
+                    "metadata": {
+                        "draft": draft_count,
+                        "published": published_count,
+                    },
+                })
+                edges.append({
+                    "source": "persona_agent",
+                    "target": f"persona_{persona_id}",
+                    "label": "manages",
+                })
+
+        # Add connector nodes
+        from avatarfactory.connectors.registry import ConnectorRegistry
+
+        connector_configs = {
+            "bluesky": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],
+            "twitter": ["TWITTER_API_KEY"],
+            "xiaohongshu": ["XIAOHONGSHU_COOKIE"],
+            "wecom": ["AVATARFACTORY_WEBHOOK_URL"],
+        }
+
+        for platform, env_keys in connector_configs.items():
+            configured = all(os.getenv(k) for k in env_keys)
+            node_color = colors["connector"] if configured else "#CCCCCC"
+
+            nodes.append({
+                "id": f"connector_{platform}",
+                "label": platform.capitalize(),
+                "type": "connector",
+                "size": 25,
+                "color": node_color,
+                "configured": configured,
+            })
+            edges.append({
+                "source": "discovery_agent",
+                "target": f"connector_{platform}",
+                "label": "fetches from",
+            })
+
+        # Add task nodes
+        scheduler = get_scheduler()
+        if scheduler:
+            for task in scheduler.list_tasks()[:10]:
+                task_color = colors["task"] if task.enabled else "#CCCCCC"
+                nodes.append({
+                    "id": f"task_{task.id}",
+                    "label": task.name[:20],
+                    "type": "task",
+                    "size": 20,
+                    "color": task_color,
+                    "enabled": task.enabled,
+                })
+                if task.persona_id:
+                    edges.append({
+                        "source": f"task_{task.id}",
+                        "target": f"persona_{task.persona_id}",
+                        "label": "targets",
+                    })
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+        }
+
+    @app.get("/connectors/status", tags=["System"])
+    async def get_connectors_status():
+        """
+        Get configuration status of all platform connectors.
+
+        Returns whether each connector is registered and configured.
+        """
+        from avatarfactory.connectors.registry import ConnectorRegistry
+
+        connector_configs = {
+            "bluesky": {
+                "env_keys": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],
+                "description": "AT Protocol social network",
+            },
+            "twitter": {
+                "env_keys": ["TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN"],
+                "description": "Twitter/X API v2",
+            },
+            "xiaohongshu": {
+                "env_keys": ["XIAOHONGSHU_COOKIE"],
+                "description": "Little Red Book (小红书)",
+            },
+            "wecom": {
+                "env_keys": ["AVATARFACTORY_WEBHOOK_URL"],
+                "description": "WeChat Work notifications",
+            },
+        }
+
+        statuses = []
+        for platform, config in connector_configs.items():
+            registered = ConnectorRegistry.is_registered(platform)
+            configured = all(os.getenv(k) is not None for k in config["env_keys"])
+            missing_keys = [k for k in config["env_keys"] if not os.getenv(k)]
+
+            statuses.append({
+                "platform": platform,
+                "description": config["description"],
+                "registered": registered,
+                "configured": configured,
+                "missing_keys": missing_keys,
+            })
+
+        return {
+            "connectors": statuses,
+            "configured_count": sum(1 for s in statuses if s["configured"]),
+            "total_count": len(statuses),
+        }
+
 
 # =============================================================================
 # Default Application Instance

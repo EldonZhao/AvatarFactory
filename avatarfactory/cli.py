@@ -1274,6 +1274,8 @@ def serve(
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to listen on"),
     reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload for development"),
+    dashboard: bool = typer.Option(False, "--dashboard", "-d", help="Also start the visual dashboard"),
+    dashboard_port: int = typer.Option(8501, "--dashboard-port", help="Port for the dashboard"),
 ):
     """
     Start the AvatarFactory API server.
@@ -1284,20 +1286,91 @@ def serve(
         avatarfactory serve                    # Start on default port 8000
         avatarfactory serve --port 3000        # Custom port
         avatarfactory serve --reload           # Development mode with auto-reload
+        avatarfactory serve --dashboard        # Start with visual dashboard
+        avatarfactory serve -d --dashboard-port 8502  # Dashboard on custom port
     """
     from avatarfactory.daemon_runner import run_full_service
 
-    console.print(Panel.fit(
+    display_host = host if host != '0.0.0.0' else 'localhost'
+
+    info_text = (
         f"[bold cyan]AvatarFactory API Server[/bold cyan]\n\n"
         f"Host: {host}\n"
         f"Port: {port}\n"
         f"Reload: {'enabled' if reload else 'disabled'}\n\n"
-        f"API Docs: http://{host if host != '0.0.0.0' else 'localhost'}:{port}/docs\n"
-        f"Health: http://{host if host != '0.0.0.0' else 'localhost'}:{port}/health",
-        title="Starting Service",
+        f"API Docs: http://{display_host}:{port}/docs\n"
+        f"Health: http://{display_host}:{port}/health"
+    )
+
+    if dashboard:
+        info_text += (
+            f"\n\n[bold cyan]Dashboard[/bold cyan]\n"
+            f"URL: http://{display_host}:{dashboard_port}"
+        )
+
+    console.print(Panel.fit(info_text, title="Starting Service"))
+
+    run_full_service(
+        host=host,
+        port=port,
+        reload=reload,
+        with_dashboard=dashboard,
+        dashboard_port=dashboard_port,
+    )
+
+
+@app.command()
+def dashboard(
+    port: int = typer.Option(8501, "--port", "-p", help="Port to listen on"),
+    host: str = typer.Option("localhost", "--host", "-h", help="Host to bind to"),
+):
+    """
+    Start the AvatarFactory visual dashboard.
+
+    Launches a Streamlit-based dashboard for:
+    - System topology visualization
+    - Persona management
+    - Content browsing
+    - Scheduler monitoring
+    - Connector status
+
+    Example:
+        avatarfactory dashboard                    # Start on default port 8501
+        avatarfactory dashboard --port 8502        # Custom port
+        avatarfactory dashboard --host 0.0.0.0     # Accessible from network
+    """
+    import subprocess
+    from pathlib import Path
+
+    dashboard_path = Path(__file__).parent / "dashboard" / "app.py"
+
+    if not dashboard_path.exists():
+        console.print("[red]Dashboard not found. Please ensure the dashboard module is installed.[/red]")
+        raise typer.Exit(1)
+
+    console.print(Panel.fit(
+        f"[bold cyan]AvatarFactory Dashboard[/bold cyan]\n\n"
+        f"Host: {host}\n"
+        f"Port: {port}\n\n"
+        f"Dashboard URL: http://{host if host != '0.0.0.0' else 'localhost'}:{port}\n\n"
+        f"[dim]Press Ctrl+C to stop[/dim]",
+        title="Starting Dashboard",
+        border_style="cyan",
     ))
 
-    run_full_service(host=host, port=port, reload=reload)
+    try:
+        subprocess.run([
+            sys.executable, "-m", "streamlit", "run",
+            str(dashboard_path),
+            "--server.port", str(port),
+            "--server.address", host,
+            "--server.headless", "true",
+        ])
+    except KeyboardInterrupt:
+        console.print("\n[cyan]Dashboard stopped.[/cyan]")
+    except FileNotFoundError:
+        console.print("[red]Streamlit not installed. Install with: pip install streamlit streamlit-agraph[/red]")
+        raise typer.Exit(1)
 
 
 @app.command()

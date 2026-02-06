@@ -1,0 +1,160 @@
+# =============================================================================
+# Azure Web App Deployment Workflow
+# =============================================================================
+#
+# Deploys AvatarFactory to Azure Web App for Containers.
+#
+# Triggers:
+# - Completion of docker-build workflow
+# - Manual trigger (workflow_dispatch)
+#
+# Required Secrets:
+# - AZURE_CREDENTIALS: Service principal credentials (JSON)
+# - AZURE_WEBAPP_PUBLISH_PROFILE: Web App publish profile (optional)
+#
+# Required Variables:
+# - AZURE_RESOURCE_GROUP: Azure resource group name
+# - AZURE_WEBAPP_NAME: Azure Web App name
+#
+# =============================================================================
+
+name: Azure Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: false
+        default: 'latest'
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set image tag
+        id: image
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "$TAG" ] || [ "$TAG" == "latest" ]; then
+            TAG="latest"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "full_image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          images: ${{ steps.image.outputs.full_image }}
+
+      - name: Configure App Settings
+        uses: azure/appservice-settings@v1
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          app-settings-json: |
+            [
+              {
+                "name": "AVATARFACTORY_KB_PATH",
+                "value": "/app/knowledges",
+                "slotSetting": false
+              },
+              {
+                "name": "WEBSITES_PORT",
+                "value": "8000",
+                "slotSetting": false
+              },
+              {
+                "name": "DOCKER_REGISTRY_SERVER_URL",
+                "value": "https://${{ env.REGISTRY }}",
+                "slotSetting": false
+              }
+            ]
+
+      - name: Health Check
+        run: |
+          echo "Waiting for deployment to complete..."
+          sleep 30
+
+          WEBAPP_URL="https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+
+          echo "Checking health endpoint..."
+          for i in {1..10}; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$WEBAPP_URL/health" || echo "000")
+            if [ "$RESPONSE" == "200" ]; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $RESPONSE, retrying in 15s..."
+            sleep 15
+          done
+
+          echo "Health check failed after 10 attempts"
+          exit 1
+
+      - name: Post Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ steps.image.outputs.full_image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web App URL:** https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Docs:** https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/docs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Health Check](https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/health)" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Documentation](https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/docs)" >> $GITHUB_STEP_SUMMARY
+
+  notify:
+    name: Notify on Failure
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Create Issue on Failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Deployment Failed: ${context.runNumber}`;
+            const body = `
+            ## Deployment Failure
+
+            **Workflow Run:** ${context.runId}
+            **Branch:** ${context.ref}
+            **Commit:** ${context.sha}
+            **Image Tag:** ${{ github.event.inputs.image_tag || 'latest' }}
+
+            Please check the [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['deployment', 'bug']
+            });

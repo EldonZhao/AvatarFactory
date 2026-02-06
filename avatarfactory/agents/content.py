@@ -7,7 +7,7 @@ Renamed from ContentLabAgent to ContentAgent as part of architecture refactoring
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from avatarfactory.agents.base import BaseAgent
 from avatarfactory.models.schemas import (
@@ -19,6 +19,9 @@ from avatarfactory.models.schemas import (
     PlatformType,
     TaskType,
 )
+
+if TYPE_CHECKING:
+    from avatarfactory.agents.review import ReviewAgent
 
 
 # Content templates for different content types
@@ -71,6 +74,59 @@ class ContentAgent(BaseAgent):
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(agent_id="content", *args, **kwargs)
         self._notification_connectors: Dict[str, Any] = {}
+        self._review_agent: Optional["ReviewAgent"] = None
+
+    # =========================================================================
+    # Review Agent Integration
+    # =========================================================================
+
+    def _get_review_agent(self) -> "ReviewAgent":
+        """
+        Lazily initialize and return the Review Agent.
+
+        Returns:
+            ReviewAgent instance
+        """
+        if self._review_agent is None:
+            from avatarfactory.agents.review import ReviewAgent
+
+            self._review_agent = ReviewAgent(
+                knowledge_base=self.kb,
+                llm_provider=self.llm_provider,
+            )
+        return self._review_agent
+
+    async def _review_content(self, content: Content) -> Optional[float]:
+        """
+        Review content using Review Agent.
+
+        Args:
+            content: Content to review
+
+        Returns:
+            Overall review score or None if review failed
+        """
+        try:
+            review_agent = self._get_review_agent()
+
+            message = AgentMessage(
+                sender="content",
+                receiver="review",
+                task_type=TaskType.REVIEW_CONTENT,
+                payload={
+                    "content_id": content.id,
+                    "persona_id": content.persona_id,
+                },
+                context={},
+            )
+
+            report = await review_agent.process(message)
+            self.log("INFO", f"Content {content.id} reviewed, score: {report.overall_score}")
+            return report.overall_score
+
+        except Exception as e:
+            self.log("WARNING", f"Failed to review content {content.id}: {e}")
+            return None
 
     # =========================================================================
     # Notification Methods
@@ -339,15 +395,29 @@ class ContentAgent(BaseAgent):
                 self.kb.save_content(variant, status="draft")
             content = variants[0]
 
-        # Send notification after content generation
+        # Auto-review content
+        review_score = await self._review_content(content)
+        if review_score is not None:
+            # Reload content to get updated review data
+            content = self.kb.load_content(content.id, status="draft") or content
+
+        # Send notification after content generation and review
         await self._send_content_notification(
             persona=persona,
             content=content,
             review_score=content.review_score,
-            review_summary=None,  # Could be populated by review agent
+            review_summary=self._build_review_summary(content),
         )
 
         return content
+
+    def _build_review_summary(self, content: Content) -> Optional[str]:
+        """Build a brief review summary from content review issues."""
+        if not content.review_issues:
+            return None
+        # Return first 3 issues as summary
+        issues = content.review_issues[:3]
+        return "; ".join(issues) if issues else None
 
     async def _generate_single_content(
         self,

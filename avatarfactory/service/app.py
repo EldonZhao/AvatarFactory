@@ -39,18 +39,87 @@ class ChatResponse(BaseModel):
     metadata: Dict[str, Any] = {}
 
 
+# -----------------------------------------------------------------------------
+# Persona Models
+# -----------------------------------------------------------------------------
+
+
+class IdentityRequest(BaseModel):
+    """Persona identity configuration."""
+    name: str = Field(..., description="Persona name/title")
+    tagline: str = Field(..., description="One-line positioning statement")
+    expertise: List[str] = Field(default_factory=list, description="Areas of expertise")
+
+
+class TargetAudienceRequest(BaseModel):
+    """Target audience definition."""
+    primary: str = Field(..., description="Primary audience description")
+    pain_points: List[str] = Field(default_factory=list, description="Audience pain points")
+    goals: List[str] = Field(default_factory=list, description="Audience goals")
+
+
+class VoiceStyleRequest(BaseModel):
+    """Voice and tone configuration."""
+    tone: str = Field(..., description="Overall tone (e.g., professional, casual)")
+    language_patterns: List[str] = Field(default_factory=list, description="Language patterns")
+    emoji_usage: str = Field(default="moderate", description="Emoji usage: none, minimal, moderate, heavy")
+
+
+class ContentPillarRequest(BaseModel):
+    """Content pillar definition."""
+    name: str = Field(..., description="Pillar name")
+    description: str = Field(default="", description="Pillar description")
+    frequency: str = Field(default="weekly", description="Posting frequency")
+    examples: List[str] = Field(default_factory=list, description="Example topics")
+
+
+class BoundariesRequest(BaseModel):
+    """Content boundaries and compliance rules."""
+    avoid: List[str] = Field(default_factory=list, description="Topics/patterns to avoid")
+    compliance: List[str] = Field(default_factory=list, description="Compliance requirements")
+
+
+class NotificationConfigRequest(BaseModel):
+    """Notification configuration."""
+    enabled: bool = Field(default=False, description="Enable notifications")
+    connector_type: str = Field(default="wecom", description="Connector type: wecom, slack, discord")
+    webhook_url: Optional[str] = Field(None, description="Webhook URL")
+    notify_on_content: bool = Field(default=True, description="Notify on content generation")
+    notify_on_review: bool = Field(default=True, description="Notify on review completion")
+
+
 class PersonaRequest(BaseModel):
-    """Persona creation request."""
-    description: str = Field(..., description="Persona description")
-    platform: str = Field("xiaohongshu", description="Target platform")
+    """Persona creation request - full schema."""
+    # Simple mode: just description, LLM generates the rest
+    description: Optional[str] = Field(None, description="Natural language persona description (simple mode)")
+
+    # Structured mode: provide full details
+    identity: Optional[IdentityRequest] = Field(None, description="Persona identity")
+    target_audience: Optional[TargetAudienceRequest] = Field(None, description="Target audience")
+    voice_style: Optional[VoiceStyleRequest] = Field(None, description="Voice and tone style")
+    content_pillars: Optional[List[ContentPillarRequest]] = Field(None, description="Content pillars")
+    boundaries: Optional[BoundariesRequest] = Field(None, description="Content boundaries")
+
+    # Common fields
+    platforms: List[str] = Field(default=["xiaohongshu"], description="Target platforms")
+    notification: Optional[NotificationConfigRequest] = Field(None, description="Notification settings")
 
 
 class PersonaResponse(BaseModel):
-    """Persona response model."""
+    """Persona response model - full details."""
     id: str
+    version: str
     name: str
     tagline: str
-    version: str
+    expertise: List[str] = []
+    target_audience: Optional[Dict[str, Any]] = None
+    voice_style: Optional[Dict[str, Any]] = None
+    content_pillars: Optional[List[Dict[str, Any]]] = None
+    boundaries: Optional[Dict[str, Any]] = None
+    platforms: List[str] = []
+    notification: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class ContentRequest(BaseModel):
@@ -253,7 +322,7 @@ def register_routes(app: FastAPI):
         message = AgentMessage(
             sender="user",
             receiver="orchestrator",
-            task_type=TaskType.ANALYZE_INPUT,
+            task_type=TaskType.CHAT,
             payload={
                 "user_input": request.message,
                 "persona_id": request.persona_id,
@@ -312,30 +381,75 @@ def register_routes(app: FastAPI):
 
     @app.post("/personas", response_model=PersonaResponse, tags=["Personas"])
     async def create_persona(request: PersonaRequest):
-        """Create a new persona."""
+        """Create a new persona.
+
+        Supports two modes:
+        - Simple mode: provide only `description` for AI-generated persona
+        - Structured mode: provide detailed fields (identity, target_audience, etc.)
+        """
         orchestrator = get_orchestrator()
 
         from avatarfactory.models.schemas import AgentMessage, TaskType
 
+        # Build payload based on mode
+        payload: Dict[str, Any] = {}
+
+        if request.identity is not None:
+            # Structured mode: use provided fields directly
+            payload["structured"] = True
+            payload["identity"] = request.identity.model_dump() if request.identity else None
+            payload["target_audience"] = (
+                request.target_audience.model_dump() if request.target_audience else None
+            )
+            payload["voice_style"] = (
+                request.voice_style.model_dump() if request.voice_style else None
+            )
+            payload["content_pillars"] = (
+                [p.model_dump() for p in request.content_pillars]
+                if request.content_pillars
+                else None
+            )
+            payload["boundaries"] = (
+                request.boundaries.model_dump() if request.boundaries else None
+            )
+            payload["platforms"] = request.platforms
+            payload["notification"] = (
+                request.notification.model_dump() if request.notification else None
+            )
+        else:
+            # Simple mode: AI generates from description
+            payload["structured"] = False
+            payload["user_input"] = f"Create a persona: {request.description}"
+            payload["platforms"] = request.platforms
+
         message = AgentMessage(
             sender="api",
             receiver="orchestrator",
-            task_type=TaskType.ANALYZE_INPUT,
-            payload={
-                "user_input": f"Create a persona: {request.description}",
-                "platform": request.platform,
-            },
+            task_type=TaskType.CREATE_PERSONA,
+            payload=payload,
             context={},
         )
 
         try:
             result = await orchestrator.process(message)
             persona_data = result.get("persona", {})
+
+            # Build response with all available fields
+            identity = persona_data.get("identity", {})
             return PersonaResponse(
                 id=persona_data.get("id", ""),
-                name=persona_data.get("identity", {}).get("name", ""),
-                tagline=persona_data.get("identity", {}).get("tagline", ""),
                 version=persona_data.get("version", "v1.0"),
+                name=identity.get("name", ""),
+                tagline=identity.get("tagline", ""),
+                expertise=identity.get("expertise", []),
+                target_audience=persona_data.get("target_audience"),
+                voice_style=persona_data.get("voice_style"),
+                content_pillars=persona_data.get("content_pillars"),
+                boundaries=persona_data.get("boundaries"),
+                platforms=persona_data.get("platforms", []),
+                notification=persona_data.get("notification"),
+                created_at=persona_data.get("created_at"),
+                updated_at=persona_data.get("updated_at"),
             )
         except Exception as e:
             raise HTTPException(

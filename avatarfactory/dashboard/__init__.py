@@ -14,7 +14,7 @@ def run_dashboard(port: int = 8501, host: str = "localhost") -> None:
     import sys
     from pathlib import Path
 
-    app_path = Path(__file__).parent / "app.py"
+    app_path = Path(__file__).parent / "Dashboard.py"
 
     subprocess.run([
         sys.executable, "-m", "streamlit", "run",

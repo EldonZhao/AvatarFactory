@@ -146,7 +146,7 @@ def start_dashboard_process(host: str = "localhost", port: int = 8501) -> subpro
     """
     from pathlib import Path
 
-    dashboard_path = Path(__file__).parent / "dashboard" / "app.py"
+    dashboard_path = Path(__file__).parent / "dashboard" / "Dashboard.py"
 
     return subprocess.Popen(
         [

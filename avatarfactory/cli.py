@@ -1342,7 +1342,7 @@ def dashboard(
     import subprocess
     from pathlib import Path
 
-    dashboard_path = Path(__file__).parent / "dashboard" / "app.py"
+    dashboard_path = Path(__file__).parent / "dashboard" / "Dashboard.py"
 
     if not dashboard_path.exists():
         console.print("[red]Dashboard not found. Please ensure the dashboard module is installed.[/red]")

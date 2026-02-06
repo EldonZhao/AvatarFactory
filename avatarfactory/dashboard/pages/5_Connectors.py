@@ -50,6 +50,9 @@ with st.sidebar:
 # Get connector statuses
 connectors = provider.get_connector_statuses()
 
+# Sort: configured first, then unconfigured
+connectors = sorted(connectors, key=lambda c: (not c.configured, c.platform))
+
 # Stats
 configured = sum(1 for c in connectors if c.configured)
 col1, col2 = st.columns(2)

@@ -1,8 +1,10 @@
 """
-Topology Page - Interactive system visualization.
+Topology Page - System architecture visualization.
 
-Displays an interactive graph showing the relationships between
-personas, agents, connectors, and scheduled tasks.
+Displays a hierarchical view showing:
+- Personas and their configurations
+- Scheduled tasks (SubAgents) per persona
+- Data flow: source connectors -> processing -> target connectors
 """
 
 import os
@@ -22,115 +24,303 @@ st.set_page_config(
 )
 
 st.title("🗺️ System Topology")
-st.markdown("Interactive visualization of the AvatarFactory system architecture.")
+st.markdown("Hierarchical view of personas, agents, and data flows.")
 
 # Initialize provider
 kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
 provider = DashboardDataProvider(kb_path)
 
-# Check if streamlit-agraph is available
-if not AGRAPH_AVAILABLE:
-    st.warning(
-        "📦 **streamlit-agraph not installed**\n\n"
-        "Install it with: `pip install streamlit-agraph`\n\n"
-        "The topology graph requires this package for interactive visualization."
+# Sidebar
+with st.sidebar:
+    st.markdown("### View Options")
+    show_disabled_tasks = st.checkbox("Show disabled tasks", value=False)
+    show_unconfigured = st.checkbox("Show unconfigured connectors", value=True)
+
+    if st.button("🔄 Refresh"):
+        st.rerun()
+
+# Get data
+personas = provider.get_personas()
+tasks = provider.get_scheduled_tasks()
+connectors = provider.get_connector_statuses()
+
+# Filter connectors if needed
+if not show_unconfigured:
+    connectors = [c for c in connectors if c.configured]
+
+# Quick stats
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Personas", len(personas))
+with col2:
+    enabled_tasks = sum(1 for t in tasks if t.get("enabled"))
+    st.metric("Active Tasks", enabled_tasks)
+with col3:
+    configured = sum(1 for c in connectors if c.configured)
+    st.metric("Connectors Ready", configured)
+with col4:
+    total_content = sum(p.draft_count + p.published_count for p in personas)
+    st.metric("Total Content", total_content)
+
+st.divider()
+
+# Task type definitions for data flow
+TASK_DATA_FLOWS = {
+    "discovery": {
+        "name": "Discovery",
+        "icon": "🔍",
+        "description": "Fetch trending content from platforms",
+        "source": "Platform",  # From platform
+        "target": "KB",  # To knowledge base
+        "flow": "Platform → Discovery Agent → Knowledge Base",
+    },
+    "content": {
+        "name": "Content Generation",
+        "icon": "📝",
+        "description": "Generate content based on persona and trends",
+        "source": "KB",  # From knowledge base (trends)
+        "target": "KB",  # To knowledge base (drafts)
+        "flow": "Knowledge Base → Content Agent → Drafts",
+    },
+    "publish": {
+        "name": "Publishing",
+        "icon": "📤",
+        "description": "Publish approved content to platforms",
+        "source": "KB",  # From knowledge base (drafts)
+        "target": "Platform",  # To platform
+        "flow": "Drafts → Review Agent → Platform",
+    },
+    "report": {
+        "name": "Reporting",
+        "icon": "📊",
+        "description": "Generate and send performance reports",
+        "source": "KB",
+        "target": "Notification",
+        "flow": "Analytics → Report Agent → Notification",
+    },
+}
+
+# Connector icons
+CONNECTOR_ICONS = {
+    "bluesky": "🦋",
+    "twitter": "𝕏",
+    "xiaohongshu": "📕",
+    "wecom": "💬",
+}
+
+# ============================================================================
+# Hierarchical View
+# ============================================================================
+
+if not personas:
+    st.info(
+        "No personas found. Create one to see the system topology.\n\n"
+        "```bash\n"
+        "avatarfactory create-persona \"your persona description\"\n"
+        "```"
     )
-
-    # Show text-based topology instead
-    st.markdown("### 📊 System Overview (Text)")
-
-    topology = provider.get_topology_data()
-
-    st.markdown("#### Agents")
-    agents = [n for n in topology["nodes"] if n["type"] == "agent"]
-    for agent in agents:
-        st.write(f"  - 🔮 **{agent['label']}**")
-
-    st.markdown("#### Personas")
-    personas = [n for n in topology["nodes"] if n["type"] == "persona"]
-    for persona in personas:
-        st.write(f"  - 💎 **{persona['label']}**")
-        meta = persona.get("metadata", {})
-        if meta:
-            st.caption(f"    Drafts: {meta.get('draft', 0)} | Published: {meta.get('published', 0)}")
-
-    st.markdown("#### Connectors")
-    connectors = [n for n in topology["nodes"] if n["type"] == "connector"]
-    for conn in connectors:
-        status = "✅" if conn["color"] != "#CCCCCC" else "⚠️"
-        st.write(f"  - {status} **{conn['label']}**")
-
-    st.markdown("#### Scheduled Tasks")
-    tasks = [n for n in topology["nodes"] if n["type"] == "task"]
-    for task in tasks:
-        status = "✅" if task["color"] != "#CCCCCC" else "⏸️"
-        st.write(f"  - {status} **{task['label']}**")
-
 else:
-    # Sidebar controls
-    with st.sidebar:
-        st.markdown("### Graph Settings")
-        physics_enabled = st.checkbox("Enable physics simulation", value=True)
-        graph_height = st.slider("Graph height", 400, 800, 600)
+    # Show each persona with its tasks and data flows
+    for persona in personas:
+        # Persona header
+        with st.expander(f"👤 **{persona.name}** - {persona.tagline[:50]}...", expanded=True):
+            # Persona info row
+            info_col1, info_col2, info_col3 = st.columns(3)
 
-        st.markdown("### Legend")
-        st.markdown("""
-        - 💎 **Diamond** = Persona
-        - 📦 **Box** = Agent
-        - 🔺 **Triangle** = Connector
-        - ⭐ **Star** = Task
-        - 🔘 Grayed = Disabled/Not configured
-        """)
+            with info_col1:
+                platforms_str = ", ".join(
+                    f"{CONNECTOR_ICONS.get(p, '📱')} {p}"
+                    for p in persona.platforms
+                )
+                st.markdown(f"**Platforms:** {platforms_str or 'None configured'}")
 
-        st.markdown("### Refresh")
-        if st.button("🔄 Refresh Data"):
-            st.rerun()
+            with info_col2:
+                st.markdown(f"**Content:** {persona.draft_count} drafts, {persona.published_count} published")
 
-    # Get topology data
-    topology = provider.get_topology_data()
+            with info_col3:
+                st.markdown(f"**Version:** {persona.version}")
 
-    # Quick stats
-    col1, col2, col3, col4 = st.columns(4)
-    node_counts = {}
-    for node in topology["nodes"]:
-        node_type = node["type"]
-        node_counts[node_type] = node_counts.get(node_type, 0) + 1
+            st.markdown("---")
 
-    with col1:
-        st.metric("Personas", node_counts.get("persona", 0))
-    with col2:
-        st.metric("Agents", node_counts.get("agent", 0))
-    with col3:
-        st.metric("Connectors", node_counts.get("connector", 0))
-    with col4:
-        st.metric("Tasks", node_counts.get("task", 0))
+            # Get tasks for this persona
+            persona_tasks = [
+                t for t in tasks
+                if t.get("persona_id") == persona.id
+            ]
 
+            if not show_disabled_tasks:
+                persona_tasks = [t for t in persona_tasks if t.get("enabled")]
+
+            if persona_tasks:
+                st.markdown("#### 🔄 Scheduled Tasks (SubAgents)")
+
+                for task in persona_tasks:
+                    task_type = task.get("task_type", "unknown")
+                    task_info = TASK_DATA_FLOWS.get(task_type, {})
+                    task_icon = task_info.get("icon", "📌")
+                    task_name = task_info.get("name", task_type.capitalize())
+                    data_flow = task_info.get("flow", "N/A")
+
+                    # Status styling
+                    enabled = task.get("enabled", True)
+                    last_status = task.get("last_status", "never")
+
+                    if not enabled:
+                        status_badge = '<span style="background: #e0e0e0; color: #666; padding: 2px 8px; border-radius: 4px; font-size: 11px;">DISABLED</span>'
+                    elif last_status == "success":
+                        status_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 4px; font-size: 11px;">SUCCESS</span>'
+                    elif last_status == "failed":
+                        status_badge = '<span style="background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 4px; font-size: 11px;">FAILED</span>'
+                    else:
+                        status_badge = '<span style="background: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 4px; font-size: 11px;">PENDING</span>'
+
+                    # Platform info
+                    task_platform = task.get("platform", "")
+                    platform_icon = CONNECTOR_ICONS.get(task_platform, "")
+
+                    # Display task card
+                    st.markdown(f"""
+                    <div style="
+                        background: white;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 8px;
+                        padding: 12px 16px;
+                        margin-bottom: 12px;
+                    ">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 16px;">
+                                {task_icon} <strong>{task_name}</strong>
+                                {f'{platform_icon} {task_platform}' if task_platform else ''}
+                            </span>
+                            {status_badge}
+                        </div>
+                        <div style="color: #666; font-size: 13px; margin-bottom: 6px;">
+                            ⏰ Schedule: <code>{task.get('schedule', 'N/A')}</code>
+                            &nbsp;|&nbsp;
+                            🔢 Runs: {task.get('run_count', 0)}
+                        </div>
+                        <div style="
+                            background: #f5f5f5;
+                            padding: 8px 12px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            color: #555;
+                        ">
+                            <strong>Data Flow:</strong> {data_flow}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            else:
+                st.caption("No scheduled tasks for this persona.")
+                st.markdown(
+                    "Add a task: `avatarfactory schedule add --type discovery "
+                    f"--persona {persona.id} --cron '0 9 * * *'`"
+                )
+
+            # Show connector data flow diagram
+            st.markdown("---")
+            st.markdown("#### 📊 Data Flow Overview")
+
+            # Build flow diagram
+            flow_cols = st.columns([1, 1, 1, 1, 1])
+
+            with flow_cols[0]:
+                st.markdown("**📥 Sources**")
+                for p in persona.platforms:
+                    icon = CONNECTOR_ICONS.get(p, "📱")
+                    configured = any(c.platform == p and c.configured for c in connectors)
+                    status = "✅" if configured else "⚠️"
+                    st.markdown(f"{icon} {p} {status}")
+
+            with flow_cols[1]:
+                st.markdown("**→**")
+                st.markdown("")
+                st.markdown("🔍 Discovery")
+
+            with flow_cols[2]:
+                st.markdown("**📦 Processing**")
+                st.markdown("📝 Content Agent")
+                st.markdown("⭐ Review Agent")
+
+            with flow_cols[3]:
+                st.markdown("**→**")
+                st.markdown("")
+                st.markdown("📤 Publish")
+
+            with flow_cols[4]:
+                st.markdown("**📤 Targets**")
+                for p in persona.platforms:
+                    icon = CONNECTOR_ICONS.get(p, "📱")
+                    configured = any(c.platform == p and c.configured for c in connectors)
+                    status = "✅" if configured else "⚠️"
+                    st.markdown(f"{icon} {p} {status}")
+                # Also show notification connector
+                wecom_configured = any(c.platform == "wecom" and c.configured for c in connectors)
+                st.markdown(f"💬 WeChat Work {'✅' if wecom_configured else '⚠️'}")
+
+st.divider()
+
+# ============================================================================
+# Connectors Overview
+# ============================================================================
+
+st.markdown("### 🔌 Connectors Status")
+
+# Sort: configured first
+sorted_connectors = sorted(connectors, key=lambda c: (not c.configured, c.platform))
+
+conn_cols = st.columns(len(sorted_connectors) if sorted_connectors else 1)
+
+for i, conn in enumerate(sorted_connectors):
+    with conn_cols[i]:
+        icon = CONNECTOR_ICONS.get(conn.platform, "📱")
+        status_color = "#4CAF50" if conn.configured else "#ff9800"
+        status_text = "Ready" if conn.configured else "Not configured"
+
+        st.markdown(f"""
+        <div style="
+            text-align: center;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid {status_color};
+        ">
+            <div style="font-size: 32px;">{icon}</div>
+            <div style="font-weight: 600; margin: 8px 0;">{conn.platform.capitalize()}</div>
+            <div style="color: {status_color}; font-size: 12px;">{status_text}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ============================================================================
+# Interactive Graph (Optional)
+# ============================================================================
+
+if AGRAPH_AVAILABLE:
     st.divider()
 
-    # Render graph
-    selected = build_topology_graph(
-        nodes=topology["nodes"],
-        edges=topology["edges"],
-        height=graph_height,
-        physics_enabled=physics_enabled,
-    )
+    with st.expander("📈 Interactive Graph View (Advanced)", expanded=False):
+        st.markdown("Click on nodes to see details. Drag to rearrange.")
 
-    # Show selected node info
-    if selected:
-        st.markdown("---")
-        st.markdown(f"### Selected: `{selected}`")
+        # Get topology data
+        topology = provider.get_topology_data()
 
-        # Find node details
-        node = next((n for n in topology["nodes"] if n["id"] == selected), None)
-        if node:
-            st.write(f"**Type:** {node['type'].capitalize()}")
-            st.write(f"**Label:** {node['label']}")
-            if node.get("metadata"):
-                st.write("**Details:**")
-                st.json(node["metadata"])
+        # Graph settings
+        col1, col2 = st.columns(2)
+        with col1:
+            physics_enabled = st.checkbox("Enable physics", value=True)
+        with col2:
+            graph_height = st.slider("Height", 400, 800, 500)
 
-            # Show connected nodes
-            connected = [e["target"] for e in topology["edges"] if e["source"] == selected]
-            connected += [e["source"] for e in topology["edges"] if e["target"] == selected]
-            if connected:
-                st.write(f"**Connected to:** {', '.join(connected)}")
+        # Render graph
+        selected = build_topology_graph(
+            nodes=topology["nodes"],
+            edges=topology["edges"],
+            height=graph_height,
+            physics_enabled=physics_enabled,
+        )
+
+        if selected:
+            node = next((n for n in topology["nodes"] if n["id"] == selected), None)
+            if node:
+                st.info(f"Selected: **{node['label']}** ({node['type']})")

@@ -165,51 +165,33 @@ else:
                     enabled = task.get("enabled", True)
                     last_status = task.get("last_status", "never")
 
-                    if not enabled:
-                        status_badge = '<span style="background: #e0e0e0; color: #666; padding: 2px 8px; border-radius: 4px; font-size: 11px;">DISABLED</span>'
-                    elif last_status == "success":
-                        status_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 4px; font-size: 11px;">SUCCESS</span>'
-                    elif last_status == "failed":
-                        status_badge = '<span style="background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 4px; font-size: 11px;">FAILED</span>'
-                    else:
-                        status_badge = '<span style="background: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 4px; font-size: 11px;">PENDING</span>'
-
                     # Platform info
                     task_platform = task.get("platform", "")
-                    platform_icon = CONNECTOR_ICONS.get(task_platform, "")
+                    platform_icon = CONNECTOR_ICONS.get(task_platform, "") if task_platform else ""
+                    platform_display = f"{platform_icon} {task_platform}" if task_platform else ""
 
-                    # Display task card
-                    st.markdown(f"""
-                    <div style="
-                        background: white;
-                        border: 1px solid #e0e0e0;
-                        border-radius: 8px;
-                        padding: 12px 16px;
-                        margin-bottom: 12px;
-                    ">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 16px;">
-                                {task_icon} <strong>{task_name}</strong>
-                                {f'{platform_icon} {task_platform}' if task_platform else ''}
-                            </span>
-                            {status_badge}
-                        </div>
-                        <div style="color: #666; font-size: 13px; margin-bottom: 6px;">
-                            ⏰ Schedule: <code>{task.get('schedule', 'N/A')}</code>
-                            &nbsp;|&nbsp;
-                            🔢 Runs: {task.get('run_count', 0)}
-                        </div>
-                        <div style="
-                            background: #f5f5f5;
-                            padding: 8px 12px;
-                            border-radius: 4px;
-                            font-size: 12px;
-                            color: #555;
-                        ">
-                            <strong>Data Flow:</strong> {data_flow}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # Schedule display
+                    schedule = task.get("schedule", "N/A")
+                    run_count = task.get("run_count", 0)
+
+                    # Render task card using Streamlit native components
+                    with st.container():
+                        tcol1, tcol2 = st.columns([4, 1])
+                        with tcol1:
+                            st.markdown(f"**{task_icon} {task_name}** {platform_display}")
+                        with tcol2:
+                            if not enabled:
+                                st.caption("⬜ DISABLED")
+                            elif last_status == "success":
+                                st.caption("✅ SUCCESS")
+                            elif last_status == "failed":
+                                st.caption("❌ FAILED")
+                            else:
+                                st.caption("🔵 PENDING")
+
+                        st.caption(f"⏰ Schedule: `{schedule}` | 🔢 Runs: {run_count}")
+                        st.info(f"**Data Flow:** {data_flow}")
+                        st.markdown("---")
 
             else:
                 st.caption("No scheduled tasks for this persona.")

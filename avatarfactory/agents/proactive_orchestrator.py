@@ -79,6 +79,10 @@ class ProactiveOrchestrator(OrchestratorAgent):
             self.log("WARNING", "No scheduler configured, cannot set up persona tasks")
             return []
 
+        # Get persona name for task naming
+        persona = self.kb.load_persona(persona_id)
+        persona_name = persona.identity.name if persona else persona_id[:12]
+
         discovery_platforms = discovery_platforms or ["bluesky"]
         content_platforms = content_platforms or ["xiaohongshu"]
         discovery_schedule = discovery_schedule or "0 */6 * * *"
@@ -89,7 +93,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
         if discovery_platforms:
             discovery_task = {
                 "id": f"discovery_{persona_id}",
-                "name": f"热点扫描",
+                "name": f"Discovery - {persona_name}",
                 "task_type": "discovery",
                 "schedule": discovery_schedule,
                 "persona_id": persona_id,
@@ -101,7 +105,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
         if content_platforms:
             content_task = {
                 "id": f"content_{persona_id}",
-                "name": f"内容生成",
+                "name": f"Content - {persona_name}",
                 "task_type": "content",
                 "schedule": content_schedule,
                 "persona_id": persona_id,

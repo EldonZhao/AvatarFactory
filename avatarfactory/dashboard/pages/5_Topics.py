@@ -1,7 +1,7 @@
 """
-Topics Page - View and manage discovered topics/ideas.
+Topics Page - View discovered content ideas.
 
-Displays trending topics and ideas from discovery scans.
+Displays content ideas from discovery scans, grouped by persona.
 """
 
 import os
@@ -19,14 +19,14 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("💡 Discovered Topics")
-st.markdown("View and manage topics discovered from platform scans.")
+st.title("💡 Content Ideas")
+st.markdown("Browse content ideas discovered from platform scans.")
 
 # Initialize provider
 kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
 provider = DashboardDataProvider(kb_path)
 
-# Get personas for filtering
+# Get personas
 personas_list = provider.get_personas()
 
 # Sidebar filters
@@ -34,7 +34,7 @@ with st.sidebar:
     st.markdown("### Filters")
 
     # Persona filter
-    persona_options = {"All": None}
+    persona_options = {"All Personas": None}
     for p in personas_list:
         persona_options[f"{p.name} ({p.id[:12]}...)"] = p.id
 
@@ -53,193 +53,157 @@ with st.sidebar:
     )
     selected_platform = None if platform_filter == "All" else platform_filter
 
-    limit = st.slider("Max items", 10, 100, 50, key="topic_limit_slider")
+    # Limit per persona
+    discoveries_per_persona = st.slider(
+        "Discoveries per persona",
+        1, 10, 5,
+        key="discoveries_per_persona",
+        help="Number of recent discoveries to show per persona"
+    )
 
     if st.button("🔄 Refresh"):
         st.rerun()
 
-    st.markdown("---")
-    st.markdown("### Bulk Actions")
+# Build persona name map
+persona_name_map = {p.id: p.name for p in personas_list}
 
-    if st.button("🗑️ Delete Selected", key="delete_selected_btn", type="secondary"):
-        if "selected_discoveries" in st.session_state and st.session_state.selected_discoveries:
-            deleted_count = 0
-            for item in st.session_state.selected_discoveries:
-                if provider.delete_discovery(item["persona_id"], item["filename"]):
-                    deleted_count += 1
-            st.success(f"Deleted {deleted_count} discovery record(s)")
-            st.session_state.selected_discoveries = []
-            st.rerun()
-        else:
-            st.warning("No items selected")
+# Platform emoji mapping
+platform_emojis = {
+    "xiaohongshu": "📕",
+    "bluesky": "🦋",
+    "twitter": "𝕏",
+}
 
-# Initialize session state for selections
-if "selected_discoveries" not in st.session_state:
-    st.session_state.selected_discoveries = []
+# Engagement badge colors
+engagement_colors = {
+    "high": "🔥",
+    "medium": "⭐",
+    "low": "💭",
+}
 
-if "selected_discovery_detail" not in st.session_state:
-    st.session_state.selected_discovery_detail = None
 
-# Get discovery history
-discoveries = provider.get_discovery_history(
-    persona_id=selected_persona,
-    platform=selected_platform,
-    limit=limit,
-)
+def get_content_ideas(discovery: dict) -> list:
+    """Extract content ideas from discovery data."""
+    # Try report.content_ideas first, then fall back to ideas
+    report = discovery.get("report", {})
+    if report and report.get("content_ideas"):
+        return report.get("content_ideas", [])
+    return discovery.get("ideas", [])
+
+
+def render_idea_card(idea: dict):
+    """Render a single idea card."""
+    platform = idea["platform"]
+    emoji = platform_emojis.get(platform, "📱")
+    engagement = idea["engagement"]
+    engagement_icon = engagement_colors.get(engagement, "💭")
+
+    with st.container():
+        # Header row
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            st.markdown(f"**{idea['topic']}**")
+            st.caption(
+                f"{emoji} {platform} | "
+                f"📌 {idea['pillar'][:20] if idea['pillar'] else 'N/A'} | "
+                f"📅 {idea['discovery_date']}"
+            )
+
+        with col2:
+            st.markdown(f"{engagement_icon} {engagement}")
+
+        # Hook
+        if idea["hook"]:
+            st.info(f"🎣 {idea['hook']}")
+
+        # Details in expander
+        with st.expander("More details"):
+            if idea["angle"]:
+                st.markdown(f"**Angle:** {idea['angle']}")
+            if idea["reasoning"]:
+                st.markdown(f"**Why:** {idea['reasoning']}")
+            st.markdown(f"**Content Type:** `{idea['content_type']}`")
+
+        st.divider()
+
+
+# Collect all ideas grouped by persona
+all_ideas = []
+
+# Get personas to iterate
+if selected_persona:
+    persona_ids = [selected_persona]
+else:
+    persona_ids = [p.id for p in personas_list]
+
+for persona_id in persona_ids:
+    # Get recent discoveries for this persona (limited)
+    discoveries = provider.kb.list_discovery_history(
+        persona_id,
+        platform=selected_platform,
+        limit=discoveries_per_persona
+    )
+
+    persona_name = persona_name_map.get(persona_id, persona_id[:12] + "...")
+
+    for discovery in discoveries:
+        ideas = get_content_ideas(discovery)
+        platform = discovery.get("platform", "unknown")
+        created_at = discovery.get("created_at", "")[:10]
+
+        for idea in ideas:
+            all_ideas.append({
+                "persona_id": persona_id,
+                "persona_name": persona_name,
+                "platform": platform,
+                "discovery_date": created_at,
+                "topic": idea.get("topic", "Untitled"),
+                "hook": idea.get("hook", ""),
+                "angle": idea.get("angle", ""),
+                "content_type": idea.get("content_type", "post"),
+                "pillar": idea.get("suggested_pillar", ""),
+                "engagement": idea.get("estimated_engagement", "medium"),
+                "reasoning": idea.get("reasoning", ""),
+            })
 
 # Stats
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Total Discoveries", len(discoveries))
+    st.metric("Total Ideas", len(all_ideas))
 with col2:
-    platforms = set(d.get("platform", "unknown") for d in discoveries)
-    st.metric("Platforms", len(platforms))
+    st.metric("Personas", len(persona_ids))
 with col3:
-    total_ideas = sum(len(d.get("ideas", [])) for d in discoveries)
-    st.metric("Total Ideas", total_ideas)
+    platforms_found = set(i["platform"] for i in all_ideas)
+    st.metric("Platforms", len(platforms_found))
 
 st.divider()
 
-# Detail view - show FIRST if selected
-if st.session_state.selected_discovery_detail:
-    detail = st.session_state.selected_discovery_detail
-
-    st.markdown("## 📊 Discovery Details")
-
-    col1, col2 = st.columns([3, 1])
-
-    with col1:
-        st.markdown(f"### {detail.get('platform', 'Unknown').capitalize()} Discovery")
-        st.markdown(f"**Date:** {detail.get('created_at', 'N/A')[:16]}")
-        st.markdown(f"**Persona:** {detail.get('persona_name', detail.get('persona_id', 'Unknown'))}")
-
-        # Trending patterns
-        patterns = detail.get("patterns", [])
-        if patterns:
-            st.markdown("#### 📈 Trending Patterns")
-            for i, pattern in enumerate(patterns[:10], 1):
-                if isinstance(pattern, dict):
-                    st.markdown(f"{i}. **{pattern.get('topic', pattern.get('pattern', 'N/A'))}** - {pattern.get('description', '')}")
-                else:
-                    st.markdown(f"{i}. {pattern}")
-
-        # Ideas
-        ideas = detail.get("ideas", [])
-        if ideas:
-            st.markdown("#### 💡 Generated Ideas")
-            for i, idea in enumerate(ideas[:10], 1):
-                if isinstance(idea, dict):
-                    st.info(f"**{idea.get('title', f'Idea {i}')}**\n\n{idea.get('description', idea.get('content', ''))}")
-                else:
-                    st.info(f"**Idea {i}:** {idea}")
-
-        # Raw data
-        with st.expander("📄 Raw Data"):
-            st.json(detail)
-
-    with col2:
-        if st.button("✖️ Close", key="close_discovery_detail"):
-            st.session_state.selected_discovery_detail = None
-            st.rerun()
-
-        st.markdown("---")
-
-        # Delete button
-        if st.button("🗑️ Delete", key="delete_this_discovery", type="secondary"):
-            filename = detail.get("_filename")
-            persona_id = detail.get("persona_id")
-            if filename and persona_id:
-                if provider.delete_discovery(persona_id, filename):
-                    st.success("Deleted!")
-                    st.session_state.selected_discovery_detail = None
-                    st.rerun()
-                else:
-                    st.error("Failed to delete")
-
-    st.divider()
-
-# Discovery list
-if not discoveries:
+# Display ideas
+if not all_ideas:
     st.info(
-        "No discovery results found.\n\n"
-        "Run discovery to find trending topics:\n"
+        "No content ideas found.\n\n"
+        "Run discovery to generate content ideas:\n"
         "```bash\n"
         "avatarfactory discover --platform bluesky --limit 30\n"
         "```"
     )
 else:
-    # Platform emoji mapping
-    platform_emojis = {
-        "xiaohongshu": "📕",
-        "bluesky": "🦋",
-        "twitter": "𝕏",
-    }
+    # Group by persona if showing all
+    if not selected_persona:
+        # Show ideas grouped by persona
+        for persona_id in persona_ids:
+            persona_ideas = [i for i in all_ideas if i["persona_id"] == persona_id]
+            if not persona_ideas:
+                continue
 
-    # Build persona name map
-    persona_name_map = {p.id: p.name for p in personas_list}
+            persona_name = persona_name_map.get(persona_id, persona_id[:12])
 
-    st.markdown("### 📋 Discovery History")
-
-    for discovery in discoveries:
-        with st.container():
-            col1, col2, col3, col4, col5, col6 = st.columns([0.5, 2, 2, 1, 1, 1])
-
-            with col1:
-                # Checkbox for selection
-                filename = discovery.get("_filename", "")
-                persona_id = discovery.get("persona_id", "")
-                is_selected = any(
-                    s["filename"] == filename and s["persona_id"] == persona_id
-                    for s in st.session_state.selected_discoveries
-                )
-
-                if st.checkbox(
-                    "",
-                    value=is_selected,
-                    key=f"select_{persona_id}_{filename}",
-                    label_visibility="collapsed"
-                ):
-                    if not is_selected:
-                        st.session_state.selected_discoveries.append({
-                            "filename": filename,
-                            "persona_id": persona_id,
-                        })
-                else:
-                    st.session_state.selected_discoveries = [
-                        s for s in st.session_state.selected_discoveries
-                        if not (s["filename"] == filename and s["persona_id"] == persona_id)
-                    ]
-
-            with col2:
-                platform = discovery.get("platform", "unknown")
-                emoji = platform_emojis.get(platform, "📱")
-                created = discovery.get("created_at", "")[:16]
-                st.markdown(f"{emoji} **{platform}** - {created}")
-
-            with col3:
-                persona_name = persona_name_map.get(persona_id, persona_id[:12] + "...")
-                st.caption(f"👤 {persona_name}")
-
-            with col4:
-                patterns_count = len(discovery.get("patterns", []))
-                st.caption(f"📈 {patterns_count} patterns")
-
-            with col5:
-                ideas_count = len(discovery.get("ideas", []))
-                st.caption(f"💡 {ideas_count} ideas")
-
-            with col6:
-                if st.button("👁️", key=f"view_{persona_id}_{filename}", help="View details"):
-                    # Load full details
-                    detail = provider.get_discovery_details(persona_id, filename)
-                    if detail:
-                        detail["persona_id"] = persona_id
-                        detail["persona_name"] = persona_name_map.get(persona_id, persona_id)
-                        st.session_state.selected_discovery_detail = detail
-                        st.rerun()
-
-            st.divider()
-
-    # Show selection count
-    if st.session_state.selected_discoveries:
-        st.info(f"Selected {len(st.session_state.selected_discoveries)} item(s) for deletion")
+            with st.expander(f"👤 **{persona_name}** ({len(persona_ideas)} ideas)", expanded=True):
+                for idea in persona_ideas:
+                    render_idea_card(idea)
+    else:
+        # Show flat list for single persona
+        st.markdown(f"### Ideas for {persona_name_map.get(selected_persona, selected_persona[:12])}")
+        for idea in all_ideas:
+            render_idea_card(idea)

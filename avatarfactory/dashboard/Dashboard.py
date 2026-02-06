@@ -175,16 +175,18 @@ def main() -> None:
 
     # Navigation hints
     st.markdown("### 📍 Quick Navigation")
-    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns(4)
+    nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns(5)
 
     with nav_col1:
         st.page_link("pages/1_Topology.py", label="System Topology", icon="🗺️")
     with nav_col2:
         st.page_link("pages/2_Personas.py", label="Manage Personas", icon="👥")
     with nav_col3:
-        st.page_link("pages/3_Content.py", label="Browse Content", icon="📝")
+        st.page_link("pages/3_Scheduler.py", label="Task Scheduler", icon="⏰")
     with nav_col4:
-        st.page_link("pages/4_Scheduler.py", label="Task Scheduler", icon="⏰")
+        st.page_link("pages/4_Content.py", label="Browse Content", icon="📝")
+    with nav_col5:
+        st.page_link("pages/5_Topics.py", label="Content Ideas", icon="💡")
 
     # Footer
     st.markdown("---")

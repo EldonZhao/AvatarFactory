@@ -254,12 +254,11 @@ if st.session_state.selected_content_id:
 if not contents:
     st.info(
         f"No {status_filter} content found.\n\n"
-        "Generate content using the CLI:\n"
-        "```bash\n"
-        "avatarfactory generate \"your topic here\"\n"
-        "```"
+        "Generate content using the sidebar or CLI."
     )
 else:
+    st.markdown("### Content List")
+
     # Platform emoji mapping
     platform_emojis = {
         "xiaohongshu": "📕",
@@ -269,45 +268,26 @@ else:
 
     # Create a table view
     for content in contents:
+        content_id = content["id"]
+        title = content.get("title", "Untitled")
+        if len(title) > 50:
+            title = title[:50] + "..."
+
+        persona_id = content.get("persona_id", "Unknown")
+        persona_name = persona_name_map.get(persona_id, persona_id[:12] + "..." if persona_id else "Unknown")
+        platform = content.get("platform", "unknown")
+        emoji = platform_emojis.get(platform, "📱")
+        pillar = content.get("pillar", "N/A")
+        score = content.get("review_score")
+
         with st.container():
-            col0, col1, col2, col3, col4, col5 = st.columns([0.5, 3, 2, 1, 1, 1])
-
-            with col0:
-                # Checkbox for selection
-                content_id = content["id"]
-                is_selected = content_id in st.session_state.selected_contents
-
-                if st.checkbox(
-                    "",
-                    value=is_selected,
-                    key=f"select_content_{content_id}",
-                    label_visibility="collapsed"
-                ):
-                    if content_id not in st.session_state.selected_contents:
-                        st.session_state.selected_contents.append(content_id)
-                else:
-                    if content_id in st.session_state.selected_contents:
-                        st.session_state.selected_contents.remove(content_id)
+            col1, col2, col3, col4 = st.columns([4, 2, 1, 1])
 
             with col1:
-                title = content.get("title", "Untitled")
-                if len(title) > 50:
-                    title = title[:50] + "..."
                 st.markdown(f"**{title}**")
+                st.caption(f"{emoji} {platform} | {persona_name} | {pillar[:15] if pillar else 'N/A'}")
 
             with col2:
-                persona_id = content.get("persona_id", "Unknown")
-                persona_name = persona_name_map.get(persona_id, persona_id[:12] + "...")
-                platform = content.get("platform", "unknown")
-                emoji = platform_emojis.get(platform, "📱")
-                st.caption(f"{emoji} {platform} | {persona_name}")
-
-            with col3:
-                pillar = content.get("pillar", "N/A")
-                st.caption(pillar[:15] if pillar else "N/A")
-
-            with col4:
-                score = content.get("review_score")
                 if score is not None:
                     if score >= 80:
                         st.success(f"{score}/100")
@@ -316,15 +296,23 @@ else:
                     else:
                         st.error(f"{score}/100")
                 else:
-                    st.caption("N/A")
+                    st.caption("Not reviewed")
 
-            with col5:
-                # Use button to select content for detail view
+            with col3:
+                # Checkbox for selection
+                is_selected = content_id in st.session_state.selected_contents
+                if st.checkbox("Select", value=is_selected, key=f"sel_{content_id}", label_visibility="collapsed"):
+                    if content_id not in st.session_state.selected_contents:
+                        st.session_state.selected_contents.append(content_id)
+                elif content_id in st.session_state.selected_contents:
+                    st.session_state.selected_contents.remove(content_id)
+
+            with col4:
                 if st.button("👁️", key=f"view_{content_id}", help="View details"):
                     st.session_state.selected_content_id = content_id
                     st.rerun()
 
-            st.divider()
+        st.divider()
 
     # Show selection count
     if st.session_state.selected_contents:

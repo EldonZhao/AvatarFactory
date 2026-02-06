@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 try:
     from fastapi import FastAPI, HTTPException, status
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import HTMLResponse
 except ImportError:
     raise ImportError(
         "FastAPI is required for the service layer. "
@@ -613,6 +614,190 @@ def register_routes(app: FastAPI):
             "image_prompts": content.image_prompts,
             "predicted_engagement": content.predicted_engagement,
         }
+
+    @app.get("/content/{content_id}/view", response_class=HTMLResponse, tags=["Content"])
+    async def view_content_html(content_id: str):
+        """View content as HTML page (for WeChat Work news card link)."""
+        orchestrator = get_orchestrator()
+
+        # Try loading from draft first, then published
+        content = orchestrator.kb.load_content(content_id, status="draft")
+        content_status = "draft"
+        if not content:
+            content = orchestrator.kb.load_content(content_id, status="published")
+            content_status = "published"
+
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Content {content_id} not found",
+            )
+
+        # Load persona for display
+        persona = orchestrator.kb.load_persona(content.persona_id)
+        persona_name = persona.identity.name if persona else content.persona_id
+
+        # Convert markdown to basic HTML
+        import re
+        body_html = content.body
+        # Headers
+        body_html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', body_html, flags=re.MULTILINE)
+        body_html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', body_html, flags=re.MULTILINE)
+        body_html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', body_html, flags=re.MULTILINE)
+        # Bold
+        body_html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', body_html)
+        # Italic
+        body_html = re.sub(r'\*(.+?)\*', r'<em>\1</em>', body_html)
+        # Links
+        body_html = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', body_html)
+        # Line breaks
+        body_html = body_html.replace('\n\n', '</p><p>').replace('\n', '<br>')
+        body_html = f'<p>{body_html}</p>'
+
+        # Build tags HTML
+        tags_html = ' '.join(f'<span class="tag">#{tag}</span>' for tag in content.tags[:10])
+
+        # Review score badge
+        score_html = ""
+        if content.review_score is not None:
+            if content.review_score >= 80:
+                score_class = "score-high"
+            elif content.review_score >= 60:
+                score_class = "score-medium"
+            else:
+                score_class = "score-low"
+            score_html = f'<span class="score {score_class}">{content.review_score}/100</span>'
+
+        html = f"""
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{content.title}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }}
+        h1 {{
+            font-size: 24px;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }}
+        .meta {{
+            font-size: 14px;
+            color: #666;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }}
+        .meta span {{
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }}
+        .score {{
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }}
+        .score-high {{ background: #e6f7e6; color: #2e7d32; }}
+        .score-medium {{ background: #fff3e0; color: #ef6c00; }}
+        .score-low {{ background: #ffebee; color: #c62828; }}
+        .content {{
+            font-size: 16px;
+            color: #333;
+        }}
+        .content p {{
+            margin-bottom: 16px;
+        }}
+        .content h2 {{
+            font-size: 20px;
+            margin: 24px 0 12px;
+            color: #1a1a1a;
+        }}
+        .content h3 {{
+            font-size: 18px;
+            margin: 20px 0 10px;
+            color: #333;
+        }}
+        .tags {{
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }}
+        .tag {{
+            display: inline-block;
+            background: #f0f0f0;
+            color: #666;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }}
+        .footer {{
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }}
+        .status-badge {{
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{content.title}</h1>
+            <div class="meta">
+                <span>👤 {persona_name}</span>
+                <span>📱 {content.platform.value}</span>
+                <span class="status-badge">{content_status}</span>
+                {score_html}
+            </div>
+        </div>
+        <div class="content">
+            {body_html}
+        </div>
+        <div class="tags">
+            {tags_html}
+        </div>
+        <div class="footer">
+            <p>由 AvatarFactory 生成 | {content.created_at.strftime('%Y-%m-%d %H:%M') if content.created_at else ''}</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+        return HTMLResponse(content=html)
 
     # -------------------------------------------------------------------------
     # Scheduler

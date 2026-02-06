@@ -321,78 +321,92 @@ class WeComConnector(BasePlatformConnector):
         persona_name: Optional[str] = None,
         platform: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        content_url: Optional[str] = None,
     ) -> PublishResult:
         """
-        Send content creation notification with review results.
+        Send content creation notification using news card format.
 
-        This is a convenience method for the common use case of
-        notifying users about newly generated content.
-
-        Note: WeChat Work has limited markdown support and 4096 byte limit.
-        This method formats the notification to work within those constraints.
+        This method uses WeChat Work's news card format which supports:
+        - Clean card-style display
+        - Clickable link to view full content
+        - Short description preview
 
         Args:
             content_title: Generated content title
-            content_body: Generated content body (will be truncated)
+            content_body: Generated content body (used for description)
             review_score: Optional review score (0-100)
             review_summary: Optional review summary text
-            content_id: Optional content ID for reference
+            content_id: Content ID for building view URL
             persona_name: Optional persona name
             platform: Target platform name
             tags: Content tags
+            content_url: Optional custom URL (if not provided, uses service URL)
 
         Returns:
             PublishResult
         """
-        # Build notification content (optimized for WeChat Work)
-        parts = []
+        import os
 
-        # Compact header
-        header_parts = []
+        # Build description (max 512 chars for WeChat Work news card)
+        description_parts = []
+
+        # Add persona and platform info
         if persona_name:
-            header_parts.append(f"人设: {persona_name}")
+            description_parts.append(f"👤 {persona_name}")
         if platform:
-            header_parts.append(f"平台: {platform}")
-        if content_id:
-            header_parts.append(f"ID: {content_id}")
+            description_parts.append(f"📱 {platform}")
 
-        if header_parts:
-            parts.append(" | ".join(header_parts))
-            parts.append("")
-
-        # Review score (prominent)
+        # Add review score
         if review_score is not None:
             if review_score >= 80:
-                score_text = f"<font color=\"info\">评分: {review_score:.0f}/100 ✅</font>"
+                description_parts.append(f"✅ 评分: {review_score:.0f}/100")
             elif review_score >= 60:
-                score_text = f"<font color=\"warning\">评分: {review_score:.0f}/100 ⚠️</font>"
+                description_parts.append(f"⚠️ 评分: {review_score:.0f}/100")
             else:
-                score_text = f"<font color=\"warning\">评分: {review_score:.0f}/100 ❌</font>"
-            parts.append(score_text)
-            parts.append("")
+                description_parts.append(f"❌ 评分: {review_score:.0f}/100")
 
-        # Content preview - very short for notification
-        # Strip markdown formatting for cleaner preview
+        # Add content preview
         body_clean = self._strip_markdown(content_body)
-        body_preview = body_clean[:300]
-        if len(body_clean) > 300:
+        # Calculate remaining space for preview
+        header_len = len(" | ".join(description_parts)) + 4 if description_parts else 0
+        max_preview_len = min(400, 500 - header_len)
+        body_preview = body_clean[:max_preview_len]
+        if len(body_clean) > max_preview_len:
             body_preview += "..."
 
-        parts.append(f"> {body_preview}")
+        if description_parts:
+            description = " | ".join(description_parts) + "\n\n" + body_preview
+        else:
+            description = body_preview
 
-        # Review summary (if any)
-        if review_summary:
-            parts.append("")
-            parts.append(f"<font color=\"comment\">审核备注: {review_summary[:100]}</font>")
+        # Build title
+        title = f"📝 {content_title}"
+        if len(title) > 60:
+            title = title[:57] + "..."
 
-        message = "\n".join(parts)
+        # Build URL
+        url = content_url
+        if not url and content_id:
+            # Try to get service URL from env
+            service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
+            if service_url:
+                url = f"{service_url}/content/{content_id}/view"
 
-        # Use text type for longer content with cleaner display
+        # If no URL available, fall back to text message type
+        if not url:
+            # WeChat Work news card requires a URL, fall back to text
+            return await self.publish(
+                content=description,
+                title=title,
+                message_type="text",
+            )
+
+        # Use news card format
         return await self.publish(
-            content=message,
-            title=f"📝 {content_title[:30]}{'...' if len(content_title) > 30 else ''}",
-            tags=tags[:3] if tags else None,  # Limit tags
-            message_type="markdown",
+            content=description,
+            title=title,
+            message_type="news",
+            url=url,
         )
 
     def _strip_markdown(self, text: str) -> str:

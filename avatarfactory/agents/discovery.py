@@ -646,10 +646,10 @@ Return ONLY a JSON array of suggestion strings:
             "report": inspiration_result["data"]["report"],
         }
 
-        # Step 4: Save results to knowledge base for ContentAgent to read
+        # Step 4: Save results to knowledges for ContentAgent to read
         try:
             self.kb.save_discovery_results(persona_id, platform, result_data)
-            self.log("INFO", f"Saved discovery results to KB for {persona_id}/{platform}")
+            self.log("INFO", f"Saved discovery results to knowledges for {persona_id}/{platform}")
         except Exception as e:
             self.log("WARNING", f"Failed to save discovery results: {e}")
 

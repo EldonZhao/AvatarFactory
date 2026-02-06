@@ -141,7 +141,7 @@ Provide a complete persona configuration in JSON format."""
             platforms=[PlatformType(target_platform)],
         )
 
-        # Save to knowledge base
+        # Save to knowledges
         self.kb.save_persona(persona)
 
         # Save initial version record

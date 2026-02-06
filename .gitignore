@@ -36,7 +36,7 @@ env/
 # Environment variables
 .env
 
-# Knowledge Base (user data)
+# Knowledges (user data)
 knowledges/
 
 # Test coverage

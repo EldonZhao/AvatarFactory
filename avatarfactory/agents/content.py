@@ -248,10 +248,10 @@ class ContentAgent(BaseAgent):
         platform: str,
     ) -> Optional[Dict[str, Any]]:
         """
-        Get trending context from knowledge base.
+        Get trending context from knowledges.
 
-        DiscoveryAgent runs on its own schedule and saves results to KB.
-        ContentAgent reads from KB - they are decoupled.
+        DiscoveryAgent runs on its own schedule and saves results to knowledges.
+        ContentAgent reads from knowledges - they are decoupled.
 
         Args:
             persona_id: Persona ID
@@ -261,7 +261,7 @@ class ContentAgent(BaseAgent):
             Dict with trending data or None if unavailable
         """
         try:
-            # Read from knowledge base (saved by DiscoveryAgent)
+            # Read from knowledges (saved by DiscoveryAgent)
             data = self.kb.get_latest_discovery(persona_id, platform)
             if data:
                 self.log("DEBUG", f"Loaded trending data for {persona_id}/{platform}")
@@ -527,7 +527,7 @@ Generate the content in JSON format."""
             image_prompts=content_data.get("image_prompts", []),
         )
 
-        # Save to knowledge base
+        # Save to knowledges
         self.kb.save_content(content, status="draft")
 
         self.log("INFO", f"Generated content: {content.id} - {content.title}")

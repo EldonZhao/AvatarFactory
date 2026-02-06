@@ -212,7 +212,7 @@ async def lifespan(app: FastAPI):
     from avatarfactory.core.llm_provider import LLMProviderFactory
     from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
 
-    # Initialize knowledge base
+    # Initialize knowledges
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 

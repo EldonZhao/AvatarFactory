@@ -186,9 +186,9 @@ def check_cli_command():
         return False
 
 
-def check_knowledge_base():
-    """Check if knowledge base directory exists"""
-    print_section("6. Knowledge Base")
+def check_knowledges():
+    """Check if knowledges directory exists"""
+    print_section("6. Knowledges")
 
     from pathlib import Path
     import os
@@ -196,7 +196,7 @@ def check_knowledge_base():
     kb_path = Path(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"))
 
     if kb_path.exists():
-        print(f"✅ Knowledge base directory found: {kb_path}")
+        print(f"✅ Knowledges directory found: {kb_path}")
 
         # Check subdirectories
         subdirs = ['personas', 'content_library', 'experiments', 'platform_rules']
@@ -208,7 +208,7 @@ def check_knowledge_base():
 
         return True
     else:
-        print(f"⚠️  Knowledge base not found at: {kb_path}")
+        print(f"⚠️  Knowledges directory not found at: {kb_path}")
         print("   (Will be created automatically on first use)")
         return True  # Not a critical issue
 
@@ -225,7 +225,7 @@ def main():
         ("AvatarFactory Package", check_avatarfactory_package),
         ("Configuration", check_env_file),
         ("CLI Command", check_cli_command),
-        ("Knowledge Base", check_knowledge_base),
+        ("Knowledges", check_knowledges),
     ]
 
     results = {}

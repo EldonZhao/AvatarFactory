@@ -108,7 +108,7 @@ class BaseAgent(ABC):
 
     def get_persona_context(self, persona_id: str) -> Dict[str, Any]:
         """
-        Get persona context from knowledge base.
+        Get persona context from knowledges.
 
         Args:
             persona_id: Persona ID

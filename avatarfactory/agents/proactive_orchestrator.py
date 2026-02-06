@@ -188,7 +188,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
                 self.log("ERROR", f"Trending scan failed for {platform}: {e}")
                 results[platform] = {"status": "error", "error": str(e)}
 
-        # Save results to knowledge base
+        # Save results to knowledges
         try:
             self.kb.save_discovery_results(persona_id, results)
         except Exception as e:

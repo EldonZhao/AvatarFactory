@@ -1,5 +1,5 @@
 """
-Knowledge Base - Data storage and retrieval layer.
+Knowledges - Data storage and retrieval layer.
 
 Handles persistence of personas, content, experiments, and other data.
 Uses file-based storage (YAML/JSON) for MVP, can be extended to database later.
@@ -25,14 +25,14 @@ from avatarfactory.models.schemas import (
 
 
 class KnowledgeBase:
-    """Knowledge base for storing and retrieving all AvatarFactory data"""
+    """Knowledges storage for all AvatarFactory data"""
 
     def __init__(self, base_path: str = "./knowledges"):
         self.base_path = Path(base_path)
         self._ensure_structure()
 
     def _ensure_structure(self) -> None:
-        """Ensure knowledge base directory structure exists"""
+        """Ensure knowledges directory structure exists"""
         dirs = [
             self.base_path / "personas",
             self.base_path / "content_library" / "published",

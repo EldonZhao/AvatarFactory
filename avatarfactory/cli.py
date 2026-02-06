@@ -255,7 +255,7 @@ def generate(
 
 @app.command()
 def list_personas():
-    """List all personas in the knowledge base."""
+    """List all personas in the knowledges."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
@@ -363,7 +363,7 @@ def list_content(
     ),
     status: str = typer.Option("draft", "--status", "-s", help="draft or published"),
 ):
-    """List content in the knowledge base."""
+    """List content in the knowledges."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
@@ -660,13 +660,13 @@ def publish_draft(
 
 @app.command()
 def stats():
-    """Show knowledge base statistics."""
+    """Show knowledges statistics."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
     stats = kb.get_storage_stats()
 
-    table = Table(title="Knowledge Base Statistics")
+    table = Table(title="Knowledges Statistics")
     table.add_column("Metric", style="cyan")
     table.add_column("Count", style="green")
 

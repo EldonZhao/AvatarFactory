@@ -253,7 +253,7 @@ avatarfactory/
 │   ├── wecom.py         # WeChat Work (企业微信)
 │   └── registry.py      # Connector registry
 ├── core/                # Core functionality
-│   ├── knowledges.py    # Knowledge base
+│   ├── knowledges.py    # Knowledges storage
 │   └── llm_provider.py  # LLM abstraction
 ├── models/              # Data models (Pydantic)
 ├── adapters/            # Platform content adapters

@@ -1,7 +1,7 @@
 """
 Data providers for the dashboard.
 
-Provides unified access to knowledge base, scheduler, and connector data
+Provides unified access to knowledges, scheduler, and connector data
 for visualization in the Streamlit dashboard.
 """
 
@@ -62,7 +62,7 @@ class DashboardDataProvider:
     """
     Unified data provider for the dashboard.
 
-    Aggregates data from KnowledgeBase, Scheduler, and ConnectorRegistry
+    Aggregates data from Knowledges, Scheduler, and ConnectorRegistry
     for display in the Streamlit dashboard.
     """
 

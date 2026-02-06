@@ -63,7 +63,7 @@ ProactiveOrchestrator (intent routing + scheduled tasks)
     ├→ DiscoveryAgent (platform trend analysis)
     ├→ ReviewAgent (4-dimension scoring)
     ├→ SimulationAgent (engagement prediction)
-    └→ KnowledgeBase (file-based persistence)
+    └→ Knowledges (file-based persistence)
 
 Platform Connectors (via ConnectorRegistry)
     ├→ BlueskyConnector (AT Protocol)
@@ -161,7 +161,7 @@ Environment variables (see `.env.example`):
 ### LLM Provider
 - `AVATARFACTORY_LLM_PROVIDER` - anthropic | azure_openai | openai
 - `AVATARFACTORY_MODEL` - model name (e.g., claude-3-5-sonnet-20241022)
-- `AVATARFACTORY_KB_PATH` - knowledge base directory (default: ./knowledges)
+- `AVATARFACTORY_KB_PATH` - knowledges directory (default: ./knowledges)
 - Provider-specific API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, AZURE_OPENAI_*)
 
 ### Platform Connectors

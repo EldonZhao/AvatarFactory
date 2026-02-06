@@ -71,22 +71,22 @@ TASK_DATA_FLOWS = {
         "icon": "🔍",
         "description": "Fetch trending content from platforms",
         "source": "Platform",  # From platform
-        "target": "KB",  # To knowledge base
-        "flow": "Platform → Discovery Agent → Knowledge Base",
+        "target": "KB",  # To knowledges
+        "flow": "Platform → Discovery Agent → Knowledges",
     },
     "content": {
         "name": "Content Generation",
         "icon": "📝",
         "description": "Generate content based on persona and trends",
-        "source": "KB",  # From knowledge base (trends)
-        "target": "KB",  # To knowledge base (drafts)
-        "flow": "Knowledge Base → Content Agent → Drafts",
+        "source": "KB",  # From knowledges (trends)
+        "target": "KB",  # To knowledges (drafts)
+        "flow": "Knowledges → Content Agent → Drafts",
     },
     "publish": {
         "name": "Publishing",
         "icon": "📤",
         "description": "Publish approved content to platforms",
-        "source": "KB",  # From knowledge base (drafts)
+        "source": "KB",  # From knowledges (drafts)
         "target": "Platform",  # To platform
         "flow": "Drafts → Review Agent → Platform",
     },

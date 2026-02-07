@@ -1,8 +1,8 @@
 """
-Content Page - Browse and preview generated content.
+Content Page - Browse and manage generated content.
 
 Displays content items with their scores and metadata.
-Supports query param ?id=content_xxx to open specific content.
+Click on a content item to view it in the dedicated Preview page.
 """
 
 import os
@@ -22,17 +22,18 @@ st.set_page_config(
 )
 
 st.title("📝 Content Library")
-st.markdown("Browse and preview all generated content.")
+st.markdown("Browse and manage all generated content.")
 
 # Initialize provider
 kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
 api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
 provider = DashboardDataProvider(kb_path)
 
-# Check for content_id in query params (for direct links from notifications)
+# Check for content_id in query params - redirect to Preview page
 query_params = st.query_params
-if "id" in query_params and "selected_content_id" not in st.session_state:
-    st.session_state.selected_content_id = query_params["id"]
+if "id" in query_params:
+    content_id = query_params["id"]
+    st.switch_page("pages/8_Preview.py")
 
 # Sidebar filters
 with st.sidebar:
@@ -184,113 +185,6 @@ st.divider()
 # Build persona ID to name mapping
 persona_name_map = {p.id: p.name for p in personas}
 
-# Session state for selected content
-if "selected_content_id" not in st.session_state:
-    st.session_state.selected_content_id = None
-
-# Content detail view - show FIRST if selected
-if st.session_state.selected_content_id:
-    content_details = provider.get_content_details(st.session_state.selected_content_id)
-
-    if content_details:
-        st.markdown("## 📄 Content Preview")
-
-        col1, col2 = st.columns([3, 1])
-
-        with col1:
-            st.markdown(f"### {content_details.get('title', 'Untitled')}")
-
-            # Metadata
-            detail_platform = content_details.get("platform", "unknown")
-            created_at = content_details.get("created_at", "Unknown")
-            pillar = content_details.get("pillar", "N/A")
-
-            st.markdown(f"""
-            <div style="
-                display: flex;
-                gap: 16px;
-                margin-bottom: 16px;
-                color: #666;
-                font-size: 14px;
-            ">
-                <span>📱 {detail_platform}</span>
-                <span>📌 {pillar}</span>
-                <span>📅 {created_at[:10] if created_at else 'N/A'}</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # Body
-            st.markdown("#### Content Body")
-            body = content_details.get("body", "No content")
-            st.markdown(body)
-
-            # Tags
-            tags = content_details.get("tags", [])
-            if tags:
-                st.markdown("#### Tags")
-                st.write(" ".join(f"`#{tag}`" for tag in tags))
-
-            # Image prompts
-            image_prompts = content_details.get("image_prompts", [])
-            if image_prompts:
-                st.markdown("#### 🖼️ Image Prompts")
-                for i, prompt in enumerate(image_prompts, 1):
-                    st.info(f"**Image {i}:** {prompt}")
-
-        with col2:
-            # Clear session state to close detail view
-            if st.button("✖️ Close", key="close_detail"):
-                st.session_state.selected_content_id = None
-                st.rerun()
-
-            st.markdown("---")
-
-            # Review score
-            detail_score = content_details.get("review_score")
-            if detail_score is not None:
-                st.metric("Review Score", f"{detail_score}/100")
-
-            issues = content_details.get("review_issues", [])
-            if issues:
-                st.markdown("**Issues:**")
-                for issue in issues[:5]:
-                    st.caption(f"⚠️ {issue}")
-
-            st.markdown("---")
-
-            # Delete button for single content with confirmation
-            if "single_delete_confirm" not in st.session_state:
-                st.session_state.single_delete_confirm = False
-
-            if st.session_state.single_delete_confirm:
-                st.warning("⚠️ Delete this content?")
-                col_yes, col_no = st.columns(2)
-                with col_yes:
-                    if st.button("✅ Yes", key="confirm_single_delete", type="primary"):
-                        if provider.delete_content(st.session_state.selected_content_id):
-                            st.success("Deleted!")
-                            st.session_state.selected_content_id = None
-                            st.session_state.single_delete_confirm = False
-                            st.rerun()
-                        else:
-                            st.error("Failed to delete")
-                with col_no:
-                    if st.button("❌ No", key="cancel_single_delete"):
-                        st.session_state.single_delete_confirm = False
-                        st.rerun()
-            else:
-                if st.button("🗑️ Delete", key="delete_this_content", type="secondary"):
-                    st.session_state.single_delete_confirm = True
-                    st.rerun()
-
-        st.divider()
-    else:
-        st.error(f"Content not found: {st.session_state.selected_content_id}")
-        if st.button("← Back to list", key="back_to_list"):
-            st.session_state.selected_content_id = None
-            st.rerun()
-        st.divider()
-
 # Content list
 if not contents:
     st.info(
@@ -350,8 +244,9 @@ else:
 
             with col4:
                 if st.button("👁️", key=f"view_{content_id}", help="View details"):
-                    st.session_state.selected_content_id = content_id
-                    st.rerun()
+                    # Navigate to dedicated Preview page with query param
+                    st.query_params["id"] = content_id
+                    st.switch_page("pages/8_Preview.py")
 
         st.divider()
 

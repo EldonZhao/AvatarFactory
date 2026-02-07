@@ -479,10 +479,18 @@ class Scheduler:
         self._save_state()
 
     async def _notify_task_completed(self, task: ScheduledTask, result: Dict[str, Any]) -> None:
-        """Send notification when task completes."""
-        import os
-        from avatarfactory.notifications import ConsoleNotifier, WebhookNotifier, NotificationMessage, NotificationPriority
+        """
+        Send notification when task completes.
 
+        Notification strategy:
+        - discovery: Send markdown format report (trending topics, ideas)
+        - content: Send news card format with link to content
+        - Other types: Console only, no webhook notification
+        """
+        import os
+        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
+
+        # Build console notification for all task types
         if task.task_type == "discovery":
             title = f"Discovery Complete: {task.name}"
             body = f"Found {result.get('trending_count', 0)} trending posts, generated {result.get('ideas_count', 0)} ideas."
@@ -507,31 +515,214 @@ class Scheduler:
             category="task_completed",
         )
 
-        # Send to console
+        # Send to console for all task types
         console_notifier = ConsoleNotifier()
         await console_notifier.send(message)
 
-        # Send to webhook if configured
+        # Send to webhook only for discovery and content tasks
         webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
-        webhook_format = os.getenv("AVATARFACTORY_WEBHOOK_FORMAT", "wecom")
-        if webhook_url:
-            try:
-                webhook_notifier = WebhookNotifier(
-                    webhook_url=webhook_url,
-                    format=webhook_format,
+        if not webhook_url:
+            return
+
+        # Only send webhook notifications for discovery and content tasks
+        if task.task_type == "discovery":
+            # Discovery: Use markdown format for detailed report
+            await self._send_discovery_webhook_notification(task, result, webhook_url)
+        elif task.task_type == "content":
+            # Content: Use news card format with link
+            await self._send_content_webhook_notification(task, result, webhook_url)
+
+    async def _send_discovery_webhook_notification(
+        self, task: ScheduledTask, result: Dict[str, Any], webhook_url: str
+    ) -> None:
+        """
+        Send discovery task notification using markdown format.
+
+        Format includes:
+        - Trending topics discovered
+        - Generated ideas
+        - Key insights
+        """
+        import httpx
+
+        # Build markdown content
+        parts = []
+        parts.append(f"### 🔍 {task.name}")
+        parts.append("")
+
+        # Trending count and ideas count
+        trending_count = result.get('trending_count', 0)
+        ideas_count = result.get('ideas_count', 0)
+        parts.append(f"📊 发现 **{trending_count}** 条热点，生成 **{ideas_count}** 个创意")
+        parts.append("")
+
+        # Pattern analysis
+        pattern_analysis = result.get('pattern_analysis', {})
+        if pattern_analysis:
+            trending_topics = pattern_analysis.get('trending_topics', [])
+            if trending_topics:
+                parts.append("**🔥 热点话题:**")
+                for topic in trending_topics[:5]:
+                    parts.append(f"> {topic}")
+                parts.append("")
+
+            key_insights = pattern_analysis.get('key_insights', [])
+            if key_insights:
+                parts.append("**💡 关键洞察:**")
+                for insight in key_insights[:3]:
+                    parts.append(f"> {insight}")
+                parts.append("")
+
+        # Ideas/suggestions
+        ideas = result.get('ideas', [])
+        suggestions = result.get('suggestions', [])
+        if ideas:
+            parts.append("**📝 创作建议:**")
+            for idea in ideas[:3]:
+                topic = idea.get('topic', '') if isinstance(idea, dict) else str(idea)
+                parts.append(f"> {topic}")
+            parts.append("")
+        elif suggestions:
+            parts.append("**📝 创作建议:**")
+            for suggestion in suggestions[:3]:
+                parts.append(f"> {suggestion[:100]}...")
+            parts.append("")
+
+        content = "\n".join(parts)
+
+        # Send via WeChat Work markdown format
+        payload = {
+            "msgtype": "markdown",
+            "markdown": {"content": content}
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    webhook_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30.0,
                 )
-                webhook_result = await webhook_notifier.send(message)
-                if webhook_result.success:
-                    logger.info(f"Sent webhook notification for task {task.id}")
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("errcode") == 0:
+                        logger.info(f"Sent discovery notification for task {task.id}")
+                    else:
+                        logger.warning(f"Discovery notification failed: {data.get('errmsg')}")
                 else:
-                    logger.warning(f"Webhook notification failed: {webhook_result.error}")
-            except Exception as e:
-                logger.warning(f"Failed to send webhook notification: {e}")
+                    logger.warning(f"Discovery notification HTTP error: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Failed to send discovery notification: {e}")
+
+    async def _send_content_webhook_notification(
+        self, task: ScheduledTask, result: Dict[str, Any], webhook_url: str
+    ) -> None:
+        """
+        Send content task notification using news card format.
+
+        Format includes:
+        - Card title with content title
+        - Description with review score and preview
+        - Clickable link to view content in dashboard
+        """
+        import os
+        import httpx
+
+        content_id = result.get('content_id', '')
+        content_title = result.get('title', 'New Content')
+        content_body = result.get('body', '')
+        review_score = result.get('review_score')
+        persona_name = result.get('persona_name', '')
+        platform = result.get('platform', '')
+
+        # Build description
+        description_parts = []
+        if persona_name:
+            description_parts.append(f"👤 {persona_name}")
+        if platform:
+            description_parts.append(f"📱 {platform}")
+        if review_score is not None:
+            if review_score >= 80:
+                description_parts.append(f"✅ 评分: {review_score:.0f}/100")
+            elif review_score >= 60:
+                description_parts.append(f"⚠️ 评分: {review_score:.0f}/100")
+            else:
+                description_parts.append(f"❌ 评分: {review_score:.0f}/100")
+
+        # Content preview
+        body_preview = content_body[:300] if content_body else ''
+        if len(content_body) > 300:
+            body_preview += "..."
+
+        if description_parts:
+            description = " | ".join(description_parts) + "\n\n" + body_preview
+        else:
+            description = body_preview
+
+        # Build URL
+        service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
+        if service_url and content_id:
+            url = f"{service_url}/Content"  # Link to dashboard content page
+        else:
+            url = ""
+
+        title = f"📝 {content_title}"
+        if len(title) > 60:
+            title = title[:57] + "..."
+
+        # If no URL, fall back to markdown format
+        if not url:
+            payload = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "content": f"### {title}\n\n{description}"
+                }
+            }
+        else:
+            # Use news card format
+            payload = {
+                "msgtype": "news",
+                "news": {
+                    "articles": [
+                        {
+                            "title": title,
+                            "description": description[:512],  # Max 512 chars
+                            "url": url,
+                            "picurl": "",
+                        }
+                    ]
+                }
+            }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    webhook_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30.0,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("errcode") == 0:
+                        logger.info(f"Sent content notification for task {task.id}")
+                    else:
+                        logger.warning(f"Content notification failed: {data.get('errmsg')}")
+                else:
+                    logger.warning(f"Content notification HTTP error: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Failed to send content notification: {e}")
 
     async def _notify_task_failed(self, task: ScheduledTask, error: str) -> None:
-        """Send notification when task fails."""
+        """
+        Send notification when task fails.
+
+        Only sends webhook notifications for discovery and content tasks.
+        """
         import os
-        from avatarfactory.notifications import ConsoleNotifier, WebhookNotifier, NotificationMessage, NotificationPriority
+        import httpx
+        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
 
         message = NotificationMessage(
             title=f"Task Failed: {task.name}",
@@ -540,26 +731,46 @@ class Scheduler:
             category="error",
         )
 
-        # Send to console
+        # Send to console for all task types
         console_notifier = ConsoleNotifier()
         await console_notifier.send(message)
 
-        # Send to webhook if configured
+        # Only send webhook notifications for discovery and content tasks
+        if task.task_type not in ("discovery", "content"):
+            return
+
         webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
-        webhook_format = os.getenv("AVATARFACTORY_WEBHOOK_FORMAT", "wecom")
-        if webhook_url:
-            try:
-                webhook_notifier = WebhookNotifier(
-                    webhook_url=webhook_url,
-                    format=webhook_format,
+        if not webhook_url:
+            return
+
+        # Build error notification using markdown format
+        content = f"### ❌ 任务失败: {task.name}\n\n"
+        content += f"**类型:** {task.task_type}\n"
+        content += f"**错误:** {error[:500]}"
+
+        payload = {
+            "msgtype": "markdown",
+            "markdown": {"content": content}
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    webhook_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30.0,
                 )
-                webhook_result = await webhook_notifier.send(message)
-                if webhook_result.success:
-                    logger.info(f"Sent webhook notification for failed task {task.id}")
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("errcode") == 0:
+                        logger.info(f"Sent error notification for task {task.id}")
+                    else:
+                        logger.warning(f"Error notification failed: {data.get('errmsg')}")
                 else:
-                    logger.warning(f"Webhook notification failed: {webhook_result.error}")
-            except Exception as e:
-                logger.warning(f"Failed to send webhook notification: {e}")
+                    logger.warning(f"Error notification HTTP error: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Failed to send error notification: {e}")
 
     async def _process_publish_queue(self) -> None:
         """Process pending items in publish queue."""

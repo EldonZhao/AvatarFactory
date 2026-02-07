@@ -7,13 +7,14 @@ and scheduler control.
 
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 # FastAPI imports with graceful fallback
 try:
-    from fastapi import FastAPI, HTTPException, status
+    from fastapi import BackgroundTasks, FastAPI, HTTPException, status
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import HTMLResponse
 except ImportError:
@@ -891,6 +892,61 @@ def register_routes(app: FastAPI):
         orchestrator = get_orchestrator()
         removed = await orchestrator.remove_persona_tasks(persona_id)
         return {"removed": removed}
+
+    @app.post("/scheduler/tasks/{task_id}/run", tags=["Scheduler"])
+    async def run_scheduler_task(task_id: str, background_tasks: BackgroundTasks):
+        """
+        Run a scheduled task immediately.
+
+        The task runs in the background and results are sent via webhook notification.
+        """
+        scheduler = get_scheduler()
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
+
+        task = scheduler.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+        # Run the task in background
+        async def run_task():
+            from avatarfactory.scheduler.tasks import TaskRegistry
+            import logging
+
+            logger = logging.getLogger("avatarfactory.scheduler")
+            logger.info(f"Running task manually: {task.name}")
+
+            try:
+                runner = TaskRegistry.get_runner(task.task_type)
+                if runner:
+                    result = await runner(task)
+                    task.last_run = datetime.now()
+                    task.run_count += 1
+                    task.last_status = "success" if result.get("success") else "error"
+                    task.last_error = result.get("error") if not result.get("success") else None
+
+                    # Send notification
+                    await scheduler._notify_task_completed(task, result)
+                    scheduler._save_state()
+                else:
+                    task.last_status = "error"
+                    task.last_error = f"Unknown task type: {task.task_type}"
+                    scheduler._save_state()
+            except Exception as e:
+                logger.error(f"Task {task.name} failed: {e}")
+                task.last_status = "error"
+                task.last_error = str(e)
+                await scheduler._notify_task_failed(task, str(e))
+                scheduler._save_state()
+
+        background_tasks.add_task(run_task)
+
+        return {
+            "status": "started",
+            "task_id": task_id,
+            "task_name": task.name,
+            "message": f"Task '{task.name}' is running in background",
+        }
 
     # -------------------------------------------------------------------------
     # Topology & System Info

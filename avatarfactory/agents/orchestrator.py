@@ -46,23 +46,34 @@ class OrchestratorAgent(BaseAgent):
     async def process(self, message: AgentMessage) -> Any:
         """Process user request by coordinating sub-agents"""
         self.log("INFO", f"Processing user request")
-        return await self._handle_user_input(message.payload.get("user_input", ""))
+        return await self._handle_user_input(
+            message.payload.get("user_input", ""),
+            context=message.payload,
+        )
 
-    async def _handle_user_input(self, user_input: str) -> Dict[str, Any]:
+    async def _handle_user_input(
+        self, user_input: str, context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Main entry point for user interactions.
 
         Args:
             user_input: Natural language user request
+            context: Additional context (e.g., persona_id from scheduler)
 
         Returns:
             Result dictionary with appropriate response
         """
         self.log("INFO", f"User input: {user_input[:100]}...")
+        context = context or {}
 
         # Step 1: Understand user intent
         intent = await self._understand_intent(user_input)
         self.log("INFO", f"Detected intent: {intent.intent_type}")
+
+        # Merge context into parameters (e.g., persona_id from scheduler)
+        if context.get("persona_id") and "persona_id" not in intent.parameters:
+            intent.parameters["persona_id"] = context["persona_id"]
 
         # Step 2: Route to appropriate handler
         handlers = {

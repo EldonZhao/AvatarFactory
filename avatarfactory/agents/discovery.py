@@ -41,7 +41,6 @@ class DiscoveryAgent(BaseAgent):
     def __init__(self, **kwargs):
         super().__init__(agent_id="discovery", **kwargs)
         self._connector_configs: Dict[str, ConnectorConfig] = {}
-        self._notification_connectors: Dict[str, Any] = {}
 
     def configure_platform(self, platform: str, config: ConnectorConfig) -> None:
         """Configure credentials for a platform."""
@@ -653,168 +652,11 @@ Return ONLY a JSON array of suggestion strings:
         except Exception as e:
             self.log("WARNING", f"Failed to save discovery results: {e}")
 
-        # Step 5: Send discovery notification
-        try:
-            persona = self.kb.load_persona(persona_id)
-            if persona:
-                await self._send_discovery_notification(
-                    persona=persona,
-                    platform=platform,
-                    trending_count=len(contents),
-                    key_insights=pattern_analysis.get("key_insights", []) if pattern_analysis else [],
-                    trending_topics=pattern_analysis.get("trending_topics", []) if pattern_analysis else [],
-                    content_ideas=inspiration_result["data"]["ideas"],
-                )
-        except Exception as e:
-            self.log("WARNING", f"Failed to send discovery notification: {e}")
+        # Note: Discovery notifications are now handled by the Scheduler engine
+        # to ensure consistent notification format across all task types.
 
         return {
             "status": "success",
             "data": result_data,
             "message": f"Discovered {len(contents)} trending posts, analyzed patterns, generated {len(inspiration_result['data']['ideas'])} content ideas.",
         }
-
-    # =========================================================================
-    # Notification Methods
-    # =========================================================================
-
-    async def _get_notification_connector(self, persona: Persona) -> Optional[Any]:
-        """
-        Get or create notification connector for a persona.
-
-        Args:
-            persona: Persona with notification config
-
-        Returns:
-            Connected notification connector or None
-        """
-        if not persona.notification or not persona.notification.enabled:
-            return None
-
-        # Check cache
-        cache_key = persona.id
-        if cache_key in self._notification_connectors:
-            connector = self._notification_connectors[cache_key]
-            if connector.is_connected():
-                return connector
-
-        try:
-            from avatarfactory.connectors import ConnectorRegistry, ConnectorConfig
-
-            # Build connector config using system-level settings
-            # Webhook URL is configured via AVATARFACTORY_WEBHOOK_URL env var
-            config = ConnectorConfig(
-                extra=persona.notification.extra,
-            )
-
-            # Create and connect
-            connector = ConnectorRegistry.create_connector(
-                persona.notification.connector_type,
-                config,
-            )
-            await connector.connect()
-
-            # Cache it
-            self._notification_connectors[cache_key] = connector
-            self.log("DEBUG", f"Created notification connector for persona {persona.id}")
-            return connector
-
-        except Exception as e:
-            self.log("WARNING", f"Failed to create notification connector: {e}")
-            return None
-
-    async def _send_discovery_notification(
-        self,
-        persona: Persona,
-        platform: str,
-        trending_count: int,
-        key_insights: List[str],
-        trending_topics: List[str],
-        content_ideas: List[Dict[str, Any]],
-    ) -> None:
-        """
-        Send notification about discovery results.
-
-        Args:
-            persona: Persona with notification config
-            platform: Platform that was searched
-            trending_count: Number of trending posts found
-            key_insights: Key insights from pattern analysis
-            trending_topics: Trending topics discovered
-            content_ideas: Generated content ideas with topic/angle/hook
-        """
-        if not persona.notification or not persona.notification.enabled:
-            return
-
-        if not persona.notification.notify_on_discovery:
-            return
-
-        connector = await self._get_notification_connector(persona)
-        if not connector:
-            return
-
-        try:
-            # Build message with key insights and top ideas
-            # Note: WeChat Work markdown has limited support:
-            # - Supports: # ## ### headers, **bold**, `code`, > quote, [link](url)
-            # - NOT supported: lists (1. -), italics, tables, code blocks
-            message_lines = [
-                f"### 🔍 Discovery Report",
-                f"",
-                f"**{persona.identity.name}** | {platform.capitalize()} | {trending_count} posts analyzed",
-            ]
-
-            # Add trending topics
-            if trending_topics:
-                topics_str = ", ".join(trending_topics[:5])
-                message_lines.append(f"")
-                message_lines.append(f"**🔥 Trending Topics**")
-                message_lines.append(f"{topics_str}")
-
-            # Add key insights (use > quote format which WeChat supports)
-            if key_insights:
-                message_lines.append(f"")
-                message_lines.append(f"**💎 Key Insights**")
-                for insight in key_insights[:3]:
-                    # Truncate long insights
-                    insight_text = insight[:80] + "..." if len(insight) > 80 else insight
-                    message_lines.append(f"> {insight_text}")
-
-            # Add top content ideas
-            if content_ideas:
-                message_lines.append(f"")
-                message_lines.append(f"**💡 Content Ideas ({len(content_ideas)})**")
-                for idea in content_ideas[:5]:
-                    topic = idea.get("topic", "Untitled")
-                    angle = idea.get("angle", "")
-                    engagement = idea.get("estimated_engagement", "medium")
-
-                    # Engagement emoji
-                    eng_emoji = {"high": "🔥", "medium": "👍", "low": "💭"}.get(engagement, "💡")
-
-                    # Build idea line - simple format for WeChat Work
-                    message_lines.append(f"")
-                    message_lines.append(f"{eng_emoji} **{topic}**")
-                    if angle:
-                        angle_short = angle[:50] + "..." if len(angle) > 50 else angle
-                        message_lines.append(f"<font color=\"comment\">{angle_short}</font>")
-
-            message = "\n".join(message_lines)
-
-            # Check if connector has send_message method for simple text
-            if hasattr(connector, "send_message"):
-                result = await connector.send_message(message)
-            else:
-                # Fallback to publish
-                result = await connector.publish(
-                    content=message,
-                    title=f"Discovery Report - {persona.identity.name}",
-                )
-
-            if result.success:
-                self.log("INFO", f"Sent discovery notification for persona {persona.id}")
-            else:
-                self.log("WARNING", f"Failed to send discovery notification: {result.error}")
-
-        except Exception as e:
-            self.log("WARNING", f"Error sending discovery notification: {e}")

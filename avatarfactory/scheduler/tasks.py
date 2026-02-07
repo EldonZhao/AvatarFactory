@@ -84,6 +84,9 @@ async def run_discovery_task(task: ScheduledTask) -> Dict[str, Any]:
             "trending_count": data.get("trending_count", 0),
             "ideas_count": len(data.get("ideas", [])),
             "suggestions": data.get("persona_suggestions", []),
+            # Include full data for notification
+            "pattern_analysis": data.get("pattern_analysis", {}),
+            "ideas": data.get("ideas", []),
         }
     else:
         return {"success": False, "error": result.get("message")}
@@ -115,11 +118,14 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
     kb = KnowledgeBase(kb_path)
     provider = LLMProviderFactory.from_env()
 
+    # Load persona for notification info
+    persona = kb.load_persona(persona_id)
+    persona_name = persona.identity.name if persona else ""
+
     orchestrator = OrchestratorAgent(knowledge_base=kb, llm_provider=provider)
 
     # If no topic, get one from persona's content pillars
     if not topic:
-        persona = kb.load_persona(persona_id)
         if persona and persona.content_pillars:
             pillar = persona.content_pillars[0]
             if pillar.examples:
@@ -145,10 +151,16 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
 
     if result.get("status") == "success":
         data = result.get("data", {})
+        content_data = data.get("content", {})
         return {
             "success": True,
-            "content_id": data.get("content", {}).get("id"),
-            "title": data.get("content", {}).get("title"),
+            "content_id": content_data.get("id"),
+            "title": content_data.get("title"),
+            # Additional fields for notification
+            "body": content_data.get("body", ""),
+            "platform": content_data.get("platform", task.platform or ""),
+            "persona_name": persona_name,
+            "review_score": content_data.get("review_score"),
         }
     else:
         return {"success": False, "error": result.get("message")}

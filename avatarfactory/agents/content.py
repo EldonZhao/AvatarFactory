@@ -73,7 +73,6 @@ class ContentAgent(BaseAgent):
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(agent_id="content", *args, **kwargs)
-        self._notification_connectors: Dict[str, Any] = {}
         self._review_agent: Optional["ReviewAgent"] = None
 
     # =========================================================================
@@ -127,121 +126,6 @@ class ContentAgent(BaseAgent):
         except Exception as e:
             self.log("WARNING", f"Failed to review content {content.id}: {e}")
             return None
-
-    # =========================================================================
-    # Notification Methods
-    # =========================================================================
-
-    async def _get_notification_connector(self, persona: Persona) -> Optional[Any]:
-        """
-        Get or create notification connector for a persona.
-
-        Args:
-            persona: Persona with notification config
-
-        Returns:
-            Connected notification connector or None
-        """
-        if not persona.notification or not persona.notification.enabled:
-            return None
-
-        # Check cache
-        cache_key = persona.id
-        if cache_key in self._notification_connectors:
-            connector = self._notification_connectors[cache_key]
-            if connector.is_connected():
-                return connector
-
-        try:
-            from avatarfactory.connectors import ConnectorRegistry, ConnectorConfig
-
-            # Build connector config using system-level settings
-            # Webhook URL is configured via AVATARFACTORY_WEBHOOK_URL env var
-            config = ConnectorConfig(
-                extra=persona.notification.extra,
-            )
-
-            # Create and connect
-            connector_type = persona.notification.connector_type
-            self.log("DEBUG", f"Creating {connector_type} notification connector")
-            connector = ConnectorRegistry.create_connector(
-                connector_type,
-                config,
-            )
-            await connector.connect()
-            self.log("DEBUG", f"Connected to {connector_type} notification connector")
-
-            # Cache it
-            self._notification_connectors[cache_key] = connector
-            self.log("DEBUG", f"Created notification connector for persona {persona.id}")
-            return connector
-
-        except Exception as e:
-            self.log("ERROR", f"Failed to create notification connector: {e}")
-            import traceback
-            self.log("DEBUG", f"Notification connector error traceback:\n{traceback.format_exc()}")
-            return None
-
-    async def _send_content_notification(
-        self,
-        persona: Persona,
-        content: Content,
-        review_score: Optional[float] = None,
-        review_summary: Optional[str] = None,
-    ) -> None:
-        """
-        Send notification about generated content.
-
-        Args:
-            persona: Persona with notification config
-            content: Generated content
-            review_score: Optional review score
-            review_summary: Optional review summary
-        """
-        if not persona.notification or not persona.notification.enabled:
-            self.log("DEBUG", f"Notification disabled for persona {persona.id}")
-            return
-
-        if not persona.notification.notify_on_content:
-            self.log("DEBUG", f"Content notification disabled for persona {persona.id}")
-            return
-
-        self.log("INFO", f"Sending content notification for {content.id}")
-        connector = await self._get_notification_connector(persona)
-        if not connector:
-            self.log("WARNING", f"No notification connector available for persona {persona.id}")
-            return
-
-        try:
-            # Check if connector has the convenience method
-            if hasattr(connector, "send_content_notification"):
-                result = await connector.send_content_notification(
-                    content_title=content.title,
-                    content_body=content.body,
-                    review_score=review_score if persona.notification.notify_on_review else None,
-                    review_summary=review_summary if persona.notification.notify_on_review else None,
-                    content_id=content.id,
-                    persona_name=persona.identity.name,
-                    platform=content.platform.value,
-                    tags=content.tags,
-                )
-            else:
-                # Fallback to generic publish
-                message = f"新内容已创建: {content.title}\n\n{content.body[:300]}..."
-                if review_score is not None and persona.notification.notify_on_review:
-                    message += f"\n\n评分: {review_score:.0f}/100"
-                result = await connector.publish(
-                    content=message,
-                    title=f"内容创作通知 - {persona.identity.name}",
-                )
-
-            if result.success:
-                self.log("INFO", f"Sent notification for content {content.id}")
-            else:
-                self.log("WARNING", f"Failed to send notification: {result.error}")
-
-        except Exception as e:
-            self.log("WARNING", f"Error sending notification: {e}")
 
     # =========================================================================
     # Trending Context
@@ -406,13 +290,8 @@ class ContentAgent(BaseAgent):
             # Reload content to get updated review data
             content = self.kb.load_content(content.id, status="draft") or content
 
-        # Send notification after content generation and review
-        await self._send_content_notification(
-            persona=persona,
-            content=content,
-            review_score=content.review_score,
-            review_summary=self._build_review_summary(content),
-        )
+        # Note: Content notifications are now handled by the Scheduler engine
+        # to ensure consistent notification format across all task types.
 
         return content
 

@@ -171,7 +171,19 @@ with col_left:
                 st.error(f"Failed to delete task: {task_id}")
         elif task_action["action"] == "run":
             task_id = task_action["task_id"]
-            st.info(f"Run task functionality coming soon: {task_id}")
+            with st.spinner(f"Starting task {task_id}..."):
+                try:
+                    with httpx.Client(timeout=30) as client:
+                        response = client.post(f"{api_url}/scheduler/tasks/{task_id}/run")
+                        if response.status_code == 200:
+                            data = response.json()
+                            st.success(f"✅ {data.get('message', 'Task started')}")
+                        elif response.status_code == 404:
+                            st.error(f"Task not found: {task_id}")
+                        else:
+                            st.error(f"Error: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
 with col_right:
     render_next_runs(next_runs)

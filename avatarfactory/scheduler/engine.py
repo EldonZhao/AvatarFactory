@@ -10,11 +10,15 @@ import logging
 import os
 import signal
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+# Suppress tzlocal timezone offset warning (common on Windows)
+warnings.filterwarnings("ignore", message="Timezone offset does not match system offset")
 
 logger = logging.getLogger("avatarfactory.scheduler")
 
@@ -668,8 +672,8 @@ class Scheduler:
             dashboard_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
 
         if dashboard_url and content_id:
-            # Link to dedicated Preview page
-            url = f"{dashboard_url}/Preview?id={content_id}"
+            # Link to content HTML view page
+            url = f"{dashboard_url}/content/{content_id}/view"
         else:
             url = ""
 
@@ -807,6 +811,21 @@ class Scheduler:
 
         self._save_state()
 
+    def _run_publish_queue(self) -> None:
+        """Execute publish queue processing (synchronous wrapper)."""
+        import asyncio
+
+        # Run the async task in a new event loop
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._process_publish_queue())
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error processing publish queue: {e}")
+
     def start(self, blocking: bool = True) -> None:
         """Start the scheduler."""
         try:
@@ -826,7 +845,7 @@ class Scheduler:
 
         # Add publish queue processor (every 5 minutes)
         self._scheduler.add_job(
-            self._process_publish_queue,
+            self._run_publish_queue,
             "interval",
             minutes=5,
             id="__publish_queue__",

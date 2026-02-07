@@ -624,6 +624,8 @@ def register_routes(app: FastAPI):
     @app.get("/content/{content_id}/view", response_class=HTMLResponse, tags=["Content"])
     async def view_content_html(content_id: str):
         """View content as HTML page (for WeChat Work news card link)."""
+        import html as html_lib
+
         orchestrator = get_orchestrator()
 
         # Try loading from draft first, then published
@@ -643,22 +645,17 @@ def register_routes(app: FastAPI):
         persona = orchestrator.kb.load_persona(content.persona_id)
         persona_name = persona.identity.name if persona else content.persona_id
 
-        # Convert markdown to basic HTML
-        import re
-        body_html = content.body
-        # Headers
-        body_html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', body_html, flags=re.MULTILINE)
-        body_html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', body_html, flags=re.MULTILINE)
-        body_html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', body_html, flags=re.MULTILINE)
-        # Bold
-        body_html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', body_html)
-        # Italic
-        body_html = re.sub(r'\*(.+?)\*', r'<em>\1</em>', body_html)
-        # Links
-        body_html = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', body_html)
-        # Line breaks
-        body_html = body_html.replace('\n\n', '</p><p>').replace('\n', '<br>')
-        body_html = f'<p>{body_html}</p>'
+        # Normalize content for better Markdown rendering
+        body_content = content.body
+        # Convert Chinese horizontal lines to Markdown horizontal rule
+        body_content = body_content.replace('———', '\n\n---\n\n')
+        body_content = body_content.replace('——', '\n\n---\n\n')
+        # Convert Chinese quotes to standard quotes for better display
+        body_content = body_content.replace('「', '"').replace('」', '"')
+        body_content = body_content.replace('『', '"').replace('』', '"')
+
+        # Escape content body for safe embedding in JavaScript
+        body_escaped = html_lib.escape(body_content).replace('`', '\\`').replace('$', '\\$')
 
         # Build tags HTML
         tags_html = ' '.join(f'<span class="tag">#{tag}</span>' for tag in content.tags[:10])
@@ -680,12 +677,14 @@ def register_routes(app: FastAPI):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{content.title}</title>
+    <title>{html_lib.escape(content.title)}</title>
+    <!-- marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
+            line-height: 1.8;
             color: #333;
             background: #f5f5f5;
             padding: 20px;
@@ -703,10 +702,11 @@ def register_routes(app: FastAPI):
             padding-bottom: 20px;
             margin-bottom: 20px;
         }}
-        h1 {{
+        .title {{
             font-size: 24px;
             color: #1a1a1a;
             margin-bottom: 12px;
+            font-weight: 600;
         }}
         .meta {{
             font-size: 14px;
@@ -733,18 +733,84 @@ def register_routes(app: FastAPI):
             font-size: 16px;
             color: #333;
         }}
-        .content p {{
-            margin-bottom: 16px;
+        .content h1 {{ font-size: 24px; margin: 24px 0 16px; color: #1a1a1a; font-weight: 600; }}
+        .content h2 {{ font-size: 20px; margin: 20px 0 12px; color: #1a1a1a; font-weight: 600; }}
+        .content h3 {{ font-size: 18px; margin: 16px 0 10px; color: #333; font-weight: 600; }}
+        .content h4 {{ font-size: 16px; margin: 14px 0 8px; color: #333; font-weight: 600; }}
+        .content p {{ margin-bottom: 16px; }}
+        .content ul, .content ol {{
+            margin: 16px 0;
+            padding-left: 28px;
         }}
-        .content h2 {{
-            font-size: 20px;
-            margin: 24px 0 12px;
-            color: #1a1a1a;
+        .content li {{
+            margin-bottom: 8px;
         }}
-        .content h3 {{
-            font-size: 18px;
-            margin: 20px 0 10px;
-            color: #333;
+        .content code {{
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 14px;
+            color: #e83e8c;
+        }}
+        .content pre {{
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 16px 0;
+        }}
+        .content pre code {{
+            background: none;
+            padding: 0;
+            color: inherit;
+        }}
+        .content blockquote {{
+            border-left: 4px solid #1976d2;
+            padding-left: 16px;
+            margin: 16px 0;
+            color: #555;
+            background: #f9f9f9;
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+        }}
+        .content a {{
+            color: #1976d2;
+            text-decoration: none;
+        }}
+        .content a:hover {{
+            text-decoration: underline;
+        }}
+        .content strong {{
+            font-weight: 600;
+        }}
+        .content em {{
+            font-style: italic;
+        }}
+        .content hr {{
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 24px 0;
+        }}
+        .content table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+        }}
+        .content th, .content td {{
+            border: 1px solid #ddd;
+            padding: 10px 12px;
+            text-align: left;
+        }}
+        .content th {{
+            background: #f5f5f5;
+            font-weight: 600;
+        }}
+        .content img {{
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 16px 0;
         }}
         .tags {{
             margin-top: 24px;
@@ -753,8 +819,8 @@ def register_routes(app: FastAPI):
         }}
         .tag {{
             display: inline-block;
-            background: #f0f0f0;
-            color: #666;
+            background: #e3f2fd;
+            color: #1976d2;
             padding: 4px 12px;
             border-radius: 16px;
             font-size: 13px;
@@ -782,17 +848,15 @@ def register_routes(app: FastAPI):
 <body>
     <div class="container">
         <div class="header">
-            <h1>{content.title}</h1>
+            <h1 class="title">{html_lib.escape(content.title)}</h1>
             <div class="meta">
-                <span>👤 {persona_name}</span>
+                <span>👤 {html_lib.escape(persona_name)}</span>
                 <span>📱 {content.platform.value}</span>
                 <span class="status-badge">{content_status}</span>
                 {score_html}
             </div>
         </div>
-        <div class="content">
-            {body_html}
-        </div>
+        <div class="content" id="content"></div>
         <div class="tags">
             {tags_html}
         </div>
@@ -800,6 +864,19 @@ def register_routes(app: FastAPI):
             <p>由 AvatarFactory 生成 | {content.created_at.strftime('%Y-%m-%d %H:%M') if content.created_at else ''}</p>
         </div>
     </div>
+    <script>
+        // Markdown content
+        const markdownContent = `{body_escaped}`;
+
+        // Configure marked options
+        marked.setOptions({{
+            breaks: true,
+            gfm: true
+        }});
+
+        // Render markdown to HTML
+        document.getElementById('content').innerHTML = marked.parse(markdownContent);
+    </script>
 </body>
 </html>
 """

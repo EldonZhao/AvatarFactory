@@ -2,7 +2,7 @@
 Content Page - Browse and manage generated content.
 
 Displays content items with their scores and metadata.
-Click on a content item to view it in the dedicated Preview page.
+Click on a content item to view it in the HTML view page.
 """
 
 import os
@@ -28,12 +28,6 @@ st.markdown("Browse and manage all generated content.")
 kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
 api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
 provider = DashboardDataProvider(kb_path)
-
-# Check for content_id in query params - redirect to Preview page
-query_params = st.query_params
-if "id" in query_params:
-    content_id = query_params["id"]
-    st.switch_page("pages/8_Preview.py")
 
 # Sidebar filters
 with st.sidebar:
@@ -243,10 +237,10 @@ else:
                     st.session_state.selected_contents.remove(content_id)
 
             with col4:
-                if st.button("👁️", key=f"view_{content_id}", help="View details"):
-                    # Navigate to dedicated Preview page with query param
-                    st.query_params["id"] = content_id
-                    st.switch_page("pages/8_Preview.py")
+                # Link to HTML view page
+                api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
+                view_url = f"{api_url}/content/{content_id}/view"
+                st.link_button("👁️", view_url, help="View details")
 
         st.divider()
 

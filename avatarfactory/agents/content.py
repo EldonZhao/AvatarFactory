@@ -162,11 +162,14 @@ class ContentAgent(BaseAgent):
             )
 
             # Create and connect
+            connector_type = persona.notification.connector_type
+            self.log("DEBUG", f"Creating {connector_type} notification connector")
             connector = ConnectorRegistry.create_connector(
-                persona.notification.connector_type,
+                connector_type,
                 config,
             )
             await connector.connect()
+            self.log("DEBUG", f"Connected to {connector_type} notification connector")
 
             # Cache it
             self._notification_connectors[cache_key] = connector
@@ -174,7 +177,9 @@ class ContentAgent(BaseAgent):
             return connector
 
         except Exception as e:
-            self.log("WARNING", f"Failed to create notification connector: {e}")
+            self.log("ERROR", f"Failed to create notification connector: {e}")
+            import traceback
+            self.log("DEBUG", f"Notification connector error traceback:\n{traceback.format_exc()}")
             return None
 
     async def _send_content_notification(
@@ -194,13 +199,17 @@ class ContentAgent(BaseAgent):
             review_summary: Optional review summary
         """
         if not persona.notification or not persona.notification.enabled:
+            self.log("DEBUG", f"Notification disabled for persona {persona.id}")
             return
 
         if not persona.notification.notify_on_content:
+            self.log("DEBUG", f"Content notification disabled for persona {persona.id}")
             return
 
+        self.log("INFO", f"Sending content notification for {content.id}")
         connector = await self._get_notification_connector(persona)
         if not connector:
+            self.log("WARNING", f"No notification connector available for persona {persona.id}")
             return
 
         try:

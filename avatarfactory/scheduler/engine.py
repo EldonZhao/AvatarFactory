@@ -480,9 +480,8 @@ class Scheduler:
 
     async def _notify_task_completed(self, task: ScheduledTask, result: Dict[str, Any]) -> None:
         """Send notification when task completes."""
-        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
-
-        notifier = ConsoleNotifier()
+        import os
+        from avatarfactory.notifications import ConsoleNotifier, WebhookNotifier, NotificationMessage, NotificationPriority
 
         if task.task_type == "discovery":
             title = f"Discovery Complete: {task.name}"
@@ -508,13 +507,31 @@ class Scheduler:
             category="task_completed",
         )
 
-        await notifier.send(message)
+        # Send to console
+        console_notifier = ConsoleNotifier()
+        await console_notifier.send(message)
+
+        # Send to webhook if configured
+        webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
+        webhook_format = os.getenv("AVATARFACTORY_WEBHOOK_FORMAT", "wecom")
+        if webhook_url:
+            try:
+                webhook_notifier = WebhookNotifier(
+                    webhook_url=webhook_url,
+                    format=webhook_format,
+                )
+                webhook_result = await webhook_notifier.send(message)
+                if webhook_result.success:
+                    logger.info(f"Sent webhook notification for task {task.id}")
+                else:
+                    logger.warning(f"Webhook notification failed: {webhook_result.error}")
+            except Exception as e:
+                logger.warning(f"Failed to send webhook notification: {e}")
 
     async def _notify_task_failed(self, task: ScheduledTask, error: str) -> None:
         """Send notification when task fails."""
-        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
-
-        notifier = ConsoleNotifier()
+        import os
+        from avatarfactory.notifications import ConsoleNotifier, WebhookNotifier, NotificationMessage, NotificationPriority
 
         message = NotificationMessage(
             title=f"Task Failed: {task.name}",
@@ -523,7 +540,26 @@ class Scheduler:
             category="error",
         )
 
-        await notifier.send(message)
+        # Send to console
+        console_notifier = ConsoleNotifier()
+        await console_notifier.send(message)
+
+        # Send to webhook if configured
+        webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
+        webhook_format = os.getenv("AVATARFACTORY_WEBHOOK_FORMAT", "wecom")
+        if webhook_url:
+            try:
+                webhook_notifier = WebhookNotifier(
+                    webhook_url=webhook_url,
+                    format=webhook_format,
+                )
+                webhook_result = await webhook_notifier.send(message)
+                if webhook_result.success:
+                    logger.info(f"Sent webhook notification for failed task {task.id}")
+                else:
+                    logger.warning(f"Webhook notification failed: {webhook_result.error}")
+            except Exception as e:
+                logger.warning(f"Failed to send webhook notification: {e}")
 
     async def _process_publish_queue(self) -> None:
         """Process pending items in publish queue."""

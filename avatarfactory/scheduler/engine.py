@@ -251,27 +251,38 @@ class Scheduler:
         except Exception as e:
             logger.warning(f"Failed to merge external task changes: {e}")
 
-    def add_task(self, task: ScheduledTask) -> None:
-        """Add a scheduled task."""
+    def add_task(self, task: ScheduledTask, save_state: bool = True) -> None:
+        """Add a scheduled task.
+
+        Args:
+            task: The task to add
+            save_state: Whether to persist state immediately (set False for batch operations)
+        """
         self._tasks[task.id] = task
-        self._save_state()
+        if save_state:
+            self._save_state()
 
         if self._running and self._scheduler:
             self._schedule_task(task)
 
-    def add_task_from_dict(self, task_dict: Dict[str, Any]) -> ScheduledTask:
+    def add_task_from_dict(self, task_dict: Dict[str, Any], save_state: bool = True) -> ScheduledTask:
         """
         Add a scheduled task from a dictionary.
 
         Args:
             task_dict: Dictionary with task properties (id, name, task_type, schedule, etc.)
+            save_state: Whether to persist state immediately (set False for batch operations)
 
         Returns:
             The created ScheduledTask
         """
         task = ScheduledTask(**task_dict)
-        self.add_task(task)
+        self.add_task(task, save_state=save_state)
         return task
+
+    def save_state(self) -> None:
+        """Public method to manually trigger state save (useful after batch operations)."""
+        self._save_state()
 
     def remove_task(self, task_id: str) -> bool:
         """Remove a scheduled task."""

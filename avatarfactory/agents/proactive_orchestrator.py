@@ -113,15 +113,21 @@ class ProactiveOrchestrator(OrchestratorAgent):
             }
             tasks.append(content_task)
 
-        # Add tasks to scheduler
+        # Add tasks to scheduler - collect all tasks first, then add in batch
+        created_tasks = []
         for task in tasks:
             try:
-                self._scheduler.add_task_from_dict(task)
+                self._scheduler.add_task_from_dict(task, save_state=False)
+                created_tasks.append(task)
                 self.log("INFO", f"Added task: {task['name']} for {persona_id}")
             except Exception as e:
                 self.log("ERROR", f"Failed to add task {task['name']}: {e}")
 
-        return tasks
+        # Save state once after all tasks are added
+        if created_tasks:
+            self._scheduler.save_state()
+
+        return created_tasks
 
     async def remove_persona_tasks(self, persona_id: str) -> int:
         """

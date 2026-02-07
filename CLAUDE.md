@@ -185,3 +185,15 @@ Environment variables (see `.env.example`):
 - Line length: 100 characters (Black, Ruff)
 - Async/await for all I/O operations
 - Pydantic models for data validation
+
+## Development Principles
+
+### No Automatic Commits
+- **NEVER** automatically commit code changes
+- All commits must be explicitly requested by the user
+- Wait for user to say "commit" or similar before running `git commit`
+
+### No Automatic Deployments
+- **NEVER** automatically deploy to Azure or any production environment
+- All deployments must be explicitly requested by the user
+- Wait for user to say "deploy" or similar before running deployment scripts

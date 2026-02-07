@@ -63,20 +63,29 @@ with st.sidebar:
                 help="Platforms to scan for trending topics"
             )
 
-            # Discovery schedule options
-            discovery_schedule_opts = {
+            # Shared schedule options for discovery and content generation
+            schedule_options = {
+                "Every hour": "0 * * * *",
+                "Every 2 hours": "0 */2 * * *",
+                "Every 3 hours": "0 */3 * * *",
+                "Every 4 hours": "0 */4 * * *",
                 "Every 6 hours": "0 */6 * * *",
+                "Every 8 hours": "0 */8 * * *",
                 "Every 12 hours": "0 */12 * * *",
                 "Daily at 9 AM": "0 9 * * *",
+                "Daily at 10 AM": "0 10 * * *",
                 "Twice daily (9 AM, 6 PM)": "0 9,18 * * *",
+                "Twice daily (10 AM, 4 PM)": "0 10,16 * * *",
             }
+
             discovery_schedule_label = st.selectbox(
                 "Discovery Schedule",
-                list(discovery_schedule_opts.keys()),
+                list(schedule_options.keys()),
+                index=4,  # Default to "Every 6 hours"
                 key="discovery_schedule_select",
                 help="How often to scan for trending topics"
             )
-            discovery_schedule = discovery_schedule_opts[discovery_schedule_label]
+            discovery_schedule = schedule_options[discovery_schedule_label]
 
             st.markdown("**Content Generation Settings**")
 
@@ -88,20 +97,14 @@ with st.sidebar:
                 help="Platforms to generate content for"
             )
 
-            # Content generation schedule options
-            content_schedule_opts = {
-                "Daily at 10 AM": "0 10 * * *",
-                "Daily at 9 AM": "0 9 * * *",
-                "Twice daily (10 AM, 4 PM)": "0 10,16 * * *",
-                "Every 8 hours": "0 */8 * * *",
-            }
             content_schedule_label = st.selectbox(
                 "Content Generation Schedule",
-                list(content_schedule_opts.keys()),
+                list(schedule_options.keys()),
+                index=4,  # Default to "Every 6 hours"
                 key="content_schedule_select",
                 help="When to generate content suggestions"
             )
-            content_schedule = content_schedule_opts[content_schedule_label]
+            content_schedule = schedule_options[content_schedule_label]
 
             st.caption("This will create discovery and content generation tasks with the selected settings.")
 

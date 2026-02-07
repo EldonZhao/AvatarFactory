@@ -30,7 +30,8 @@ st.markdown("Monitor scheduled tasks and their execution status.")
 
 # Initialize provider
 kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
+# In container, Dashboard and API run together, use internal API URL
+api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://127.0.0.1:8000")
 provider = DashboardDataProvider(kb_path)
 
 # Get personas for task creation

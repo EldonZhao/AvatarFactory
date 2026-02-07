@@ -123,27 +123,63 @@ az appservice plan create `
     --output none
 
 Write-Host "Step 7: Creating Web App..." -ForegroundColor Green
+# Build correct image path
+$ImagePath = "$AcrLoginServer/avatarfactory:latest"
+Write-Host "  Image: $ImagePath" -ForegroundColor Gray
+
 az webapp create `
     --resource-group $ResourceGroup `
     --plan $AppServicePlan `
     --name $AppName `
-    --container-image-name "$AcrLoginServer/avatarfactory:latest" `
+    --container-image-name $ImagePath `
+    --container-registry-url "https://$AcrLoginServer" `
+    --container-registry-user $AcrUsername `
+    --container-registry-password $AcrPassword `
+    --output none
+
+# Verify container settings
+Write-Host "  Verifying container configuration..." -ForegroundColor Gray
+az webapp config container set `
+    --resource-group $ResourceGroup `
+    --name $AppName `
+    --container-image-name $ImagePath `
     --container-registry-url "https://$AcrLoginServer" `
     --container-registry-user $AcrUsername `
     --container-registry-password $AcrPassword `
     --output none
 
 Write-Host "Step 8: Mounting Azure File Share..." -ForegroundColor Green
-az webapp config storage-account add `
+# Try to add, if exists then update
+$StorageExists = az webapp config storage-account list `
     --resource-group $ResourceGroup `
     --name $AppName `
-    --custom-id "knowledges" `
-    --storage-type AzureFiles `
-    --share-name $FileShare `
-    --account-name $StorageAccount `
-    --access-key $StorageKey `
-    --mount-path "/app/knowledges" `
-    --output none
+    --query "[?name=='knowledges']" -o tsv 2>$null
+
+if ($StorageExists) {
+    Write-Host "  Updating existing storage mount..." -ForegroundColor Gray
+    az webapp config storage-account update `
+        --resource-group $ResourceGroup `
+        --name $AppName `
+        --custom-id "knowledges" `
+        --storage-type AzureFiles `
+        --share-name $FileShare `
+        --account-name $StorageAccount `
+        --access-key $StorageKey `
+        --mount-path "/app/knowledges" `
+        --output none
+} else {
+    Write-Host "  Adding new storage mount..." -ForegroundColor Gray
+    az webapp config storage-account add `
+        --resource-group $ResourceGroup `
+        --name $AppName `
+        --custom-id "knowledges" `
+        --storage-type AzureFiles `
+        --share-name $FileShare `
+        --account-name $StorageAccount `
+        --access-key $StorageKey `
+        --mount-path "/app/knowledges" `
+        --output none
+}
 
 Write-Host "Step 9: Configuring App Settings..." -ForegroundColor Green
 az webapp config appsettings set `
@@ -151,7 +187,7 @@ az webapp config appsettings set `
     --name $AppName `
     --settings `
         AVATARFACTORY_KB_PATH="/app/knowledges" `
-        WEBSITES_PORT="8000" `
+        WEBSITES_PORT="80" `
         DOCKER_ENABLE_CI="true" `
     --output none
 

@@ -120,17 +120,36 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Bulk Actions")
 
-    if st.button("🗑️ Delete Selected", key="delete_selected_content_btn", type="secondary"):
-        if "selected_contents" in st.session_state and st.session_state.selected_contents:
-            deleted_count = 0
-            for content_id in st.session_state.selected_contents:
-                if provider.delete_content(content_id):
-                    deleted_count += 1
-            st.success(f"Deleted {deleted_count} content(s)")
-            st.session_state.selected_contents = []
-            st.rerun()
-        else:
-            st.warning("No items selected")
+    # Initialize bulk delete confirmation state
+    if "bulk_delete_confirm" not in st.session_state:
+        st.session_state.bulk_delete_confirm = False
+
+    if st.session_state.bulk_delete_confirm:
+        selected_count = len(st.session_state.get("selected_contents", []))
+        st.warning(f"⚠️ Delete {selected_count} selected content(s)?")
+        col_yes, col_no = st.columns(2)
+        with col_yes:
+            if st.button("✅ Yes, Delete", key="confirm_bulk_delete", type="primary"):
+                if "selected_contents" in st.session_state and st.session_state.selected_contents:
+                    deleted_count = 0
+                    for content_id in st.session_state.selected_contents:
+                        if provider.delete_content(content_id):
+                            deleted_count += 1
+                    st.success(f"Deleted {deleted_count} content(s)")
+                    st.session_state.selected_contents = []
+                    st.session_state.bulk_delete_confirm = False
+                    st.rerun()
+        with col_no:
+            if st.button("❌ Cancel", key="cancel_bulk_delete"):
+                st.session_state.bulk_delete_confirm = False
+                st.rerun()
+    else:
+        if st.button("🗑️ Delete Selected", key="delete_selected_content_btn", type="secondary"):
+            if "selected_contents" in st.session_state and st.session_state.selected_contents:
+                st.session_state.bulk_delete_confirm = True
+                st.rerun()
+            else:
+                st.warning("No items selected")
 
 # Initialize session state for selections
 if "selected_contents" not in st.session_state:
@@ -233,14 +252,30 @@ if st.session_state.selected_content_id:
 
             st.markdown("---")
 
-            # Delete button for single content
-            if st.button("🗑️ Delete", key="delete_this_content", type="secondary"):
-                if provider.delete_content(st.session_state.selected_content_id):
-                    st.success("Deleted!")
-                    st.session_state.selected_content_id = None
+            # Delete button for single content with confirmation
+            if "single_delete_confirm" not in st.session_state:
+                st.session_state.single_delete_confirm = False
+
+            if st.session_state.single_delete_confirm:
+                st.warning("⚠️ Delete this content?")
+                col_yes, col_no = st.columns(2)
+                with col_yes:
+                    if st.button("✅ Yes", key="confirm_single_delete", type="primary"):
+                        if provider.delete_content(st.session_state.selected_content_id):
+                            st.success("Deleted!")
+                            st.session_state.selected_content_id = None
+                            st.session_state.single_delete_confirm = False
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete")
+                with col_no:
+                    if st.button("❌ No", key="cancel_single_delete"):
+                        st.session_state.single_delete_confirm = False
+                        st.rerun()
+            else:
+                if st.button("🗑️ Delete", key="delete_this_content", type="secondary"):
+                    st.session_state.single_delete_confirm = True
                     st.rerun()
-                else:
-                    st.error("Failed to delete")
 
         st.divider()
     else:

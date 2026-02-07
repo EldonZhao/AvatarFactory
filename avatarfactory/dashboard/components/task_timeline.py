@@ -32,6 +32,10 @@ def render_task_timeline(
 
     action_result = None
 
+    # Initialize session state for delete confirmations
+    if "task_delete_confirm" not in st.session_state:
+        st.session_state.task_delete_confirm = None
+
     # Filter tasks
     if not show_disabled:
         tasks = [t for t in tasks if t.get("enabled")]
@@ -120,8 +124,23 @@ def render_task_timeline(
                         action_result = {"action": "run", "task_id": task_id}
 
                 with col5:
-                    if st.button("🗑️", key=f"delete_{task_id}", help="Delete task"):
-                        action_result = {"action": "delete", "task_id": task_id}
+                    # Check if this task is pending deletion confirmation
+                    if st.session_state.task_delete_confirm == task_id:
+                        # Show confirmation buttons
+                        if st.button("✅", key=f"confirm_delete_{task_id}", help="Confirm delete"):
+                            action_result = {"action": "delete", "task_id": task_id}
+                            st.session_state.task_delete_confirm = None
+                    else:
+                        if st.button("🗑️", key=f"delete_{task_id}", help="Delete task"):
+                            st.session_state.task_delete_confirm = task_id
+                            st.rerun()
+
+            # Show cancel button if this task is pending confirmation
+            if st.session_state.task_delete_confirm == task_id:
+                st.warning(f"⚠️ Delete task '{task.get('name', task_id)}'?")
+                if st.button("❌ Cancel", key=f"cancel_delete_{task_id}"):
+                    st.session_state.task_delete_confirm = None
+                    st.rerun()
 
             st.divider()
 

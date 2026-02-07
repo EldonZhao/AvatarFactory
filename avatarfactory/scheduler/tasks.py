@@ -99,9 +99,15 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
 
     Expected task params:
     - persona_id: str
-    - topic: str (optional - will use content pillars if not provided)
+    - topic: str (optional - will use discovery ideas or content pillars)
     - count: int (default: 1)
+
+    Topic selection priority:
+    1. Explicit topic from task params
+    2. Unused ideas from recent discovery results
+    3. Random pillar/example combination (avoiding recent topics)
     """
+    import random
     from avatarfactory.agents.orchestrator import OrchestratorAgent
     from avatarfactory.core.knowledges import KnowledgeBase
     from avatarfactory.core.llm_provider import LLMProviderFactory
@@ -124,14 +130,9 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
 
     orchestrator = OrchestratorAgent(knowledge_base=kb, llm_provider=provider)
 
-    # If no topic, get one from persona's content pillars
+    # If no topic, try to get one from discovery ideas or pillars
     if not topic:
-        if persona and persona.content_pillars:
-            pillar = persona.content_pillars[0]
-            if pillar.examples:
-                topic = pillar.examples[0]
-            else:
-                topic = f"{pillar.name} tips"
+        topic = await _select_topic_for_persona(kb, persona_id, persona)
 
     if not topic:
         return {"success": False, "error": "No topic available for content generation"}
@@ -164,6 +165,94 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
         }
     else:
         return {"success": False, "error": result.get("message")}
+
+
+async def _select_topic_for_persona(kb, persona_id: str, persona) -> Optional[str]:
+    """
+    Select a topic for content generation, avoiding duplicates.
+
+    Priority:
+    1. Unused ideas from recent discovery results
+    2. Random pillar/example combination (avoiding recent content titles)
+    """
+    import random
+
+    # Get recent content titles to avoid duplicates
+    recent_contents = kb.list_content(persona_id=persona_id, status="draft")
+    # Only check the most recent 20
+    recent_contents = recent_contents[:20] if len(recent_contents) > 20 else recent_contents
+    recent_titles = set()
+    recent_topics = set()
+    for c in recent_contents:
+        if c.title:
+            recent_titles.add(c.title.lower())
+            # Extract topic keywords (first 5 words)
+            words = c.title.lower().split()[:5]
+            recent_topics.add(" ".join(words))
+
+    # Try to get ideas from discovery results
+    try:
+        discovery_results = kb.get_latest_discovery(persona_id)
+        if discovery_results:
+            ideas = discovery_results.get("ideas", [])
+            # Filter out ideas that might be duplicates
+            unused_ideas = []
+            for idea in ideas:
+                idea_topic = idea.get("topic", "") if isinstance(idea, dict) else str(idea)
+                idea_lower = idea_topic.lower()
+                # Check if this idea is too similar to recent content
+                is_duplicate = False
+                for recent in recent_topics:
+                    if recent in idea_lower or idea_lower in recent:
+                        is_duplicate = True
+                        break
+                if not is_duplicate and idea_topic:
+                    unused_ideas.append(idea_topic)
+
+            if unused_ideas:
+                # Pick a random unused idea
+                return random.choice(unused_ideas)
+    except Exception:
+        pass  # Discovery results not available
+
+    # Fallback to pillars with randomization
+    if persona and persona.content_pillars:
+        # Collect all possible topics from all pillars
+        all_topics = []
+        for pillar in persona.content_pillars:
+            if pillar.examples:
+                for example in pillar.examples:
+                    # Check if not too similar to recent content
+                    example_lower = example.lower()
+                    is_duplicate = False
+                    for recent in recent_topics:
+                        if recent in example_lower or example_lower in recent:
+                            is_duplicate = True
+                            break
+                    if not is_duplicate:
+                        all_topics.append(example)
+            else:
+                # Generate topic from pillar name
+                topic = f"{pillar.name} tips and insights"
+                all_topics.append(topic)
+
+        if all_topics:
+            return random.choice(all_topics)
+
+        # If all examples are used, generate a variation
+        pillar = random.choice(persona.content_pillars)
+        variations = [
+            f"Latest trends in {pillar.name}",
+            f"Common mistakes in {pillar.name}",
+            f"Best practices for {pillar.name}",
+            f"Beginner's guide to {pillar.name}",
+            f"Advanced techniques in {pillar.name}",
+            f"Case study: {pillar.name} in action",
+            f"Future of {pillar.name}",
+        ]
+        return random.choice(variations)
+
+    return None
 
 
 @TaskRegistry.register("publish")

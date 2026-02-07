@@ -2,6 +2,7 @@
 Content Page - Browse and preview generated content.
 
 Displays content items with their scores and metadata.
+Supports query param ?id=content_xxx to open specific content.
 """
 
 import os
@@ -27,6 +28,11 @@ st.markdown("Browse and preview all generated content.")
 kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
 api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
 provider = DashboardDataProvider(kb_path)
+
+# Check for content_id in query params (for direct links from notifications)
+query_params = st.query_params
+if "id" in query_params and "selected_content_id" not in st.session_state:
+    st.session_state.selected_content_id = query_params["id"]
 
 # Sidebar filters
 with st.sidebar:

@@ -660,10 +660,16 @@ class Scheduler:
         else:
             description = body_preview
 
-        # Build URL
-        service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
-        if service_url and content_id:
-            url = f"{service_url}/Content"  # Link to dashboard content page
+        # Build URL - link directly to the content detail view
+        # Use AVATARFACTORY_DASHBOARD_URL if set, otherwise fallback to SERVICE_URL
+        dashboard_url = os.getenv("AVATARFACTORY_DASHBOARD_URL", "").rstrip("/")
+        if not dashboard_url:
+            # In Azure deployment, dashboard is at the same URL
+            dashboard_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
+
+        if dashboard_url and content_id:
+            # Streamlit multipage apps use /Page_Name format
+            url = f"{dashboard_url}/Content?id={content_id}"
         else:
             url = ""
 

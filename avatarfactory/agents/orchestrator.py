@@ -39,9 +39,23 @@ class OrchestratorAgent(BaseAgent):
             llm_provider=self.llm_provider,
         )
 
+        # Evolution agent (lazy initialization)
+        self._evolution_agent: Optional[Any] = None
+
         # Deprecated aliases for backward compatibility
         self.persona_lab = self.persona_agent
         self.content_lab = self.content_agent
+
+    @property
+    def evolution_agent(self) -> Any:
+        """Lazily initialize evolution agent."""
+        if self._evolution_agent is None:
+            from avatarfactory.agents.evolution import EvolutionAgent
+            self._evolution_agent = EvolutionAgent(
+                knowledge_base=self.kb,
+                llm_provider=self.llm_provider,
+            )
+        return self._evolution_agent
 
     async def process(self, message: AgentMessage) -> Any:
         """Process user request by coordinating sub-agents"""
@@ -81,6 +95,12 @@ class OrchestratorAgent(BaseAgent):
             "generate_content": self._handle_generate_content,
             "analyze_data": self._handle_analyze_data,
             "optimize_persona": self._handle_optimize_persona,
+            # Evolution intents
+            "evolve_persona": self._handle_evolve_persona,
+            "review_suggestion": self._handle_review_suggestion,
+            "show_suggestions": self._handle_show_suggestions,
+            "agent_config": self._handle_agent_config,
+            "rollback": self._handle_rollback,
         }
 
         handler = handlers.get(intent.intent_type)
@@ -108,12 +128,20 @@ Possible intents:
 - generate_content: User wants to generate content for an existing persona
 - analyze_data: User wants to analyze performance data
 - optimize_persona: User wants to optimize an existing persona
+- evolve_persona: User wants to suggest or apply changes to persona (e.g., "make it more casual", "change the tone")
+- review_suggestion: User wants to approve or reject a pending suggestion (e.g., "approve suggestion X", "reject")
+- show_suggestions: User wants to see pending evolution suggestions
+- agent_config: User wants to modify agent behavior settings (e.g., "make content longer", "increase creativity")
+- rollback: User wants to rollback to a previous persona version
 
 Output MUST be valid JSON:
 {
-  "intent_type": "create_persona|generate_content|analyze_data|optimize_persona",
+  "intent_type": "create_persona|generate_content|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|rollback",
   "parameters": {
     // Extract relevant parameters from user input
+    // For evolve_persona: include "user_feedback" with the suggestion
+    // For review_suggestion: include "suggestion_id" and "approved" (boolean)
+    // For rollback: include "version" (e.g., "v1.0")
   },
   "confidence": <0.0-1.0>
 }"""
@@ -361,4 +389,225 @@ Output MUST be valid JSON:
         return {
             "suggestions": suggestions,
             "message": f"💡 Found {len(suggestions)} optimization suggestions",
+        }
+
+    # =========================================================================
+    # Evolution Handlers
+    # =========================================================================
+
+    async def _handle_evolve_persona(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle persona evolution - generate suggestions from user feedback"""
+
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "No persona found."}
+            persona_id = personas[0]
+
+        # Get user feedback from parameters or use original input
+        user_feedback = parameters.get("user_feedback", original_input)
+
+        # Generate suggestions via evolution agent
+        suggestions = await self.evolution_agent.generate_suggestions_from_user_input(
+            persona_id, user_feedback
+        )
+
+        if not suggestions:
+            return {
+                "message": "Could not generate suggestions from the feedback.",
+                "suggestions": [],
+            }
+
+        # Format suggestions for display
+        suggestion_list = []
+        for s in suggestions:
+            suggestion_list.append({
+                "id": s.id,
+                "severity": s.severity.value,
+                "area": s.area.value,
+                "suggestion": s.suggestion,
+                "rationale": s.rationale,
+                "expected_impact": s.expected_impact,
+            })
+
+        return {
+            "suggestions": suggestion_list,
+            "count": len(suggestions),
+            "message": (
+                f"🔄 Generated {len(suggestions)} suggestion(s):\n\n"
+                + "\n".join([
+                    f"  [{s['severity']}] {s['area']}: {s['suggestion']}\n"
+                    f"     Rationale: {s['rationale']}\n"
+                    f"     Use 'approve suggestion {s['id']}' or 'reject suggestion {s['id']}' to review."
+                    for s in suggestion_list
+                ])
+            ),
+        }
+
+    async def _handle_review_suggestion(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle suggestion review - approve or reject"""
+
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "No persona found."}
+            persona_id = personas[0]
+
+        suggestion_id = parameters.get("suggestion_id")
+        if not suggestion_id:
+            # Try to find suggestion ID from pending suggestions
+            pending = self.kb.list_evolution_suggestions(persona_id, status="pending")
+            if pending:
+                suggestion_id = pending[0].id
+            else:
+                return {"message": "No pending suggestions to review."}
+
+        approved = parameters.get("approved", True)
+        rejection_reason = parameters.get("rejection_reason")
+
+        # Review the suggestion
+        suggestion = await self.evolution_agent.review_suggestion(
+            persona_id, suggestion_id, approved, rejection_reason
+        )
+
+        if approved:
+            return {
+                "suggestion": suggestion.model_dump(mode="json"),
+                "message": (
+                    f"✅ Approved and applied suggestion: {suggestion.suggestion}\n"
+                    f"New version: {suggestion.applied_version}"
+                ),
+            }
+        else:
+            return {
+                "suggestion": suggestion.model_dump(mode="json"),
+                "message": f"❌ Rejected suggestion: {suggestion.suggestion}",
+            }
+
+    async def _handle_show_suggestions(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle showing pending evolution suggestions"""
+
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "No persona found."}
+            persona_id = personas[0]
+
+        status = parameters.get("status", "pending")
+        suggestions = self.kb.list_evolution_suggestions(persona_id, status=status)
+
+        if not suggestions:
+            return {
+                "suggestions": [],
+                "message": f"No {status} suggestions found.",
+            }
+
+        suggestion_list = []
+        for s in suggestions:
+            suggestion_list.append({
+                "id": s.id,
+                "severity": s.severity.value,
+                "area": s.area.value,
+                "suggestion": s.suggestion,
+                "confidence": s.confidence,
+                "created_at": s.created_at.isoformat(),
+            })
+
+        return {
+            "suggestions": suggestion_list,
+            "count": len(suggestions),
+            "message": (
+                f"📋 {len(suggestions)} {status} suggestion(s):\n\n"
+                + "\n".join([
+                    f"  [{s['severity']}] {s['id']}: {s['suggestion']}"
+                    for s in suggestion_list
+                ])
+            ),
+        }
+
+    async def _handle_agent_config(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle agent configuration changes"""
+
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "No persona found."}
+            persona_id = personas[0]
+
+        agent_type = parameters.get("agent_type", "content")
+        updates = parameters.get("updates", {})
+
+        # If no updates provided, interpret user feedback as config change
+        if not updates and original_input:
+            # Use evolution agent to generate config suggestion
+            suggestions = await self.evolution_agent.generate_suggestions_from_user_input(
+                persona_id, original_input
+            )
+            # Filter to agent config suggestions
+            config_suggestions = [
+                s for s in suggestions
+                if s.area.value == "agent_config"
+            ]
+            if config_suggestions:
+                return {
+                    "suggestions": [s.model_dump(mode="json") for s in config_suggestions],
+                    "message": f"Generated {len(config_suggestions)} agent config suggestions. Use 'approve' to apply.",
+                }
+
+        # Apply direct config updates
+        if updates:
+            from avatarfactory.core.agent_config import AgentConfigManager
+            config_manager = AgentConfigManager(self.kb)
+            new_config = config_manager.update_config(persona_id, agent_type, updates)
+            return {
+                "config": new_config.model_dump(),
+                "message": f"✅ Updated {agent_type} agent configuration.",
+            }
+
+        return {"message": "No configuration changes specified."}
+
+    async def _handle_rollback(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle persona rollback to previous version"""
+
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "No persona found."}
+            persona_id = personas[0]
+
+        version = parameters.get("version")
+        if not version:
+            # Show available versions
+            versions = self.kb.list_persona_versions(persona_id)
+            if len(versions) <= 1:
+                return {"message": "No previous versions available for rollback."}
+            return {
+                "versions": versions,
+                "message": (
+                    f"Available versions: {', '.join(versions)}\n"
+                    "Specify a version to rollback to."
+                ),
+            }
+
+        # Perform rollback
+        persona = await self.evolution_agent.rollback_change(persona_id, version)
+
+        return {
+            "persona": persona.model_dump(mode="json"),
+            "message": f"⏪ Rolled back to version {version}. Current version: {persona.version}",
         }

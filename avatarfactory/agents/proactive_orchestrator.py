@@ -57,6 +57,8 @@ class ProactiveOrchestrator(OrchestratorAgent):
         content_platforms: Optional[List[str]] = None,
         discovery_schedule: Optional[str] = None,
         content_schedule: Optional[str] = None,
+        evolution_schedule: Optional[str] = None,
+        enable_evolution: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Set up proactive scheduled tasks for a persona.
@@ -64,6 +66,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
         Creates:
         - Discovery task: scan for trending topics
         - Content task: generate content suggestions
+        - Evolution task: analyze feedback and generate suggestions (optional)
 
         Args:
             persona_id: Persona ID to set up tasks for
@@ -71,6 +74,8 @@ class ProactiveOrchestrator(OrchestratorAgent):
             content_platforms: Platforms for content generation (defaults to ["xiaohongshu"])
             discovery_schedule: Custom cron schedule for discovery (default: "0 */6 * * *")
             content_schedule: Custom cron schedule for content generation (default: "0 9 * * *")
+            evolution_schedule: Custom cron schedule for evolution analysis (default: "0 8 * * 0")
+            enable_evolution: Whether to enable evolution tasks (default: True)
 
         Returns:
             List of created task configurations
@@ -87,6 +92,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
         content_platforms = content_platforms or ["xiaohongshu"]
         discovery_schedule = discovery_schedule or "0 */6 * * *"
         content_schedule = content_schedule or "0 9 * * *"
+        evolution_schedule = evolution_schedule or "0 8 * * 0"  # Weekly on Sunday 8:00
         tasks = []
 
         # Discovery task (only if discovery platforms specified)
@@ -112,6 +118,18 @@ class ProactiveOrchestrator(OrchestratorAgent):
                 "extra_params": {"count": 3, "platforms": content_platforms},
             }
             tasks.append(content_task)
+
+        # Evolution task (analyze feedback and generate suggestions)
+        if enable_evolution:
+            evolution_task = {
+                "id": f"evolution_{persona_id}",
+                "name": f"Evolution - {persona_name}",
+                "task_type": "evolution_analysis",
+                "schedule": evolution_schedule,
+                "persona_id": persona_id,
+                "extra_params": {"period": "7d"},
+            }
+            tasks.append(evolution_task)
 
         # Add tasks to scheduler - collect all tasks first, then add in batch
         created_tasks = []

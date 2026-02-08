@@ -152,6 +152,17 @@ class Persona(BaseModel):
         None, description="Notification connector configuration"
     )
 
+    # Evolution settings
+    evolution: Optional["EvolutionConfig"] = Field(
+        None, description="Evolution configuration"
+    )
+
+    # Per-persona agent configurations
+    agent_configs: Dict[str, "AgentConfig"] = Field(
+        default_factory=dict,
+        description="Per-agent configurations keyed by agent_type",
+    )
+
     metadata: Dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata"
     )
@@ -526,3 +537,210 @@ class DiscoveryReport(BaseModel):
 
     # Persona optimization suggestions
     persona_suggestions: List[str] = Field(default_factory=list)
+
+
+# ============================================================================
+# Evolution Models
+# ============================================================================
+
+
+class EvolutionSeverity(str, Enum):
+    """Severity level for evolution suggestions"""
+
+    MINOR = "minor"
+    MODERATE = "moderate"
+    MAJOR = "major"
+
+
+class EvolutionTarget(str, Enum):
+    """Target type for evolution suggestions"""
+
+    PERSONA = "persona"
+    CONTENT_AGENT = "content_agent"
+    REVIEW_AGENT = "review_agent"
+    DISCOVERY_AGENT = "discovery_agent"
+
+
+class EvolutionArea(str, Enum):
+    """Area of change for evolution suggestions"""
+
+    IDENTITY = "identity"
+    VOICE_STYLE = "voice_style"
+    CONTENT_PILLARS = "content_pillars"
+    BOUNDARIES = "boundaries"
+    TARGET_AUDIENCE = "target_audience"
+    AGENT_CONFIG = "agent_config"
+
+
+class EvolutionSuggestionStatus(str, Enum):
+    """Status of an evolution suggestion"""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    AUTO_APPLIED = "auto_applied"
+
+
+class EvolutionSource(str, Enum):
+    """Source of evolution suggestion"""
+
+    AUTOMATED = "automated"
+    USER_FEEDBACK = "user_feedback"
+    DISCOVERY = "discovery"
+
+
+class EvolutionSuggestion(BaseModel):
+    """Evolution suggestion for persona or agent improvement"""
+
+    id: str = Field(..., description="Unique suggestion ID")
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    # Change target
+    target: EvolutionTarget = Field(..., description="What to evolve")
+    area: EvolutionArea = Field(..., description="Area of change")
+
+    # Suggestion content
+    suggestion: str = Field(..., description="Human-readable suggestion")
+    current_value: Optional[Dict[str, Any]] = Field(
+        None, description="Current value before change"
+    )
+    proposed_value: Optional[Dict[str, Any]] = Field(
+        None, description="Proposed new value"
+    )
+
+    # Analysis
+    rationale: str = Field(..., description="Why this change is recommended")
+    expected_impact: str = Field(..., description="Expected effect of the change")
+    confidence: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Confidence score 0-1"
+    )
+    severity: EvolutionSeverity = Field(
+        default=EvolutionSeverity.MODERATE, description="Change severity"
+    )
+
+    # Evidence
+    evidence: List[str] = Field(
+        default_factory=list, description="Supporting data points"
+    )
+    source: EvolutionSource = Field(
+        default=EvolutionSource.AUTOMATED, description="Source of suggestion"
+    )
+
+    # Status
+    status: EvolutionSuggestionStatus = Field(
+        default=EvolutionSuggestionStatus.PENDING, description="Current status"
+    )
+    reviewed_at: Optional[datetime] = None
+    rejection_reason: Optional[str] = None
+    applied_version: Optional[str] = Field(
+        None, description="Persona version after applying"
+    )
+
+
+class AgentConfig(BaseModel):
+    """Per-persona agent configuration for customizing agent behavior"""
+
+    agent_type: str = Field(..., description="Agent type: content, review, discovery")
+
+    # LLM parameters
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=4096, ge=100, le=8192)
+
+    # Prompt customization
+    system_prompt_additions: Optional[str] = Field(
+        None, description="Additional system prompt text"
+    )
+    style_emphasis: List[str] = Field(
+        default_factory=list, description="Styles to emphasize"
+    )
+    avoid_patterns: List[str] = Field(
+        default_factory=list, description="Patterns to avoid"
+    )
+
+    # Behavior tuning
+    creativity_level: str = Field(
+        default="balanced",
+        description="Creativity: conservative, balanced, creative",
+    )
+    detail_level: str = Field(
+        default="standard",
+        description="Detail level: brief, standard, detailed",
+    )
+
+    # Performance tracking
+    performance_history: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Historical performance records"
+    )
+
+
+class EvolutionConfig(BaseModel):
+    """Evolution configuration for a persona"""
+
+    enabled: bool = Field(default=True, description="Whether evolution is enabled")
+
+    # Auto-apply settings
+    auto_apply_minor: bool = Field(
+        default=True, description="Auto-apply minor changes"
+    )
+    auto_apply_threshold: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold for auto-apply",
+    )
+
+    # Analysis triggers
+    analysis_schedule: str = Field(
+        default="weekly",
+        description="Analysis frequency: daily, weekly, biweekly, monthly",
+    )
+    score_threshold: float = Field(
+        default=65.0,
+        description="Score below which to trigger analysis",
+    )
+
+    # Notification preferences
+    notify_on_suggestion: bool = Field(
+        default=True, description="Notify when suggestions are generated"
+    )
+    notify_on_auto_apply: bool = Field(
+        default=True, description="Notify when changes are auto-applied"
+    )
+
+
+class EvolutionFeedbackAnalysis(BaseModel):
+    """Analysis of feedback for evolution suggestions"""
+
+    persona_id: str
+    analyzed_at: datetime = Field(default_factory=datetime.now)
+    period: str = Field(default="7d", description="Analysis period")
+
+    # Review analysis
+    review_analysis: Dict[str, Any] = Field(
+        default_factory=dict, description="Review score patterns"
+    )
+
+    # Content performance
+    content_analysis: Dict[str, Any] = Field(
+        default_factory=dict, description="Content performance patterns"
+    )
+
+    # Discovery alignment
+    discovery_analysis: Dict[str, Any] = Field(
+        default_factory=dict, description="Discovery/trend alignment"
+    )
+
+    # Overall insights
+    key_insights: List[str] = Field(
+        default_factory=list, description="Key findings from analysis"
+    )
+    improvement_areas: List[str] = Field(
+        default_factory=list, description="Areas needing improvement"
+    )
+    strengths: List[str] = Field(
+        default_factory=list, description="Current strengths"
+    )
+
+
+# Rebuild Persona model to resolve forward references
+Persona.model_rebuild()

@@ -21,6 +21,9 @@ from avatarfactory.models.schemas import (
     ReviewReport,
     SimulationReport,
     WeeklyRetrospective,
+    EvolutionSuggestion,
+    EvolutionFeedbackAnalysis,
+    AgentConfig,
 )
 
 
@@ -548,6 +551,253 @@ class KnowledgeBase:
             "published_contents": len(self.list_content(status="published")),
             "total_experiments": len(self.list_experiments()),
         }
+
+    # ========================================================================
+    # Evolution Management
+    # ========================================================================
+
+    def _get_evolution_dir(self, persona_id: str) -> Path:
+        """Get evolution directory for a persona."""
+        evolution_dir = self.base_path / "personas" / persona_id / "evolution"
+        evolution_dir.mkdir(parents=True, exist_ok=True)
+        return evolution_dir
+
+    def save_evolution_suggestion(
+        self, persona_id: str, suggestion: EvolutionSuggestion
+    ) -> None:
+        """
+        Save an evolution suggestion.
+
+        Args:
+            persona_id: Persona ID
+            suggestion: EvolutionSuggestion to save
+        """
+        evolution_dir = self._get_evolution_dir(persona_id)
+        suggestions_path = evolution_dir / "suggestions.json"
+
+        # Load existing suggestions
+        suggestions = []
+        if suggestions_path.exists():
+            with open(suggestions_path, "r", encoding="utf-8") as f:
+                suggestions = json.load(f)
+
+        # Check if suggestion with same ID exists (update) or add new
+        updated = False
+        for i, s in enumerate(suggestions):
+            if s.get("id") == suggestion.id:
+                suggestions[i] = suggestion.model_dump(mode="json")
+                updated = True
+                break
+
+        if not updated:
+            suggestions.append(suggestion.model_dump(mode="json"))
+
+        with open(suggestions_path, "w", encoding="utf-8") as f:
+            json.dump(suggestions, f, indent=2, ensure_ascii=False)
+
+    def load_evolution_suggestion(
+        self, persona_id: str, suggestion_id: str
+    ) -> Optional[EvolutionSuggestion]:
+        """
+        Load a specific evolution suggestion.
+
+        Args:
+            persona_id: Persona ID
+            suggestion_id: Suggestion ID
+
+        Returns:
+            EvolutionSuggestion or None if not found
+        """
+        evolution_dir = self._get_evolution_dir(persona_id)
+        suggestions_path = evolution_dir / "suggestions.json"
+
+        if not suggestions_path.exists():
+            return None
+
+        with open(suggestions_path, "r", encoding="utf-8") as f:
+            suggestions = json.load(f)
+
+        for s in suggestions:
+            if s.get("id") == suggestion_id:
+                return EvolutionSuggestion(**s)
+
+        return None
+
+    def list_evolution_suggestions(
+        self,
+        persona_id: str,
+        status: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[EvolutionSuggestion]:
+        """
+        List evolution suggestions for a persona.
+
+        Args:
+            persona_id: Persona ID
+            status: Filter by status (pending, approved, rejected, auto_applied)
+            limit: Maximum number of suggestions to return
+
+        Returns:
+            List of EvolutionSuggestion, newest first
+        """
+        evolution_dir = self._get_evolution_dir(persona_id)
+        suggestions_path = evolution_dir / "suggestions.json"
+
+        if not suggestions_path.exists():
+            return []
+
+        with open(suggestions_path, "r", encoding="utf-8") as f:
+            suggestions = json.load(f)
+
+        result = []
+        for s in suggestions:
+            if status is None or s.get("status") == status:
+                result.append(EvolutionSuggestion(**s))
+
+        # Sort by created_at descending
+        result.sort(key=lambda x: x.created_at, reverse=True)
+        return result[:limit]
+
+    def save_feedback_analysis(
+        self, persona_id: str, analysis: EvolutionFeedbackAnalysis
+    ) -> None:
+        """
+        Save feedback analysis results.
+
+        Args:
+            persona_id: Persona ID
+            analysis: EvolutionFeedbackAnalysis to save
+        """
+        evolution_dir = self._get_evolution_dir(persona_id)
+        analysis_path = evolution_dir / "feedback_analysis.json"
+
+        with open(analysis_path, "w", encoding="utf-8") as f:
+            json.dump(analysis.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
+
+    def load_feedback_analysis(
+        self, persona_id: str
+    ) -> Optional[EvolutionFeedbackAnalysis]:
+        """
+        Load latest feedback analysis.
+
+        Args:
+            persona_id: Persona ID
+
+        Returns:
+            EvolutionFeedbackAnalysis or None if not found
+        """
+        evolution_dir = self._get_evolution_dir(persona_id)
+        analysis_path = evolution_dir / "feedback_analysis.json"
+
+        if not analysis_path.exists():
+            return None
+
+        with open(analysis_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return EvolutionFeedbackAnalysis(**data)
+
+    def save_agent_config(
+        self, persona_id: str, agent_type: str, config: AgentConfig
+    ) -> None:
+        """
+        Save per-persona agent configuration.
+
+        This also updates the persona's agent_configs field.
+
+        Args:
+            persona_id: Persona ID
+            agent_type: Agent type (content, review, discovery)
+            config: AgentConfig to save
+        """
+        # Load persona and update agent_configs
+        persona = self.load_persona(persona_id)
+        if not persona:
+            raise ValueError(f"Persona {persona_id} not found")
+
+        # Update agent_configs
+        if persona.agent_configs is None:
+            persona.agent_configs = {}
+        persona.agent_configs[agent_type] = config
+
+        # Save persona
+        self.save_persona(persona)
+
+    def load_agent_config(
+        self, persona_id: str, agent_type: str
+    ) -> Optional[AgentConfig]:
+        """
+        Load per-persona agent configuration.
+
+        Args:
+            persona_id: Persona ID
+            agent_type: Agent type (content, review, discovery)
+
+        Returns:
+            AgentConfig or None if not found
+        """
+        persona = self.load_persona(persona_id)
+        if not persona or not persona.agent_configs:
+            return None
+
+        config_data = persona.agent_configs.get(agent_type)
+        if config_data is None:
+            return None
+
+        # If it's already an AgentConfig, return it
+        if isinstance(config_data, AgentConfig):
+            return config_data
+
+        # Otherwise parse from dict
+        return AgentConfig(**config_data)
+
+    def get_persona_version(
+        self, persona_id: str, version: str
+    ) -> Optional[Persona]:
+        """
+        Load a specific version of a persona.
+
+        Args:
+            persona_id: Persona ID
+            version: Version string (e.g., "v1.0", "v1.5")
+
+        Returns:
+            Persona at that version or None if not found
+        """
+        versions_dir = self.base_path / "personas" / persona_id / "versions"
+        version_path = versions_dir / f"{version}.yaml"
+
+        if not version_path.exists():
+            return None
+
+        with open(version_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return Persona(**data)
+
+    def list_persona_versions(self, persona_id: str) -> List[str]:
+        """
+        List all available versions of a persona.
+
+        Args:
+            persona_id: Persona ID
+
+        Returns:
+            List of version strings, newest first
+        """
+        versions_dir = self.base_path / "personas" / persona_id / "versions"
+
+        if not versions_dir.exists():
+            return []
+
+        versions = []
+        for version_path in versions_dir.glob("v*.yaml"):
+            versions.append(version_path.stem)
+
+        # Sort by version number descending
+        def version_key(v: str) -> tuple:
+            parts = v.lstrip("v").split(".")
+            return tuple(int(p) for p in parts)
+
+        return sorted(versions, key=version_key, reverse=True)
 
     # ========================================================================
     # Discovery Results (Trending Data)

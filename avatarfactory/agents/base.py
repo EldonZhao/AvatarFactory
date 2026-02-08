@@ -49,6 +49,17 @@ class BaseAgent(ABC):
         # Multi-connector support
         self._connectors: Dict[str, Any] = {}
 
+        # Agent config manager (lazy initialization)
+        self._config_manager: Optional[Any] = None
+
+    @property
+    def config_manager(self) -> Any:
+        """Lazily initialize agent config manager."""
+        if self._config_manager is None:
+            from avatarfactory.core.agent_config import AgentConfigManager
+            self._config_manager = AgentConfigManager(self.kb)
+        return self._config_manager
+
     @abstractmethod
     async def process(self, message: AgentMessage) -> Any:
         """
@@ -82,25 +93,63 @@ class BaseAgent(ABC):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
+        persona_id: Optional[str] = None,
     ) -> str:
         """
         Call LLM with the given prompt.
 
+        Supports per-persona agent configuration when persona_id is provided.
+
         Args:
             prompt: User prompt
             system: System prompt (optional)
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (default, may be overridden by config)
+            max_tokens: Maximum tokens to generate (default, may be overridden by config)
+            persona_id: Optional persona ID for per-persona configuration
 
         Returns:
             LLM response text
         """
         try:
+            # Apply per-persona configuration if available
+            actual_temperature = temperature
+            actual_max_tokens = max_tokens
+            system_additions = None
+
+            if persona_id is not None:
+                config_params = self.config_manager.apply_llm_params(
+                    persona_id=persona_id,
+                    agent_type=self.agent_id,
+                    base_temperature=temperature,
+                    base_max_tokens=max_tokens,
+                )
+                actual_temperature = config_params.get("temperature", temperature)
+                actual_max_tokens = config_params.get("max_tokens", max_tokens)
+                system_additions = config_params.get("system_prompt_additions")
+
+                # Build enhanced system prompt if additions exist
+                if system_additions and system:
+                    system = f"{system}\n\n{system_additions}"
+                elif system_additions:
+                    system = system_additions
+
+                # Add style emphasis if present
+                style_emphasis = config_params.get("style_emphasis", [])
+                if style_emphasis and system:
+                    emphasis_text = "Style emphasis: " + ", ".join(style_emphasis)
+                    system = f"{system}\n\n{emphasis_text}"
+
+                # Add avoid patterns if present
+                avoid_patterns = config_params.get("avoid_patterns", [])
+                if avoid_patterns and system:
+                    avoid_text = "Patterns to avoid: " + ", ".join(avoid_patterns)
+                    system = f"{system}\n\n{avoid_text}"
+
             return await self.llm_provider.generate(
                 prompt=prompt,
                 system=system,
-                temperature=temperature,
-                max_tokens=max_tokens,
+                temperature=actual_temperature,
+                max_tokens=actual_max_tokens,
             )
         except Exception as e:
             self.log("ERROR", f"LLM call failed: {e}")

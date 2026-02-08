@@ -1204,6 +1204,317 @@ def register_routes(app: FastAPI):
             "total_count": len(statuses),
         }
 
+    # -------------------------------------------------------------------------
+    # Evolution
+    # -------------------------------------------------------------------------
+
+    @app.get("/personas/{persona_id}/evolution/suggestions", tags=["Evolution"])
+    async def list_evolution_suggestions(
+        persona_id: str,
+        status: Optional[str] = None,
+        limit: int = 50,
+    ):
+        """List evolution suggestions for a persona."""
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        suggestions = orchestrator.kb.list_evolution_suggestions(
+            persona_id, status=status, limit=limit
+        )
+
+        return {
+            "count": len(suggestions),
+            "suggestions": [s.model_dump(mode="json") for s in suggestions],
+        }
+
+    @app.post("/personas/{persona_id}/evolution/analyze", tags=["Evolution"])
+    async def analyze_evolution(
+        persona_id: str,
+        period: str = "7d",
+        background_tasks: BackgroundTasks = None,
+    ):
+        """
+        Analyze feedback and generate evolution suggestions.
+
+        This runs the evolution analysis which:
+        1. Analyzes review scores and patterns
+        2. Analyzes content performance
+        3. Checks discovery alignment
+        4. Generates improvement suggestions
+        """
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Run analysis
+        from avatarfactory.agents.evolution import EvolutionAgent
+        evolution_agent = EvolutionAgent(
+            knowledge_base=orchestrator.kb,
+            llm_provider=orchestrator.llm_provider,
+        )
+
+        result = await evolution_agent.run_scheduled_evolution(persona_id)
+
+        return {
+            "status": "success",
+            "persona_id": persona_id,
+            "period": period,
+            "suggestions_count": result.get("suggestions_count", 0),
+            "auto_applied_count": result.get("auto_applied_count", 0),
+            "pending_approval": result.get("pending_approval", []),
+        }
+
+    @app.post("/personas/{persona_id}/evolution/suggest", tags=["Evolution"])
+    async def suggest_from_feedback(
+        persona_id: str,
+        feedback: str,
+    ):
+        """
+        Generate evolution suggestions from user feedback.
+
+        Provide natural language feedback like "make the tone more casual"
+        and get specific suggestions for persona changes.
+        """
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Generate suggestions
+        from avatarfactory.agents.evolution import EvolutionAgent
+        evolution_agent = EvolutionAgent(
+            knowledge_base=orchestrator.kb,
+            llm_provider=orchestrator.llm_provider,
+        )
+
+        suggestions = await evolution_agent.generate_suggestions_from_user_input(
+            persona_id, feedback
+        )
+
+        return {
+            "count": len(suggestions),
+            "suggestions": [s.model_dump(mode="json") for s in suggestions],
+        }
+
+    class SuggestionReviewRequest(BaseModel):
+        """Request to review a suggestion."""
+        approved: bool = Field(..., description="Whether to approve the suggestion")
+        rejection_reason: Optional[str] = Field(None, description="Reason for rejection")
+
+    @app.post(
+        "/personas/{persona_id}/evolution/suggestions/{suggestion_id}/review",
+        tags=["Evolution"],
+    )
+    async def review_suggestion(
+        persona_id: str,
+        suggestion_id: str,
+        request: SuggestionReviewRequest,
+    ):
+        """
+        Approve or reject an evolution suggestion.
+
+        Approved suggestions are automatically applied to the persona.
+        """
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Review suggestion
+        from avatarfactory.agents.evolution import EvolutionAgent
+        evolution_agent = EvolutionAgent(
+            knowledge_base=orchestrator.kb,
+            llm_provider=orchestrator.llm_provider,
+        )
+
+        try:
+            suggestion = await evolution_agent.review_suggestion(
+                persona_id,
+                suggestion_id,
+                request.approved,
+                request.rejection_reason,
+            )
+            return {
+                "status": "approved" if request.approved else "rejected",
+                "suggestion": suggestion.model_dump(mode="json"),
+            }
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
+
+    class RollbackRequest(BaseModel):
+        """Request to rollback persona."""
+        version: str = Field(..., description="Version to rollback to (e.g., 'v1.0')")
+
+    @app.post("/personas/{persona_id}/evolution/rollback", tags=["Evolution"])
+    async def rollback_persona(persona_id: str, request: RollbackRequest):
+        """
+        Rollback persona to a previous version.
+        """
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Perform rollback
+        from avatarfactory.agents.evolution import EvolutionAgent
+        evolution_agent = EvolutionAgent(
+            knowledge_base=orchestrator.kb,
+            llm_provider=orchestrator.llm_provider,
+        )
+
+        try:
+            restored = await evolution_agent.rollback_change(persona_id, request.version)
+            return {
+                "status": "success",
+                "restored_from": request.version,
+                "current_version": restored.version,
+                "persona": restored.model_dump(mode="json"),
+            }
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
+
+    @app.get("/personas/{persona_id}/evolution/history", tags=["Evolution"])
+    async def get_evolution_history(persona_id: str):
+        """
+        Get evolution history including version changes and applied suggestions.
+        """
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Get version history
+        versions = orchestrator.kb.get_persona_history(persona_id)
+
+        # Get applied suggestions
+        all_suggestions = orchestrator.kb.list_evolution_suggestions(persona_id)
+        applied_suggestions = [
+            s for s in all_suggestions
+            if s.status.value in ("approved", "auto_applied")
+        ]
+
+        return {
+            "persona_id": persona_id,
+            "current_version": persona.version,
+            "versions": [v.model_dump(mode="json") for v in versions],
+            "available_versions": orchestrator.kb.list_persona_versions(persona_id),
+            "applied_suggestions": [s.model_dump(mode="json") for s in applied_suggestions],
+        }
+
+    # -------------------------------------------------------------------------
+    # Agent Configuration
+    # -------------------------------------------------------------------------
+
+    @app.get("/personas/{persona_id}/agents/{agent_type}/config", tags=["Evolution"])
+    async def get_agent_config(persona_id: str, agent_type: str):
+        """Get agent configuration for a persona."""
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        from avatarfactory.core.agent_config import AgentConfigManager
+        config_manager = AgentConfigManager(orchestrator.kb)
+
+        config = config_manager.get_config(persona_id, agent_type)
+        return {
+            "persona_id": persona_id,
+            "agent_type": agent_type,
+            "config": config.model_dump(),
+        }
+
+    class AgentConfigUpdateRequest(BaseModel):
+        """Request to update agent configuration."""
+        temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+        max_tokens: Optional[int] = Field(None, ge=100, le=8192)
+        creativity_level: Optional[str] = Field(None)
+        detail_level: Optional[str] = Field(None)
+        system_prompt_additions: Optional[str] = Field(None)
+        style_emphasis: Optional[List[str]] = Field(None)
+        avoid_patterns: Optional[List[str]] = Field(None)
+
+    @app.put("/personas/{persona_id}/agents/{agent_type}/config", tags=["Evolution"])
+    async def update_agent_config(
+        persona_id: str,
+        agent_type: str,
+        request: AgentConfigUpdateRequest,
+    ):
+        """Update agent configuration for a persona."""
+        orchestrator = get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        from avatarfactory.core.agent_config import AgentConfigManager
+        config_manager = AgentConfigManager(orchestrator.kb)
+
+        # Build updates from non-None fields
+        updates = {k: v for k, v in request.model_dump().items() if v is not None}
+
+        if not updates:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No updates provided",
+            )
+
+        new_config = config_manager.update_config(persona_id, agent_type, updates)
+
+        return {
+            "status": "updated",
+            "persona_id": persona_id,
+            "agent_type": agent_type,
+            "config": new_config.model_dump(),
+        }
+
 
 # =============================================================================
 # Default Application Instance

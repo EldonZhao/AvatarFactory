@@ -407,6 +407,97 @@ async def run_proactive_optimize(task: ScheduledTask) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Evolution Task Runners
+# =============================================================================
+
+
+@TaskRegistry.register("evolution_analysis")
+async def run_evolution_analysis(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run evolution analysis task - analyze feedback and generate suggestions.
+
+    Expected task params:
+    - persona_id: str
+    - period: str (optional, default: "7d")
+    """
+    import os
+    from avatarfactory.agents.evolution import EvolutionAgent
+    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.llm_provider import LLMProviderFactory
+
+    persona_id = task.persona_id
+    period = task.extra_params.get("period", "7d")
+
+    if not persona_id:
+        return {"success": False, "error": "persona_id required for evolution analysis"}
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+    provider = LLMProviderFactory.from_env()
+
+    agent = EvolutionAgent(knowledge_base=kb, llm_provider=provider)
+
+    try:
+        result = await agent.run_scheduled_evolution(persona_id)
+
+        return {
+            "success": True,
+            "persona_id": persona_id,
+            "suggestions_count": result.get("suggestions_count", 0),
+            "auto_applied_count": result.get("auto_applied_count", 0),
+            "pending_approval": result.get("pending_approval", []),
+            # Include analysis summary for notification
+            "analysis": result.get("analysis", {}),
+        }
+    except Exception as e:
+        logger.error(f"Evolution analysis failed for {persona_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@TaskRegistry.register("retrospective")
+async def run_retrospective(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run retrospective generation task - generate weekly report.
+
+    Expected task params:
+    - persona_id: str
+    - period: str (optional, default: "weekly")
+    """
+    import os
+    from avatarfactory.agents.evolution import EvolutionAgent
+    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.llm_provider import LLMProviderFactory
+
+    persona_id = task.persona_id
+    period = task.extra_params.get("period", "weekly")
+
+    if not persona_id:
+        return {"success": False, "error": "persona_id required for retrospective"}
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+    provider = LLMProviderFactory.from_env()
+
+    agent = EvolutionAgent(knowledge_base=kb, llm_provider=provider)
+
+    try:
+        retrospective = await agent.generate_retrospective(persona_id, period)
+
+        return {
+            "success": True,
+            "persona_id": persona_id,
+            "week": retrospective.get("week"),
+            "summary": retrospective.get("summary", {}),
+            "what_worked": retrospective.get("what_worked", []),
+            "what_didnt": retrospective.get("what_didnt", []),
+            "key_insights": retrospective.get("key_insights", []),
+        }
+    except Exception as e:
+        logger.error(f"Retrospective generation failed for {persona_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# =============================================================================
 # Publish Content Helper
 # =============================================================================
 

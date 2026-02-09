@@ -972,6 +972,7 @@ def register_routes(app: FastAPI):
         height: int = 1050,
         scale: float = 2.0,
         format: str = "a4",
+        output: str = "zip",
     ):
         """
         Export content as multiple PNG images (paginated).
@@ -985,12 +986,16 @@ def register_routes(app: FastAPI):
             height: Page height in pixels (default 1050, A4 content height)
             scale: Device scale factor for higher resolution (default 2.0)
             format: Page format preset - 'a4' (750x1050), 'letter' (765x990),
-                    'mobile' (375x667), 'custom' (use width/height params)
+                    'mobile' (375x667), 'xiaohongshu' (750x1000), 'custom'
+            output: Output format - 'zip' (download ZIP file) or 'json' (base64 JSON)
 
         Returns:
-            JSON with base64-encoded images and metadata
+            ZIP file with PNG images or JSON with base64-encoded images
         """
         import base64
+        import io
+        import zipfile
+        from fastapi.responses import StreamingResponse
 
         # Page format presets (content area in pixels at 96 DPI)
         formats = {
@@ -1089,27 +1094,46 @@ def register_routes(app: FastAPI):
                 # Crop the image
                 cropped = img.crop((0, y_start, img_width, y_end))
 
-                # Convert to base64
+                # Save to buffer
                 buffer = BytesIO()
                 cropped.save(buffer, format="PNG")
                 buffer.seek(0)
+                page_data = buffer.read()
 
                 images.append({
                     "page": i + 1,
-                    "data": base64.b64encode(buffer.read()).decode("utf-8"),
+                    "data": page_data,
+                    "data_b64": base64.b64encode(page_data).decode("utf-8"),
                 })
 
-                await browser.close()
+            # Return as ZIP file or JSON based on output parameter
+            if output == "zip":
+                # Create ZIP file in memory
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for img_data in images:
+                        filename = f"{content_id}_page{img_data['page']:02d}.png"
+                        zf.writestr(filename, img_data["data"])
 
-            return {
-                "content_id": content_id,
-                "title": content.title,
-                "total_pages": num_pages,
-                "width": width,
-                "height": height,
-                "scale": scale,
-                "images": images,
-            }
+                zip_buffer.seek(0)
+                return StreamingResponse(
+                    zip_buffer,
+                    media_type="application/zip",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{content_id}_{format}.zip"'
+                    },
+                )
+            else:
+                # Return JSON with base64 data
+                return {
+                    "content_id": content_id,
+                    "title": content.title,
+                    "total_pages": num_pages,
+                    "width": width,
+                    "height": height,
+                    "scale": scale,
+                    "images": [{"page": img["page"], "data": img["data_b64"]} for img in images],
+                }
 
         except Exception as e:
             raise HTTPException(

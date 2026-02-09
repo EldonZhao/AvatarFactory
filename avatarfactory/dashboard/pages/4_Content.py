@@ -231,7 +231,7 @@ else:
                 # Export dropdown
                 export_format = st.selectbox(
                     "Export",
-                    ["", "📷 Image", "📄 A4 Pages", "📱 Mobile"],
+                    ["", "📷 Image", "📄 A4 Pages", "📱 Mobile", "📕 小红书"],
                     key=f"export_{content_id}",
                     label_visibility="collapsed",
                 )
@@ -239,9 +239,11 @@ else:
                     if export_format == "📷 Image":
                         st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/image)")
                     elif export_format == "📄 A4 Pages":
-                        st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/images?format=a4)")
+                        st.markdown(f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=a4)")
                     elif export_format == "📱 Mobile":
-                        st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/images?format=mobile)")
+                        st.markdown(f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=mobile)")
+                    elif export_format == "📕 小红书":
+                        st.markdown(f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=xiaohongshu)")
 
             with col4:
                 # Checkbox for selection

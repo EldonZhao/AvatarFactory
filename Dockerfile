@@ -27,9 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libpango-1.0-0 \
     libcairo2 \
-    # Chinese fonts for screenshot rendering
+    # Chinese fonts and emoji for screenshot rendering
     fonts-noto-cjk \
+    fonts-noto-color-emoji \
     fonts-wqy-zenhei \
+    fonts-symbola \
     fontconfig \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -fv

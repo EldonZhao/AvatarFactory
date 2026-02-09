@@ -1043,29 +1043,61 @@ def register_routes(app: FastAPI):
                 # Get full page height
                 full_height = await page.evaluate("document.body.scrollHeight")
 
-                # Calculate number of pages
-                num_pages = (full_height + height - 1) // height
+                # Resize viewport to full height for full page screenshot
+                await page.set_viewport_size({"width": width, "height": full_height})
+                await page.wait_for_timeout(200)
 
-                images = []
-                for i in range(num_pages):
-                    y_offset = i * height
-                    remaining_height = min(height, full_height - y_offset)
+                # Take full page screenshot first
+                full_screenshot = await page.screenshot(full_page=True, type="png")
 
-                    # Take screenshot of current viewport
-                    screenshot = await page.screenshot(
-                        type="png",
-                        clip={
-                            "x": 0,
-                            "y": y_offset,
-                            "width": width,
-                            "height": remaining_height,
-                        },
-                    )
+                await browser.close()
 
-                    images.append({
-                        "page": i + 1,
-                        "data": base64.b64encode(screenshot).decode("utf-8"),
-                    })
+            # Split the full screenshot into pages using PIL
+            from io import BytesIO
+            try:
+                from PIL import Image
+            except ImportError:
+                # If PIL not available, return single image
+                return {
+                    "content_id": content_id,
+                    "title": content.title,
+                    "total_pages": 1,
+                    "width": width,
+                    "height": full_height,
+                    "scale": scale,
+                    "images": [{
+                        "page": 1,
+                        "data": base64.b64encode(full_screenshot).decode("utf-8"),
+                    }],
+                }
+
+            # Open the full screenshot
+            img = Image.open(BytesIO(full_screenshot))
+            img_width, img_height = img.size
+
+            # Calculate page height in pixels (accounting for scale)
+            page_height_px = int(height * scale)
+
+            # Calculate number of pages
+            num_pages = max(1, (img_height + page_height_px - 1) // page_height_px)
+
+            images = []
+            for i in range(num_pages):
+                y_start = i * page_height_px
+                y_end = min((i + 1) * page_height_px, img_height)
+
+                # Crop the image
+                cropped = img.crop((0, y_start, img_width, y_end))
+
+                # Convert to base64
+                buffer = BytesIO()
+                cropped.save(buffer, format="PNG")
+                buffer.seek(0)
+
+                images.append({
+                    "page": i + 1,
+                    "data": base64.b64encode(buffer.read()).decode("utf-8"),
+                })
 
                 await browser.close()
 

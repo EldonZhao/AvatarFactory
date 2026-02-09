@@ -32,5 +32,6 @@ streamlit-agraph>=0.0.45
 
 # Screenshot / Image Export
 playwright>=1.40.0
+Pillow>=10.0.0
 
 # Note: video (moviepy), edge-tts and Pillow excluded to simplify build

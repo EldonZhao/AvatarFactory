@@ -218,7 +218,31 @@ for message in st.session_state.chat_messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Chat input
+# Quick actions - placed above chat input for better UX
+st.markdown("##### Quick Commands")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    if st.button("📝 Generate", key="quick_generate", use_container_width=True):
+        st.session_state.chat_messages.append({"role": "user", "content": "Generate content for my persona"})
+        st.rerun()
+
+with col2:
+    if st.button("🔍 Trends", key="quick_discover", use_container_width=True):
+        st.session_state.chat_messages.append({"role": "user", "content": "Discover trending topics"})
+        st.rerun()
+
+with col3:
+    if st.button("📊 Stats", key="quick_stats", use_container_width=True):
+        st.session_state.chat_messages.append({"role": "user", "content": "Show my content statistics"})
+        st.rerun()
+
+with col4:
+    if st.button("🔄 Evolve", key="quick_suggestions", use_container_width=True):
+        st.session_state.chat_messages.append({"role": "user", "content": "Show pending evolution suggestions"})
+        st.rerun()
+
+# Chat input (fixed at bottom by Streamlit)
 if prompt := st.chat_input("Type your message..."):
     # Add user message to history
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
@@ -253,29 +277,3 @@ if prompt := st.chat_input("Type your message..."):
     # Check if evolution suggestions were generated (refresh sidebar)
     if any(keyword in prompt.lower() for keyword in ["更", "改", "调整", "优化", "casual", "formal", "shorter", "longer"]):
         st.session_state.evolution_refresh += 1
-
-# Quick actions
-st.divider()
-st.markdown("### Quick Commands")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    if st.button("📝 Generate Content", key="quick_generate"):
-        st.session_state.chat_messages.append({"role": "user", "content": "Generate content for my persona"})
-        st.rerun()
-
-with col2:
-    if st.button("🔍 Discover Trends", key="quick_discover"):
-        st.session_state.chat_messages.append({"role": "user", "content": "Discover trending topics"})
-        st.rerun()
-
-with col3:
-    if st.button("📊 Show Stats", key="quick_stats"):
-        st.session_state.chat_messages.append({"role": "user", "content": "Show my content statistics"})
-        st.rerun()
-
-with col4:
-    if st.button("🔄 Show Suggestions", key="quick_suggestions"):
-        st.session_state.chat_messages.append({"role": "user", "content": "Show pending evolution suggestions"})
-        st.rerun()

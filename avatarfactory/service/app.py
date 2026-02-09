@@ -880,6 +880,211 @@ def register_routes(app: FastAPI):
 """
         return HTMLResponse(content=html)
 
+    @app.get("/content/{content_id}/image", tags=["Content"])
+    async def export_content_image(
+        content_id: str,
+        width: int = 800,
+        scale: float = 2.0,
+    ):
+        """
+        Export content as PNG image.
+
+        Args:
+            content_id: Content ID to export
+            width: Image width in pixels (default 800)
+            scale: Device scale factor for higher resolution (default 2.0)
+
+        Returns:
+            PNG image of the rendered content
+        """
+        import io
+        from fastapi.responses import StreamingResponse
+
+        orchestrator = get_orchestrator()
+
+        # Check if content exists
+        content = orchestrator.kb.load_content(content_id, status="draft")
+        if not content:
+            content = orchestrator.kb.load_content(content_id, status="published")
+
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Content {content_id} not found",
+            )
+
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Playwright not installed. Install with: pip install playwright && playwright install chromium",
+            )
+
+        # Get the view URL
+        # Use internal URL for self-request
+        import os
+        service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
+        view_url = f"{service_url}/content/{content_id}/view"
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page(
+                    viewport={"width": width, "height": 800},
+                    device_scale_factor=scale,
+                )
+
+                await page.goto(view_url, wait_until="networkidle")
+
+                # Wait for marked.js to render
+                await page.wait_for_timeout(500)
+
+                # Get full page height
+                height = await page.evaluate("document.body.scrollHeight")
+
+                # Resize viewport to full height
+                await page.set_viewport_size({"width": width, "height": height})
+
+                # Take screenshot
+                screenshot = await page.screenshot(full_page=True, type="png")
+
+                await browser.close()
+
+            return StreamingResponse(
+                io.BytesIO(screenshot),
+                media_type="image/png",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{content_id}.png"'
+                },
+            )
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Screenshot failed: {str(e)}",
+            )
+
+    @app.get("/content/{content_id}/images", tags=["Content"])
+    async def export_content_images_paginated(
+        content_id: str,
+        width: int = 750,
+        height: int = 1050,
+        scale: float = 2.0,
+        format: str = "a4",
+    ):
+        """
+        Export content as multiple PNG images (paginated).
+
+        Splits long content into multiple images of specified height.
+        Default dimensions match A4 paper content area (with margins).
+
+        Args:
+            content_id: Content ID to export
+            width: Image width in pixels (default 750, A4 content width)
+            height: Page height in pixels (default 1050, A4 content height)
+            scale: Device scale factor for higher resolution (default 2.0)
+            format: Page format preset - 'a4' (750x1050), 'letter' (765x990),
+                    'mobile' (375x667), 'custom' (use width/height params)
+
+        Returns:
+            JSON with base64-encoded images and metadata
+        """
+        import base64
+
+        # Page format presets (content area in pixels at 96 DPI)
+        formats = {
+            "a4": (750, 1050),        # A4 with margins
+            "letter": (765, 990),     # US Letter with margins
+            "mobile": (375, 667),     # iPhone SE viewport
+            "xiaohongshu": (750, 1000),  # 小红书推荐比例
+        }
+
+        if format in formats:
+            width, height = formats[format]
+
+        orchestrator = get_orchestrator()
+
+        # Check if content exists
+        content = orchestrator.kb.load_content(content_id, status="draft")
+        if not content:
+            content = orchestrator.kb.load_content(content_id, status="published")
+
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Content {content_id} not found",
+            )
+
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Playwright not installed. Install with: pip install playwright && playwright install chromium",
+            )
+
+        # Get the view URL
+        import os
+        service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
+        view_url = f"{service_url}/content/{content_id}/view"
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    device_scale_factor=scale,
+                )
+
+                await page.goto(view_url, wait_until="networkidle")
+                await page.wait_for_timeout(500)
+
+                # Get full page height
+                full_height = await page.evaluate("document.body.scrollHeight")
+
+                # Calculate number of pages
+                num_pages = (full_height + height - 1) // height
+
+                images = []
+                for i in range(num_pages):
+                    y_offset = i * height
+                    remaining_height = min(height, full_height - y_offset)
+
+                    # Take screenshot of current viewport
+                    screenshot = await page.screenshot(
+                        type="png",
+                        clip={
+                            "x": 0,
+                            "y": y_offset,
+                            "width": width,
+                            "height": remaining_height,
+                        },
+                    )
+
+                    images.append({
+                        "page": i + 1,
+                        "data": base64.b64encode(screenshot).decode("utf-8"),
+                    })
+
+                await browser.close()
+
+            return {
+                "content_id": content_id,
+                "title": content.title,
+                "total_pages": num_pages,
+                "width": width,
+                "height": height,
+                "scale": scale,
+                "images": images,
+            }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Screenshot failed: {str(e)}",
+            )
+
     # -------------------------------------------------------------------------
     # Scheduler
     # -------------------------------------------------------------------------

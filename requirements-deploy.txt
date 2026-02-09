@@ -30,4 +30,7 @@ uvicorn>=0.27.0
 streamlit>=1.28.0
 streamlit-agraph>=0.0.45
 
+# Screenshot / Image Export
+playwright>=1.40.0
+
 # Note: video (moviepy), edge-tts and Pillow excluded to simplify build

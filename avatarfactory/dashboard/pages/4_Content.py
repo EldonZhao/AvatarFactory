@@ -210,7 +210,7 @@ else:
         score = content.get("review_score")
 
         with st.container():
-            col1, col2, col3, col4 = st.columns([4, 2, 1, 1])
+            col1, col2, col3, col4, col5 = st.columns([4, 1, 2, 1, 1])
 
             with col1:
                 st.markdown(f"**{title}**")
@@ -228,6 +228,22 @@ else:
                     st.caption("Not reviewed")
 
             with col3:
+                # Export dropdown
+                export_format = st.selectbox(
+                    "Export",
+                    ["", "📷 Image", "📄 A4 Pages", "📱 Mobile"],
+                    key=f"export_{content_id}",
+                    label_visibility="collapsed",
+                )
+                if export_format:
+                    if export_format == "📷 Image":
+                        st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/image)")
+                    elif export_format == "📄 A4 Pages":
+                        st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/images?format=a4)")
+                    elif export_format == "📱 Mobile":
+                        st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/images?format=mobile)")
+
+            with col4:
                 # Checkbox for selection
                 is_selected = content_id in st.session_state.selected_contents
                 if st.checkbox("Select", value=is_selected, key=f"sel_{content_id}", label_visibility="collapsed"):
@@ -236,7 +252,7 @@ else:
                 elif content_id in st.session_state.selected_contents:
                     st.session_state.selected_contents.remove(content_id)
 
-            with col4:
+            with col5:
                 # Link to HTML view page
                 api_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
                 view_url = f"{api_url}/content/{content_id}/view"

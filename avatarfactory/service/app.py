@@ -703,13 +703,13 @@ def register_routes(app: FastAPI):
             margin-bottom: 20px;
         }}
         .title {{
-            font-size: 24px;
+            font-size: 28px;
             color: #1a1a1a;
             margin-bottom: 12px;
             font-weight: 600;
         }}
         .meta {{
-            font-size: 14px;
+            font-size: 16px;
             color: #666;
             display: flex;
             flex-wrap: wrap;
@@ -730,13 +730,13 @@ def register_routes(app: FastAPI):
         .score-medium {{ background: #fff3e0; color: #ef6c00; }}
         .score-low {{ background: #ffebee; color: #c62828; }}
         .content {{
-            font-size: 16px;
+            font-size: 18px;
             color: #333;
         }}
-        .content h1 {{ font-size: 24px; margin: 24px 0 16px; color: #1a1a1a; font-weight: 600; }}
-        .content h2 {{ font-size: 20px; margin: 20px 0 12px; color: #1a1a1a; font-weight: 600; }}
-        .content h3 {{ font-size: 18px; margin: 16px 0 10px; color: #333; font-weight: 600; }}
-        .content h4 {{ font-size: 16px; margin: 14px 0 8px; color: #333; font-weight: 600; }}
+        .content h1 {{ font-size: 28px; margin: 24px 0 16px; color: #1a1a1a; font-weight: 600; }}
+        .content h2 {{ font-size: 24px; margin: 20px 0 12px; color: #1a1a1a; font-weight: 600; }}
+        .content h3 {{ font-size: 20px; margin: 16px 0 10px; color: #333; font-weight: 600; }}
+        .content h4 {{ font-size: 18px; margin: 14px 0 8px; color: #333; font-weight: 600; }}
         .content p {{ margin-bottom: 16px; }}
         .content ul, .content ol {{
             margin: 16px 0;
@@ -750,7 +750,7 @@ def register_routes(app: FastAPI):
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 16px;
             color: #e83e8c;
         }}
         .content pre {{
@@ -821,9 +821,9 @@ def register_routes(app: FastAPI):
             display: inline-block;
             background: #e3f2fd;
             color: #1976d2;
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 16px;
-            font-size: 13px;
+            font-size: 15px;
             margin-right: 8px;
             margin-bottom: 8px;
         }}
@@ -831,7 +831,7 @@ def register_routes(app: FastAPI):
             margin-top: 24px;
             padding-top: 16px;
             border-top: 1px solid #eee;
-            font-size: 12px;
+            font-size: 14px;
             color: #999;
             text-align: center;
         }}

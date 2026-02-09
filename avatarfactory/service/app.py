@@ -851,8 +851,6 @@ def register_routes(app: FastAPI):
             <h1 class="title">{html_lib.escape(content.title)}</h1>
             <div class="meta">
                 <span>👤 {html_lib.escape(persona_name)}</span>
-                <span>📱 {content.platform.value}</span>
-                <span class="status-badge">{content_status}</span>
                 {score_html}
             </div>
         </div>

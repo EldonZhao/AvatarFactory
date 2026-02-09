@@ -5,7 +5,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install runtime dependencies + build tools for pip packages + nginx + playwright deps
+# Install runtime dependencies + build tools for pip packages + nginx + playwright deps + fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gcc \
@@ -27,7 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libpango-1.0-0 \
     libcairo2 \
-    && rm -rf /var/lib/apt/lists/*
+    # Chinese fonts for screenshot rendering
+    fonts-noto-cjk \
+    fonts-wqy-zenhei \
+    fontconfig \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -fv
 
 # Install Python dependencies directly (no build stage)
 COPY requirements-deploy.txt requirements.txt

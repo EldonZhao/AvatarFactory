@@ -187,6 +187,24 @@ class DashboardDataProvider:
             "wecom": {
                 "env_keys": ["AVATARFACTORY_WEBHOOK_URL"],
             },
+            "linkedin": {
+                "env_keys": ["LINKEDIN_ACCESS_TOKEN"],
+            },
+            "threads": {
+                "env_keys": ["THREADS_ACCESS_TOKEN"],
+            },
+            "instagram": {
+                "env_keys": ["INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_BUSINESS_ACCOUNT_ID"],
+            },
+            "weibo": {
+                "env_keys": ["WEIBO_ACCESS_TOKEN"],
+            },
+            "mastodon": {
+                "env_keys": ["MASTODON_ACCESS_TOKEN"],
+            },
+            "toutiao": {
+                "env_keys": ["TOUTIAO_ACCESS_TOKEN"],
+            },
         }
 
         statuses = []

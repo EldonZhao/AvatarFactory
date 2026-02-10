@@ -21,6 +21,9 @@ from avatarfactory.connectors.registry import ConnectorRegistry
 # Import connectors to trigger registration
 from avatarfactory.connectors import twitter, bluesky, xiaohongshu, wecom
 
+# Import new connectors
+from avatarfactory.connectors import linkedin, threads, instagram, weibo, mastodon, toutiao
+
 __all__ = [
     "BasePlatformConnector",
     "ConnectorConfig",

@@ -9,6 +9,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 import streamlit as st
 
 from avatarfactory.dashboard.data import DashboardDataProvider
@@ -104,6 +108,68 @@ platform_info = {
         },
         "docs_url": "https://developer.work.weixin.qq.com/document/path/91770",
     },
+    "linkedin": {
+        "name": "LinkedIn",
+        "icon": "💼",
+        "description": "LinkedIn OAuth 2.0 for professional content",
+        "env_vars": {
+            "LINKEDIN_ACCESS_TOKEN": "OAuth 2.0 access token",
+            "LINKEDIN_CLIENT_ID": "Client ID from developer portal (optional)",
+            "LINKEDIN_CLIENT_SECRET": "Client Secret (optional)",
+            "LINKEDIN_ORGANIZATION_ID": "Organization ID for company pages (optional)",
+        },
+        "docs_url": "https://www.linkedin.com/developers/apps",
+    },
+    "threads": {
+        "name": "Threads",
+        "icon": "🧵",
+        "description": "Threads (Meta) Graph API",
+        "env_vars": {
+            "THREADS_ACCESS_TOKEN": "Access token from Meta developer portal",
+            "THREADS_USER_ID": "Your Threads user ID",
+        },
+        "docs_url": "https://developers.facebook.com/docs/threads",
+    },
+    "instagram": {
+        "name": "Instagram",
+        "icon": "📸",
+        "description": "Instagram Business Graph API",
+        "env_vars": {
+            "INSTAGRAM_ACCESS_TOKEN": "Access token from Meta developer portal",
+            "INSTAGRAM_BUSINESS_ACCOUNT_ID": "Instagram Business Account ID",
+        },
+        "docs_url": "https://developers.facebook.com/docs/instagram-api",
+    },
+    "weibo": {
+        "name": "Weibo",
+        "icon": "🔴",
+        "description": "Weibo (微博) OAuth 2.0",
+        "env_vars": {
+            "WEIBO_ACCESS_TOKEN": "OAuth 2.0 access token",
+            "WEIBO_UID": "Your Weibo user ID",
+            "WEIBO_APP_KEY": "App key (optional)",
+        },
+        "docs_url": "https://open.weibo.com/",
+    },
+    "mastodon": {
+        "name": "Mastodon",
+        "icon": "🐘",
+        "description": "Mastodon/Fediverse - Works with any instance",
+        "env_vars": {
+            "MASTODON_ACCESS_TOKEN": "Access token from your instance settings",
+            "MASTODON_INSTANCE_URL": "Your instance URL (e.g., https://mastodon.social)",
+        },
+        "docs_url": "https://docs.joinmastodon.org/client/token/",
+    },
+    "toutiao": {
+        "name": "Toutiao",
+        "icon": "📰",
+        "description": "今日头条/头条号 - Bytedance content platform",
+        "env_vars": {
+            "TOUTIAO_ACCESS_TOKEN": "OAuth 2.0 access token from Toutiao Open Platform",
+        },
+        "docs_url": "https://open.mp.toutiao.com/",
+    },
 }
 
 # Display connector cards
@@ -191,6 +257,25 @@ with st.expander("How to configure connectors"):
     TWITTER_API_KEY=your_api_key
     TWITTER_API_SECRET=your_api_secret
     TWITTER_ACCESS_TOKEN=your_access_token
+
+    # LinkedIn
+    LINKEDIN_ACCESS_TOKEN=your_access_token
+
+    # Threads
+    THREADS_ACCESS_TOKEN=your_access_token
+    THREADS_USER_ID=your_user_id
+
+    # Instagram
+    INSTAGRAM_ACCESS_TOKEN=your_access_token
+    INSTAGRAM_BUSINESS_ACCOUNT_ID=your_account_id
+
+    # Weibo
+    WEIBO_ACCESS_TOKEN=your_access_token
+    WEIBO_UID=your_user_id
+
+    # Mastodon
+    MASTODON_ACCESS_TOKEN=your_access_token
+    MASTODON_INSTANCE_URL=https://mastodon.social
 
     # Notifications (system-level, shared by all personas)
     AVATARFACTORY_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx

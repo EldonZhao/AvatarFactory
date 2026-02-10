@@ -255,6 +255,7 @@ def create_app(
     title: str = "AvatarFactory API",
     version: str = "1.0.0",
     enable_cors: bool = True,
+    enable_multi_tenancy: bool = False,  # Disabled by default for safety
 ) -> FastAPI:
     """
     Create and configure FastAPI application.
@@ -263,6 +264,7 @@ def create_app(
         title: API title
         version: API version
         enable_cors: Whether to enable CORS middleware
+        enable_multi_tenancy: Whether to enable multi-tenancy support (default: False)
 
     Returns:
         Configured FastAPI application
@@ -282,6 +284,25 @@ def create_app(
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    # Add multi-tenancy support (opt-in, disabled by default)
+    if enable_multi_tenancy:
+        try:
+            from avatarfactory.middleware.auth import TenantAuthMiddleware
+            from avatarfactory.service.tenant_api import (
+                create_admin_router,
+                create_tenant_router,
+            )
+
+            # Add auth middleware
+            application.add_middleware(TenantAuthMiddleware)
+
+            # Add tenant API routes
+            application.include_router(create_admin_router())
+            application.include_router(create_tenant_router())
+        except ImportError:
+            # Multi-tenancy dependencies not installed
+            pass
 
     # Register routes
     register_routes(application)
@@ -1370,6 +1391,11 @@ def register_routes(app: FastAPI):
             "twitter": ["TWITTER_API_KEY"],
             "xiaohongshu": ["XIAOHONGSHU_COOKIE"],
             "wecom": ["AVATARFACTORY_WEBHOOK_URL"],
+            "linkedin": ["LINKEDIN_ACCESS_TOKEN"],
+            "threads": ["THREADS_ACCESS_TOKEN"],
+            "instagram": ["INSTAGRAM_ACCESS_TOKEN"],
+            "weibo": ["WEIBO_ACCESS_TOKEN"],
+            "mastodon": ["MASTODON_ACCESS_TOKEN"],
         }
 
         for platform, env_keys in connector_configs.items():
@@ -1440,6 +1466,26 @@ def register_routes(app: FastAPI):
             "wecom": {
                 "env_keys": ["AVATARFACTORY_WEBHOOK_URL"],
                 "description": "WeChat Work notifications",
+            },
+            "linkedin": {
+                "env_keys": ["LINKEDIN_ACCESS_TOKEN"],
+                "description": "LinkedIn OAuth 2.0",
+            },
+            "threads": {
+                "env_keys": ["THREADS_ACCESS_TOKEN"],
+                "description": "Threads (Meta) Graph API",
+            },
+            "instagram": {
+                "env_keys": ["INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_BUSINESS_ACCOUNT_ID"],
+                "description": "Instagram Business Graph API",
+            },
+            "weibo": {
+                "env_keys": ["WEIBO_ACCESS_TOKEN"],
+                "description": "Weibo (微博) OAuth 2.0",
+            },
+            "mastodon": {
+                "env_keys": ["MASTODON_ACCESS_TOKEN"],
+                "description": "Mastodon/Fediverse",
             },
         }
 

@@ -148,3 +148,67 @@ class ConnectorRegistry:
         """Clear all registered connectors (for testing)."""
         cls._connectors.clear()
         cls._instances.clear()
+
+    @classmethod
+    def get_for_tenant(
+        cls,
+        platform: str,
+        tenant_id: str,
+        kb_path: str = "./knowledges",
+        use_cache: bool = False,
+    ) -> BasePlatformConnector:
+        """
+        Get a connector configured for a specific tenant.
+
+        Loads credentials from the tenant's configuration and creates
+        a connector instance with those credentials.
+
+        Args:
+            platform: Platform name
+            tenant_id: Tenant ID
+            kb_path: Knowledge base path
+            use_cache: Whether to cache connector instances
+
+        Returns:
+            Configured connector instance
+
+        Raises:
+            ValueError: If platform is not registered or tenant has no credentials
+        """
+        # Import here to avoid circular dependency
+        from avatarfactory.core.tenant import TenantManager
+
+        platform_key = platform.lower()
+        connector_class = cls._connectors.get(platform_key)
+
+        if not connector_class:
+            available = ", ".join(cls._connectors.keys())
+            raise ValueError(
+                f"Unknown platform: {platform}. "
+                f"Available platforms: {available}"
+            )
+
+        # Get credentials for this tenant
+        tenant_manager = TenantManager(kb_path)
+        credentials = tenant_manager.get_connector_credentials(tenant_id, platform_key)
+
+        if not credentials:
+            raise ValueError(
+                f"No credentials configured for platform '{platform}' "
+                f"in tenant '{tenant_id}'"
+            )
+
+        # Create config from credentials
+        config = ConnectorConfig(**credentials)
+
+        # Check cache
+        if use_cache:
+            cache_key = f"{tenant_id}:{platform_key}"
+            if cache_key in cls._instances:
+                return cls._instances[cache_key]
+
+            instance = connector_class(config)
+            cls._instances[cache_key] = instance
+            return instance
+
+        return connector_class(config)

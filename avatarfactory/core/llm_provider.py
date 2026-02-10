@@ -292,3 +292,49 @@ class LLMProviderFactory:
     def list_providers(cls) -> list[str]:
         """List available providers"""
         return list(cls._providers.keys())
+
+    @classmethod
+    def create_for_tenant(
+        cls,
+        tenant_id: str,
+        kb_path: str = "./knowledges",
+    ) -> BaseLLMProvider:
+        """
+        Create LLM provider for a specific tenant.
+
+        Loads LLM configuration from the tenant's config, including
+        decrypted API key and provider settings.
+
+        If tenant has no LLM config, falls back to environment variables.
+
+        Args:
+            tenant_id: Tenant ID
+            kb_path: Knowledge base path
+
+        Returns:
+            LLM provider instance configured for the tenant
+        """
+        # Import here to avoid circular dependency
+        from avatarfactory.core.tenant import TenantManager
+
+        tenant_manager = TenantManager(kb_path)
+        llm_config = tenant_manager.get_llm_config(tenant_id)
+
+        if not llm_config or not llm_config.api_key_encrypted:
+            # Fallback to environment-based config
+            return cls.from_env()
+
+        # Decrypt the API key
+        api_key = tenant_manager.get_decrypted_llm_api_key(tenant_id)
+
+        # Build kwargs based on provider
+        kwargs: Dict[str, Any] = {
+            "model": llm_config.model,
+            "api_key": api_key,
+        }
+
+        if llm_config.provider == "azure_openai":
+            kwargs["endpoint"] = llm_config.azure_endpoint
+            kwargs["api_version"] = llm_config.azure_api_version
+
+        return cls.create(llm_config.provider, **kwargs)

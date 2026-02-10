@@ -34,4 +34,7 @@ streamlit-agraph>=0.0.45
 playwright>=1.40.0
 Pillow>=10.0.0
 
+# Encryption (for multi-tenant credential management)
+cryptography>=42.0.0
+
 # Note: video (moviepy), edge-tts and Pillow excluded to simplify build

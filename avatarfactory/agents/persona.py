@@ -15,6 +15,7 @@ from avatarfactory.models.schemas import (
     Boundaries,
     ContentPillar,
     Identity,
+    NotificationConfig,
     Persona,
     PersonaVersion,
     PlatformType,
@@ -139,6 +140,8 @@ Provide a complete persona configuration in JSON format."""
             ],
             boundaries=Boundaries(**persona_data["boundaries"]),
             platforms=[PlatformType(target_platform)],
+            # Enable notifications by default for new personas
+            notification=NotificationConfig(enabled=True),
         )
 
         # Save to knowledges

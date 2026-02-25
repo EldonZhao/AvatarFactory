@@ -120,6 +120,7 @@ def run_full_service(
             port=port,
             reload=reload,
             log_level="info",
+            timeout_keep_alive=300,  # 5 minutes keep-alive timeout for long LLM calls
         )
     except KeyboardInterrupt:
         logger.info("Service stopped by user")

@@ -198,6 +198,15 @@ with col_right:
         task_type = task.get("task_type", "unknown")
         type_counts[task_type] = type_counts.get(task_type, 0) + 1
 
+    # Display name mapping for task types
+    type_display_names = {
+        "discovery": "Discovery",
+        "content": "Content",
+        "publish": "Publish",
+        "evolution_analysis": "Evolution",
+    }
+
     if type_counts:
         for task_type, count in sorted(type_counts.items()):
-            st.markdown(f"**{task_type.capitalize()}:** {count}")
+            display_name = type_display_names.get(task_type, task_type.replace("_", " ").title())
+            st.markdown(f"**{display_name}:** {count}")

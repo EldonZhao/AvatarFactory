@@ -360,8 +360,18 @@ def register_routes(app: FastAPI):
 
         try:
             result = await orchestrator.process(message)
+
+            # Handle new result format: {"status": "success", "data": {...}}
+            if result.get("status") == "error":
+                return ChatResponse(
+                    response=result.get("message", "An error occurred"),
+                    metadata=result,
+                )
+
+            # Extract data from nested structure
+            data = result.get("data", result)
             return ChatResponse(
-                response=result.get("message", str(result)),
+                response=data.get("message", str(data)),
                 metadata=result,
             )
         except Exception as e:
@@ -460,10 +470,29 @@ def register_routes(app: FastAPI):
 
         try:
             result = await orchestrator.process(message)
-            persona_data = result.get("persona", {})
+
+            # Handle new result format: {"status": "success", "data": {...}}
+            if result.get("status") == "error":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=result.get("message", "Failed to create persona"),
+                )
+
+            # Extract persona data from nested structure
+            data = result.get("data", result)
+            persona_data = data.get("persona", {})
 
             # Build response with all available fields
             identity = persona_data.get("identity", {})
+
+            # Convert datetime to string if needed
+            created_at = persona_data.get("created_at")
+            updated_at = persona_data.get("updated_at")
+            if hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
+            if hasattr(updated_at, 'isoformat'):
+                updated_at = updated_at.isoformat()
+
             return PersonaResponse(
                 id=persona_data.get("id", ""),
                 version=persona_data.get("version", "v1.0"),
@@ -476,8 +505,8 @@ def register_routes(app: FastAPI):
                 boundaries=persona_data.get("boundaries"),
                 platforms=persona_data.get("platforms", []),
                 notification=persona_data.get("notification"),
-                created_at=persona_data.get("created_at"),
-                updated_at=persona_data.get("updated_at"),
+                created_at=created_at,
+                updated_at=updated_at,
             )
         except Exception as e:
             raise HTTPException(

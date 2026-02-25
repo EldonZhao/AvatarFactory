@@ -539,6 +539,26 @@ class Scheduler:
         if not webhook_url:
             return
 
+        # Check if persona has notifications enabled
+        if task.persona_id:
+            from avatarfactory.core.knowledges import KnowledgeBase
+            kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+            kb = KnowledgeBase(kb_path)
+            persona = kb.load_persona(task.persona_id)
+            if persona:
+                # Check if persona has notification disabled
+                if persona.notification is None or not persona.notification.enabled:
+                    logger.debug(f"Skipping notification for persona {task.persona_id}: notifications disabled")
+                    return
+
+                # Check notification type preferences
+                if task.task_type == "discovery" and not persona.notification.notify_on_discovery:
+                    logger.debug(f"Skipping discovery notification for persona {task.persona_id}")
+                    return
+                if task.task_type == "content" and not persona.notification.notify_on_content:
+                    logger.debug(f"Skipping content notification for persona {task.persona_id}")
+                    return
+
         # Only send webhook notifications for discovery and content tasks
         if task.task_type == "discovery":
             # Discovery: Use markdown format for detailed report
@@ -763,6 +783,18 @@ class Scheduler:
         webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
         if not webhook_url:
             return
+
+        # Check if persona has notifications enabled
+        if task.persona_id:
+            from avatarfactory.core.knowledges import KnowledgeBase
+            kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+            kb = KnowledgeBase(kb_path)
+            persona = kb.load_persona(task.persona_id)
+            if persona:
+                # Check if persona has notification disabled
+                if persona.notification is None or not persona.notification.enabled:
+                    logger.debug(f"Skipping error notification for persona {task.persona_id}: notifications disabled")
+                    return
 
         # Build error notification using markdown format
         content = f"### ❌ 任务失败: {task.name}\n\n"

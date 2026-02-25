@@ -54,14 +54,28 @@ def render_task_timeline(
         "content": "📝",
         "publish": "📤",
         "report": "📊",
+        "evolution_analysis": "🔄",
         "proactive_trending": "🔍",
         "proactive_content": "📝",
         "proactive_optimize": "⚙️",
     }
 
+    # Display name mapping for task types
+    type_display_names = {
+        "discovery": "Discovery",
+        "content": "Content",
+        "publish": "Publish",
+        "report": "Report",
+        "evolution_analysis": "Evolution",
+        "proactive_trending": "Trending",
+        "proactive_content": "Content",
+        "proactive_optimize": "Optimize",
+    }
+
     for task_type, type_tasks in task_types.items():
         icon = type_icons.get(task_type, "📌")
-        st.markdown(f"### {icon} {task_type.replace('proactive_', '').capitalize()} Tasks")
+        display_name = type_display_names.get(task_type, task_type.replace("_", " ").title())
+        st.markdown(f"### {icon} {display_name} Tasks")
 
         for task in type_tasks:
             task_id = task["id"]

@@ -35,6 +35,34 @@ if "chat_persona_id" not in st.session_state:
 if "evolution_refresh" not in st.session_state:
     st.session_state.evolution_refresh = 0
 
+# Track pending message to send (for quick commands)
+if "pending_message" not in st.session_state:
+    st.session_state.pending_message = None
+
+
+def send_chat_message(message: str) -> str:
+    """Send a message to the chat API and return the response."""
+    try:
+        with httpx.Client(timeout=180) as client:
+            response = client.post(
+                f"{api_url}/chat",
+                json={
+                    "message": message,
+                    "persona_id": st.session_state.chat_persona_id
+                }
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("response", "No response")
+            else:
+                return f"Error: {response.status_code} - {response.text}"
+    except httpx.TimeoutException:
+        return "Request timed out. The operation may still be processing. Please check back later."
+    except httpx.ConnectError:
+        return "Connection error: Could not connect to API server. Please ensure the service is running."
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 
 def fetch_pending_suggestions(persona_id: str) -> list:
     """Fetch pending evolution suggestions for a persona."""
@@ -109,16 +137,32 @@ with st.sidebar:
     except Exception:
         personas = []
 
-    persona_options = {"None (General)": None}
-    for p in personas:
-        persona_options[f"{p.get('name', 'Unknown')} ({p.get('id', '')[:12]}...)"] = p.get("id")
+    # Handle no personas case
+    if not personas:
+        st.warning("No personas found. Please create a persona first.")
+        st.session_state.chat_persona_id = None
+    else:
+        # Build persona options without None option
+        persona_options = {}
+        for p in personas:
+            persona_options[f"{p.get('name', 'Unknown')} ({p.get('id', '')[:12]}...)"] = p.get("id")
 
-    selected_label = st.selectbox(
-        "Active Persona",
-        list(persona_options.keys()),
-        key="chat_persona_select"
-    )
-    st.session_state.chat_persona_id = persona_options[selected_label]
+        # Get current selection index
+        current_labels = list(persona_options.keys())
+        current_index = 0
+        if st.session_state.chat_persona_id:
+            for i, pid in enumerate(persona_options.values()):
+                if pid == st.session_state.chat_persona_id:
+                    current_index = i
+                    break
+
+        selected_label = st.selectbox(
+            "Active Persona",
+            current_labels,
+            index=current_index,
+            key="chat_persona_select"
+        )
+        st.session_state.chat_persona_id = persona_options[selected_label]
 
     if st.button("🗑️ Clear Chat", key="clear_chat"):
         st.session_state.chat_messages = []
@@ -218,32 +262,51 @@ for message in st.session_state.chat_messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Quick actions - placed above chat input for better UX
-st.markdown("##### Quick Commands")
-col1, col2, col3, col4 = st.columns(4)
+# Quick actions - only show when persona is selected
+if st.session_state.chat_persona_id:
+    st.markdown("##### Quick Commands")
+    col1, col2, col3, col4 = st.columns(4)
 
-with col1:
-    if st.button("📝 Generate", key="quick_generate", use_container_width=True):
-        st.session_state.chat_messages.append({"role": "user", "content": "Generate content for my persona"})
-        st.rerun()
+    with col1:
+        if st.button("📝 Generate", key="quick_generate", use_container_width=True):
+            st.session_state.pending_message = "Generate content for my persona"
 
-with col2:
-    if st.button("🔍 Trends", key="quick_discover", use_container_width=True):
-        st.session_state.chat_messages.append({"role": "user", "content": "Discover trending topics"})
-        st.rerun()
+    with col2:
+        if st.button("🔍 Trends", key="quick_discover", use_container_width=True):
+            st.session_state.pending_message = "Discover trending topics"
 
-with col3:
-    if st.button("📊 Stats", key="quick_stats", use_container_width=True):
-        st.session_state.chat_messages.append({"role": "user", "content": "Show my content statistics"})
-        st.rerun()
+    with col3:
+        if st.button("📊 Stats", key="quick_stats", use_container_width=True):
+            st.session_state.pending_message = "Show my content statistics"
 
-with col4:
-    if st.button("🔄 Evolve", key="quick_suggestions", use_container_width=True):
-        st.session_state.chat_messages.append({"role": "user", "content": "Show pending evolution suggestions"})
-        st.rerun()
+    with col4:
+        if st.button("🔄 Evolve", key="quick_suggestions", use_container_width=True):
+            st.session_state.pending_message = "Show pending evolution suggestions"
+
+# Process pending message from quick commands
+if st.session_state.pending_message:
+    pending_msg = st.session_state.pending_message
+    st.session_state.pending_message = None
+
+    # Add user message to history
+    st.session_state.chat_messages.append({"role": "user", "content": pending_msg})
+
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(pending_msg)
+
+    # Get AI response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            assistant_message = send_chat_message(pending_msg)
+
+        st.markdown(assistant_message)
+        st.session_state.chat_messages.append({"role": "assistant", "content": assistant_message})
 
 # Chat input (fixed at bottom by Streamlit)
-if prompt := st.chat_input("Type your message..."):
+if not st.session_state.chat_persona_id:
+    st.info("Please create a persona first to start chatting.")
+elif prompt := st.chat_input("Type your message..."):
     # Add user message to history
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
 
@@ -254,22 +317,7 @@ if prompt := st.chat_input("Type your message..."):
     # Get AI response
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            try:
-                with httpx.Client(timeout=60) as client:
-                    response = client.post(
-                        f"{api_url}/chat",
-                        json={
-                            "message": prompt,
-                            "persona_id": st.session_state.chat_persona_id
-                        }
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        assistant_message = data.get("response", "No response")
-                    else:
-                        assistant_message = f"Error: {response.status_code} - {response.text}"
-            except Exception as e:
-                assistant_message = f"Connection error: {str(e)}"
+            assistant_message = send_chat_message(prompt)
 
         st.markdown(assistant_message)
         st.session_state.chat_messages.append({"role": "assistant", "content": assistant_message})

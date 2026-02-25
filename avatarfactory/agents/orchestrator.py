@@ -93,6 +93,7 @@ class OrchestratorAgent(BaseAgent):
         handlers = {
             "create_persona": self._handle_create_persona,
             "generate_content": self._handle_generate_content,
+            "discover_trends": self._handle_discover_trends,
             "analyze_data": self._handle_analyze_data,
             "optimize_persona": self._handle_optimize_persona,
             # Evolution intents
@@ -126,7 +127,8 @@ class OrchestratorAgent(BaseAgent):
 Possible intents:
 - create_persona: User wants to create a new persona
 - generate_content: User wants to generate content for an existing persona
-- analyze_data: User wants to analyze performance data
+- discover_trends: User wants to discover trending topics, hot topics, or what's popular on social platforms
+- analyze_data: User wants to analyze performance data or statistics
 - optimize_persona: User wants to optimize an existing persona
 - evolve_persona: User wants to suggest or apply changes to persona (e.g., "make it more casual", "change the tone")
 - review_suggestion: User wants to approve or reject a pending suggestion (e.g., "approve suggestion X", "reject")
@@ -136,9 +138,10 @@ Possible intents:
 
 Output MUST be valid JSON:
 {
-  "intent_type": "create_persona|generate_content|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|rollback",
+  "intent_type": "create_persona|generate_content|discover_trends|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|rollback",
   "parameters": {
     // Extract relevant parameters from user input
+    // For discover_trends: include "platform" if mentioned (bluesky, twitter, xiaohongshu, etc.)
     // For evolve_persona: include "user_feedback" with the suggestion
     // For review_suggestion: include "suggestion_id" and "approved" (boolean)
     // For rollback: include "version" (e.g., "v1.0")
@@ -319,6 +322,70 @@ Output MUST be valid JSON:
                 f"Status: {'✅ Approved' if review_report.overall_score >= 70 else '⚠️ Needs revision'}"
             ),
         }
+
+    async def _handle_discover_trends(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle trending topics discovery workflow"""
+
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "No persona found. Please create a persona first."}
+            persona_id = personas[0]
+
+        persona = self.kb.load_persona(persona_id)
+        if not persona:
+            return {"message": f"Persona {persona_id} not found"}
+
+        platform = parameters.get("platform", "bluesky")
+
+        self.log("INFO", f"Discovering trends for persona {persona_id} on {platform}")
+
+        # Import DiscoveryAgent
+        from avatarfactory.agents.discovery import DiscoveryAgent
+
+        discovery_agent = DiscoveryAgent(
+            knowledge_base=self.kb,
+            llm_provider=self.llm_provider,
+        )
+
+        try:
+            result = await discovery_agent.discover_and_analyze(
+                persona_id=persona_id,
+                platform=platform,
+                limit=20,
+            )
+
+            if result.get("status") != "success":
+                return {"message": f"Discovery failed: {result.get('message', 'Unknown error')}"}
+
+            data = result.get("data", {})
+            ideas = data.get("ideas", [])
+            trending_count = data.get("trending_count", 0)
+
+            # Build message with top ideas
+            ideas_text = ""
+            if ideas:
+                ideas_text = "\n\nTop content ideas:\n" + "\n".join([
+                    f"  • {idea.get('topic', '')} ({idea.get('estimated_engagement', 'medium')} engagement)"
+                    for idea in ideas[:5]
+                ])
+
+            return {
+                "trending_count": trending_count,
+                "ideas": ideas,
+                "message": (
+                    f"🔍 Discovered {trending_count} trending posts on {platform}\n"
+                    f"Generated {len(ideas)} content ideas for {persona.identity.name}"
+                    f"{ideas_text}"
+                ),
+            }
+
+        except Exception as e:
+            self.log("ERROR", f"Discovery failed: {e}")
+            return {"message": f"Discovery failed: {str(e)}"}
 
     async def _handle_analyze_data(
         self, parameters: Dict[str, Any], original_input: str

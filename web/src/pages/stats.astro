@@ -12,6 +12,7 @@ const personasWithStats = personas.map(p => ({
   persona: p,
   stats: getPersonaStats(p.id)
 }));
+const base = import.meta.env.BASE_URL || '';
 
 // Aggregate content by pillar and platform
 const contentByPillar: Record<string, number> = {};
@@ -79,7 +80,7 @@ if (personaCount > 0) {
       <h2 class="text-xl font-semibold mb-4">Avatar 统计</h2>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {personasWithStats.filter(({ stats }) => stats.avg_review_score > 0).map(({ persona, stats }) => (
-          <a href={`/avatars/${persona.id}`}>
+          <a href={`${base}/avatars/${persona.id}`}>
             <Card hover>
               <CardContent className="p-4">
                 <div class="flex items-center gap-4">

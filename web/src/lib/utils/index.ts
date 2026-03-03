@@ -1,6 +1,27 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// Get base URL for links - works in both Astro and client-side React
+export function getBaseUrl(): string {
+  // In browser, check if we're on /chronicle path
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname;
+    if (path.startsWith('/chronicle')) {
+      return '/chronicle';
+    }
+  }
+  // Default (local dev)
+  return '';
+}
+
+// Helper to build URLs with base path
+export function buildUrl(path: string): string {
+  const base = getBaseUrl();
+  // Ensure path starts with /
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

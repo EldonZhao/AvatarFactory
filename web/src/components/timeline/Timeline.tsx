@@ -4,7 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, cn, buildUrl } from '@/lib/utils';
 import type { TimelineEvent } from '@/lib/types';
 
 interface TimelineProps {
@@ -159,7 +159,7 @@ function TimelineItem({ event, index }: TimelineItemProps) {
         </p>
         {event.content_id && (
           <a
-            href={`/content/${event.content_id}`}
+            href={buildUrl(`/content/${event.content_id}`)}
             className="inline-block mt-1 text-xs text-[hsl(var(--primary))] hover:underline"
           >
             查看内容 →

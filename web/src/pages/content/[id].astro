@@ -14,9 +14,10 @@ export async function getStaticPaths() {
 
 const { id } = Astro.params;
 const content = getContent(id);
+const base = import.meta.env.BASE_URL || '';
 
 if (!content) {
-  return Astro.redirect('/');
+  return Astro.redirect(`${base}/`);
 }
 
 const review = getReview(id);
@@ -27,11 +28,11 @@ const persona = getPersona(content.persona_id);
   <div class="space-y-8 animate-fade-in">
     <!-- Breadcrumb -->
     <nav class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-      <a href="/" class="hover:text-[hsl(var(--foreground))]">首页</a>
+      <a href={`${base}/`} class="hover:text-[hsl(var(--foreground))]">首页</a>
       <span>/</span>
       {persona && (
         <>
-          <a href={`/avatars/${persona.id}`} class="hover:text-[hsl(var(--foreground))]">{persona.identity.name}</a>
+          <a href={`${base}/avatars/${persona.id}`} class="hover:text-[hsl(var(--foreground))]">{persona.identity.name}</a>
           <span>/</span>
         </>
       )}
@@ -59,7 +60,7 @@ const persona = getPersona(content.persona_id);
       </div>
 
       {persona && (
-        <a href={`/avatars/${persona.id}`} class="inline-flex items-center gap-2 p-2 rounded-lg bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] transition-colors">
+        <a href={`${base}/avatars/${persona.id}`} class="inline-flex items-center gap-2 p-2 rounded-lg bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] transition-colors">
           <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
             {persona.identity.name.slice(0, 2)}
           </div>

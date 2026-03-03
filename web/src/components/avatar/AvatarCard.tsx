@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { ScoreBadge } from '../ui/Score';
-import { cn, getPlatformColor, getPlatformName } from '@/lib/utils';
+import { cn, getPlatformColor, getPlatformName, buildUrl } from '@/lib/utils';
 import type { Persona, PersonaStats } from '@/lib/types';
 
 interface AvatarCardProps {
@@ -32,7 +32,7 @@ export function AvatarCard({ persona, stats, index = 0 }: AvatarCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05 }}
     >
-      <a href={`/avatars/${persona.id}`}>
+      <a href={buildUrl(`/avatars/${persona.id}`)}>
         <Card hover className="h-full">
           <CardHeader className="pb-3">
             <div className="flex items-start gap-4">

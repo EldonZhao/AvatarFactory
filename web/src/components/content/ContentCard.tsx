@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { ScoreBadge } from '../ui/Score';
-import { cn, formatDate, truncate, getPlatformColor, getPlatformName } from '@/lib/utils';
+import { cn, formatDate, truncate, getPlatformColor, getPlatformName, buildUrl } from '@/lib/utils';
 import type { Content } from '@/lib/types';
 
 interface ContentCardProps {
@@ -21,7 +21,7 @@ export function ContentCard({ content, index = 0, showPersona = false }: Content
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05 }}
     >
-      <a href={`/content/${content.id}`}>
+      <a href={buildUrl(`/content/${content.id}`)}>
         <Card hover className="h-full">
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-3">

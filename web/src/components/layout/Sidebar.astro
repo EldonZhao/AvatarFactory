@@ -1,22 +1,23 @@
 ---
 const pathname = Astro.url.pathname;
+const base = import.meta.env.BASE_URL || '';
 
 const navItems = [
-  { href: '/', label: '仪表板', icon: 'home' },
-  { href: '/avatars', label: 'Avatar', icon: 'users' },
-  { href: '/scheduler', label: '调度任务', icon: 'clock' },
-  { href: '/stats', label: '统计分析', icon: 'chart' },
+  { href: `${base}/`, label: '仪表板', icon: 'home' },
+  { href: `${base}/avatars`, label: 'Avatar', icon: 'users' },
+  { href: `${base}/scheduler`, label: '调度任务', icon: 'clock' },
+  { href: `${base}/stats`, label: '统计分析', icon: 'chart' },
 ];
 
 function isActive(href: string): boolean {
-  if (href === '/') return pathname === '/';
+  if (href === `${base}/`) return pathname === `${base}/` || pathname === base;
   return pathname.startsWith(href);
 }
 ---
 
 <aside class="w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] hidden lg:block">
   <div class="p-6">
-    <a href="/" class="flex items-center gap-3 group">
+    <a href={`${base}/`} class="flex items-center gap-3 group">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/25 transition-shadow">
         <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />

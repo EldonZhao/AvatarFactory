@@ -15,9 +15,10 @@ export async function getStaticPaths() {
 
 const { id } = Astro.params;
 const persona = getPersona(id);
+const base = import.meta.env.BASE_URL || '';
 
 if (!persona) {
-  return Astro.redirect('/avatars');
+  return Astro.redirect(`${base}/avatars`);
 }
 
 const history = getPersonaHistory(id);
@@ -79,13 +80,13 @@ const gradient = gradientColors[0];
 
     <!-- Navigation Tabs -->
     <div class="flex gap-2 border-b border-[hsl(var(--border))] pb-2">
-      <a href={`/avatars/${id}`} class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium">
+      <a href={`${base}/avatars/${id}`} class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium">
         人设详情
       </a>
-      <a href={`/avatars/${id}/content`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
+      <a href={`${base}/avatars/${id}/content`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
         内容 ({stats.total_content})
       </a>
-      <a href={`/avatars/${id}/timeline`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
+      <a href={`${base}/avatars/${id}/timeline`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
         时间线
       </a>
     </div>

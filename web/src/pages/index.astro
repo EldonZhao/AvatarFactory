@@ -17,6 +17,7 @@ const recentContent = getRecentContent(6);
 const globalStats = getGlobalStats();
 const timelineEvents = getTimelineEvents(undefined, 10);
 const activeTasks = getActiveTasks().slice(0, 5);
+const base = import.meta.env.BASE_URL || '';
 ---
 
 <PageLayout title="仪表板">
@@ -38,7 +39,7 @@ const activeTasks = getActiveTasks().slice(0, 5);
         <section>
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold">最近的 Avatar</h2>
-            <a href="/avatars" class="text-sm text-[hsl(var(--primary))] hover:underline">查看全部 →</a>
+            <a href={`${base}/avatars`} class="text-sm text-[hsl(var(--primary))] hover:underline">查看全部 →</a>
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             {personasWithStats.map(({ persona, stats }, index) => (

@@ -12,9 +12,10 @@ export async function getStaticPaths() {
 
 const { id } = Astro.params;
 const persona = getPersona(id);
+const base = import.meta.env.BASE_URL || '';
 
 if (!persona) {
-  return Astro.redirect('/avatars');
+  return Astro.redirect(`${base}/avatars`);
 }
 
 const stats = getPersonaStats(id);
@@ -28,7 +29,7 @@ const gradient = 'from-blue-500 to-purple-600';
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-start gap-6">
       <!-- Avatar -->
-      <a href={`/avatars/${id}`} class={cn('w-16 h-16 rounded-xl bg-gradient-to-br flex items-center justify-center text-white font-bold text-xl shadow-lg hover:shadow-xl transition-shadow', gradient)}>
+      <a href={`${base}/avatars/${id}`} class={cn('w-16 h-16 rounded-xl bg-gradient-to-br flex items-center justify-center text-white font-bold text-xl shadow-lg hover:shadow-xl transition-shadow', gradient)}>
         {persona.identity.name.slice(0, 2)}
       </a>
 
@@ -50,13 +51,13 @@ const gradient = 'from-blue-500 to-purple-600';
 
     <!-- Navigation Tabs -->
     <div class="flex gap-2 border-b border-[hsl(var(--border))] pb-2">
-      <a href={`/avatars/${id}`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
+      <a href={`${base}/avatars/${id}`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
         人设详情
       </a>
-      <a href={`/avatars/${id}/content`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
+      <a href={`${base}/avatars/${id}/content`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
         内容 ({stats.total_content})
       </a>
-      <a href={`/avatars/${id}/timeline`} class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium">
+      <a href={`${base}/avatars/${id}/timeline`} class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium">
         时间线
       </a>
     </div>

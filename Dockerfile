@@ -15,7 +15,8 @@ RUN npm ci --silent
 # Copy source
 COPY web/ ./
 
-# Fix permissions and build static site
+# Fix permissions and build static site with /chronicle base path
+ENV ASTRO_BASE=/chronicle
 RUN chmod -R +x node_modules/.bin && npm run build
 
 # Stage 2: Main application

@@ -145,66 +145,82 @@ async def get_persona(persona_id: str) -> Optional[Dict[str, Any]]:
 @router.get("/personas/{persona_id}/stats")
 async def get_persona_stats(persona_id: str) -> Dict[str, Any]:
     """Get statistics for a persona."""
-    orchestrator = _get_orchestrator()
+    import logging
+    logger = logging.getLogger(__name__)
 
-    # Verify persona exists
-    persona = orchestrator.kb.load_persona(persona_id)
-    if not persona:
+    try:
+        orchestrator = _get_orchestrator()
+
+        # Verify persona exists
+        persona = orchestrator.kb.load_persona(persona_id)
+        if not persona:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Persona {persona_id} not found",
+            )
+
+        # Get content for this persona
+        all_content = orchestrator.kb.list_content(persona_id=persona_id, status="draft")
+        published_content = orchestrator.kb.list_content(persona_id=persona_id, status="published")
+
+        # Combine content lists
+        contents = all_content + published_content
+
+        content_by_pillar: Dict[str, int] = {}
+        content_by_platform: Dict[str, int] = {}
+        total_consistency = 0
+        total_platform_fit = 0
+        total_compliance = 0
+        total_engagement = 0
+        review_count = 0
+
+        for content in contents:
+            try:
+                pillar = content.pillar or "unknown"
+                platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+
+                content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
+                content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
+
+                # Load review for this content
+                review = orchestrator.kb.load_review_report(content.id, persona_id)
+                if review:
+                    total_consistency += review.persona_consistency.score
+                    total_platform_fit += review.platform_fit.score
+                    total_compliance += review.compliance.score
+                    total_engagement += review.engagement_potential.score
+                    review_count += 1
+            except Exception as e:
+                logger.warning(f"Error processing content {content.id}: {e}")
+                continue
+
+        avg_score = 0
+        if review_count > 0:
+            avg_score = (total_consistency + total_platform_fit + total_compliance + total_engagement) / (review_count * 4)
+
+        return {
+            "persona_id": persona_id,
+            "total_content": len(contents),
+            "published_content": len(published_content),
+            "draft_content": len(all_content),
+            "avg_review_score": round(avg_score),
+            "content_by_pillar": content_by_pillar,
+            "content_by_platform": content_by_platform,
+            "score_distribution": {
+                "persona_consistency": round(total_consistency / review_count) if review_count > 0 else 0,
+                "platform_fit": round(total_platform_fit / review_count) if review_count > 0 else 0,
+                "compliance": round(total_compliance / review_count) if review_count > 0 else 0,
+                "engagement_potential": round(total_engagement / review_count) if review_count > 0 else 0,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting persona stats for {persona_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Persona {persona_id} not found",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting persona stats: {str(e)}",
         )
-
-    # Get content for this persona
-    all_content = orchestrator.kb.list_content(persona_id=persona_id, status="draft")
-    published_content = orchestrator.kb.list_content(persona_id=persona_id, status="published")
-
-    # Combine content lists
-    contents = all_content + published_content
-
-    content_by_pillar: Dict[str, int] = {}
-    content_by_platform: Dict[str, int] = {}
-    total_consistency = 0
-    total_platform_fit = 0
-    total_compliance = 0
-    total_engagement = 0
-    review_count = 0
-
-    for content in contents:
-        pillar = content.pillar or "unknown"
-        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-
-        content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
-        content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
-
-        # Load review for this content
-        review = orchestrator.kb.load_review(content.id)
-        if review:
-            total_consistency += review.persona_consistency.score
-            total_platform_fit += review.platform_fit.score
-            total_compliance += review.compliance.score
-            total_engagement += review.engagement_potential.score
-            review_count += 1
-
-    avg_score = 0
-    if review_count > 0:
-        avg_score = (total_consistency + total_platform_fit + total_compliance + total_engagement) / (review_count * 4)
-
-    return {
-        "persona_id": persona_id,
-        "total_content": len(contents),
-        "published_content": len(published_content),
-        "draft_content": len(all_content),
-        "avg_review_score": round(avg_score),
-        "content_by_pillar": content_by_pillar,
-        "content_by_platform": content_by_platform,
-        "score_distribution": {
-            "persona_consistency": round(total_consistency / review_count) if review_count > 0 else 0,
-            "platform_fit": round(total_platform_fit / review_count) if review_count > 0 else 0,
-            "compliance": round(total_compliance / review_count) if review_count > 0 else 0,
-            "engagement_potential": round(total_engagement / review_count) if review_count > 0 else 0,
-        },
-    }
 
 
 @router.get("/personas/{persona_id}/history")
@@ -396,7 +412,18 @@ async def get_content(content_id: str) -> Optional[Dict[str, Any]]:
 async def get_content_review(content_id: str) -> Optional[Dict[str, Any]]:
     """Get review report for a content item."""
     orchestrator = _get_orchestrator()
-    review = orchestrator.kb.load_review(content_id)
+
+    # First, find the content to get persona_id
+    content = None
+    for status in ["draft", "published"]:
+        content = orchestrator.kb.load_content(content_id, status=status)
+        if content:
+            break
+
+    if not content:
+        return None
+
+    review = orchestrator.kb.load_review_report(content_id, content.persona_id)
 
     if not review:
         return None
@@ -671,7 +698,7 @@ async def _build_timeline_events(
                 # Add review events
                 contents = drafts + published
                 for content in contents:
-                    review = orchestrator.kb.load_review(content.id)
+                    review = orchestrator.kb.load_review_report(content.id, pid)
                     if review:
                         timestamp = review.reviewed_at.isoformat() if hasattr(review.reviewed_at, 'isoformat') else str(review.reviewed_at)
                         events.append({

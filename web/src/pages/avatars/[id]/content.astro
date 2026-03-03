@@ -1,0 +1,78 @@
+---
+import PageLayout from '../../../layouts/PageLayout.astro';
+import { ContentList } from '../../../components/content/ContentCard';
+import { Badge } from '../../../components/ui/Badge';
+import { ScoreRing } from '../../../components/ui/Score';
+import { getAllPersonaIds, getPersona, getContentByPersona, getPersonaStats } from '../../../lib/data';
+import { cn, getPlatformColor, getPlatformName } from '../../../lib/utils';
+
+export async function getStaticPaths() {
+  const ids = getAllPersonaIds();
+  return ids.map(id => ({ params: { id } }));
+}
+
+const { id } = Astro.params;
+const persona = getPersona(id);
+
+if (!persona) {
+  return Astro.redirect('/avatars');
+}
+
+const contents = getContentByPersona(id);
+const stats = getPersonaStats(id);
+
+const gradient = 'from-blue-500 to-purple-600';
+---
+
+<PageLayout title={`${persona.identity.name} - 内容`}>
+  <div class="space-y-8 animate-fade-in">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start gap-6">
+      <!-- Avatar -->
+      <a href={`/avatars/${id}`} class={cn('w-16 h-16 rounded-xl bg-gradient-to-br flex items-center justify-center text-white font-bold text-xl shadow-lg hover:shadow-xl transition-shadow', gradient)}>
+        {persona.identity.name.slice(0, 2)}
+      </a>
+
+      <!-- Info -->
+      <div class="flex-1">
+        <div class="flex items-center gap-3 mb-1">
+          <h1 class="text-2xl font-bold">{persona.identity.name}</h1>
+          <Badge variant="outline">{persona.version}</Badge>
+        </div>
+        <p class="text-[hsl(var(--muted-foreground))]">{persona.identity.tagline}</p>
+      </div>
+
+      <!-- Stats -->
+      <div class="flex gap-4">
+        <div class="text-center">
+          <div class="text-2xl font-bold">{stats.total_content}</div>
+          <div class="text-xs text-[hsl(var(--muted-foreground))]">总内容</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-green-500">{stats.published_content}</div>
+          <div class="text-xs text-[hsl(var(--muted-foreground))]">已发布</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-yellow-500">{stats.draft_content}</div>
+          <div class="text-xs text-[hsl(var(--muted-foreground))]">草稿</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex gap-2 border-b border-[hsl(var(--border))] pb-2">
+      <a href={`/avatars/${id}`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
+        人设详情
+      </a>
+      <a href={`/avatars/${id}/content`} class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium">
+        内容 ({stats.total_content})
+      </a>
+      <a href={`/avatars/${id}/timeline`} class="px-4 py-2 rounded-lg hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] font-medium transition-colors">
+        时间线
+      </a>
+    </div>
+
+    <!-- Content List -->
+    <ContentList contents={contents} emptyMessage="该 Avatar 暂无内容" client:load />
+  </div>
+</PageLayout>

@@ -1,0 +1,105 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import { StatsOverview } from '../components/dashboard/StatsOverview';
+import { ContentTrendChart, ScoreDistributionChart, ContentByPillarChart, ContentByPlatformChart } from '../components/stats/Charts';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { ScoreRing } from '../components/ui/Score';
+import { getGlobalStats, getAllPersonas, getPersonaStats } from '../lib/data';
+
+const globalStats = getGlobalStats();
+const personas = getAllPersonas();
+const personasWithStats = personas.map(p => ({
+  persona: p,
+  stats: getPersonaStats(p.id)
+}));
+
+// Aggregate content by pillar and platform
+const contentByPillar: Record<string, number> = {};
+const contentByPlatform: Record<string, number> = {};
+let avgScoreDistribution = {
+  persona_consistency: 0,
+  platform_fit: 0,
+  compliance: 0,
+  engagement_potential: 0,
+};
+let personaCount = 0;
+
+for (const { stats } of personasWithStats) {
+  for (const [pillar, count] of Object.entries(stats.content_by_pillar)) {
+    contentByPillar[pillar] = (contentByPillar[pillar] || 0) + count;
+  }
+  for (const [platform, count] of Object.entries(stats.content_by_platform)) {
+    contentByPlatform[platform] = (contentByPlatform[platform] || 0) + count;
+  }
+  if (stats.avg_review_score > 0) {
+    avgScoreDistribution.persona_consistency += stats.score_distribution.persona_consistency;
+    avgScoreDistribution.platform_fit += stats.score_distribution.platform_fit;
+    avgScoreDistribution.compliance += stats.score_distribution.compliance;
+    avgScoreDistribution.engagement_potential += stats.score_distribution.engagement_potential;
+    personaCount++;
+  }
+}
+
+if (personaCount > 0) {
+  avgScoreDistribution.persona_consistency = Math.round(avgScoreDistribution.persona_consistency / personaCount);
+  avgScoreDistribution.platform_fit = Math.round(avgScoreDistribution.platform_fit / personaCount);
+  avgScoreDistribution.compliance = Math.round(avgScoreDistribution.compliance / personaCount);
+  avgScoreDistribution.engagement_potential = Math.round(avgScoreDistribution.engagement_potential / personaCount);
+}
+---
+
+<PageLayout title="统计分析">
+  <div class="space-y-8 animate-fade-in">
+    <!-- Header -->
+    <div>
+      <h1 class="text-3xl font-bold">统计分析</h1>
+      <p class="text-[hsl(var(--muted-foreground))] mt-1">数据洞察与可视化</p>
+    </div>
+
+    <!-- Overview Stats -->
+    <StatsOverview stats={globalStats} client:load />
+
+    <!-- Charts Grid -->
+    <div class="grid gap-6 lg:grid-cols-2">
+      <ContentTrendChart data={globalStats.content_by_day} client:load />
+      <ScoreDistributionChart data={avgScoreDistribution} client:load />
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+      {Object.keys(contentByPillar).length > 0 && (
+        <ContentByPillarChart data={contentByPillar} client:load />
+      )}
+      {Object.keys(contentByPlatform).length > 0 && (
+        <ContentByPlatformChart data={contentByPlatform} client:load />
+      )}
+    </div>
+
+    <!-- Per-Persona Stats -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">Avatar 统计</h2>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {personasWithStats.filter(({ stats }) => stats.avg_review_score > 0).map(({ persona, stats }) => (
+          <a href={`/avatars/${persona.id}`}>
+            <Card hover>
+              <CardContent className="p-4">
+                <div class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                    {persona.identity.name.slice(0, 2)}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <h3 class="font-medium truncate">{persona.identity.name}</h3>
+                    <div class="flex items-center gap-3 text-sm text-[hsl(var(--muted-foreground))]">
+                      <span>{stats.total_content} 内容</span>
+                      <span>{stats.published_content} 发布</span>
+                    </div>
+                  </div>
+                  <ScoreRing score={stats.avg_review_score} size="sm" showLabel={false} client:load />
+                </div>
+              </CardContent>
+            </Card>
+          </a>
+        ))}
+      </div>
+    </section>
+  </div>
+</PageLayout>

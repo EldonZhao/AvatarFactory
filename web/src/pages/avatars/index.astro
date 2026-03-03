@@ -1,0 +1,38 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import { AvatarCard } from '../../components/avatar/AvatarCard';
+import { getAllPersonas, getPersonaStats } from '../../lib/data';
+
+const personas = getAllPersonas();
+const personasWithStats = personas.map(p => ({
+  persona: p,
+  stats: getPersonaStats(p.id)
+}));
+---
+
+<PageLayout title="Avatar 列表">
+  <div class="space-y-8 animate-fade-in">
+    <!-- Header -->
+    <div>
+      <h1 class="text-3xl font-bold">Avatar 列表</h1>
+      <p class="text-[hsl(var(--muted-foreground))] mt-1">共 {personas.length} 个人设</p>
+    </div>
+
+    <!-- Avatar Grid -->
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {personasWithStats.map(({ persona, stats }, index) => (
+        <AvatarCard persona={persona} stats={stats} index={index} client:load />
+      ))}
+    </div>
+
+    {personas.length === 0 && (
+      <div class="text-center py-16 text-[hsl(var(--muted-foreground))]">
+        <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <p class="text-lg">暂无 Avatar</p>
+        <p class="text-sm mt-1">在 Dashboard 中创建你的第一个人设</p>
+      </div>
+    )}
+  </div>
+</PageLayout>

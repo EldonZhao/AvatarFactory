@@ -1,6 +1,24 @@
-# AvatarFactory Dockerfile - Full Version with Dashboard
+# AvatarFactory Dockerfile - Full Version with Dashboard + Chronicle Web
 # For Azure deployment
 
+# Stage 1: Build the Chronicle static website
+FROM node:20-alpine AS web-builder
+
+WORKDIR /web
+
+# Copy package files
+COPY web/package*.json ./
+
+# Install dependencies
+RUN npm ci --silent
+
+# Copy source
+COPY web/ ./
+
+# Fix permissions and build static site
+RUN chmod -R +x node_modules/.bin && npm run build
+
+# Stage 2: Main application
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -50,6 +68,9 @@ COPY pyproject.toml setup.py README.md ./
 
 # Install package
 RUN pip install --no-cache-dir -e .
+
+# Copy Chronicle web static files from builder
+COPY --from=web-builder /web/dist /app/chronicle
 
 # Create knowledge directory
 RUN mkdir -p /app/knowledges

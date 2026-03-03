@@ -1,5 +1,39 @@
-export { getAllPersonas, getPersona, getPersonaHistory, getPersonaVersions, getPersonaVersion, getAllPersonaIds } from './personas';
-export { getAllContent, getContent, getContentByPersona, getReview, getReviewsForPersona, getRecentContent } from './content';
-export { getAllTasks, getTask, getTasksByPersona, getActiveTasks, getTaskStats } from './scheduler';
-export { getTimelineEvents, getGlobalStats } from './timeline';
-export { getPersonaStats } from './stats';
+/**
+ * Data layer - re-exports API client functions for SSR
+ *
+ * All data is now fetched from the FastAPI backend via API calls.
+ * This enables server-side rendering without direct file system access.
+ */
+
+export {
+  // Persona functions
+  getAllPersonas,
+  getAllPersonaIds,
+  getPersona,
+  getPersonaHistory,
+  getPersonaVersions,
+  getPersonaStats,
+
+  // Content functions
+  getAllContent,
+  getAllContentIds,
+  getRecentContent,
+  getContent,
+  getContentByPersona,
+  getReview,
+  getReviewsForPersona,
+
+  // Scheduler functions
+  getAllTasks,
+  getTask,
+  getTasksByPersona,
+  getActiveTasks,
+  getTaskStats,
+
+  // Timeline & Stats functions
+  getTimelineEvents,
+  getGlobalStats,
+} from '../api/client';
+
+// Note: getPersonaVersion is not implemented in the API yet
+// If needed, it can be added to the chronicle_routes.py

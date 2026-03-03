@@ -1,15 +1,18 @@
 ---
+export const prerender = false;
+
 import PageLayout from '../layouts/PageLayout.astro';
 import { TaskCard } from '../components/scheduler/TaskCard';
 import { SchedulerStats } from '../components/scheduler/SchedulerStats';
 import { Badge } from '../components/ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { getAllTasks, getTaskStats } from '../lib/data';
+import type { ScheduledTask } from '../lib/types';
 
-const tasks = getAllTasks();
-const stats = getTaskStats();
+const tasks = await getAllTasks();
+const stats = await getTaskStats();
 
-const tasksByType: Record<string, typeof tasks> = {};
+const tasksByType: Record<string, ScheduledTask[]> = {};
 for (const task of tasks) {
   if (!tasksByType[task.task_type]) {
     tasksByType[task.task_type] = [];

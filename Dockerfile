@@ -1,7 +1,7 @@
-# AvatarFactory Dockerfile - Full Version with Dashboard + Chronicle Web
+# AvatarFactory Dockerfile - Full Version with Dashboard + Chronicle SSR
 # For Azure deployment
 
-# Stage 1: Build the Chronicle static website
+# Stage 1: Build the Chronicle SSR website
 FROM node:20-alpine AS web-builder
 
 WORKDIR /web
@@ -15,7 +15,7 @@ RUN npm ci --silent
 # Copy source
 COPY web/ ./
 
-# Fix permissions and build static site with /chronicle base path
+# Fix permissions and build SSR with /chronicle base path
 ENV ASTRO_BASE=/chronicle
 RUN chmod -R +x node_modules/.bin && npm run build
 
@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libffi-dev \
     nginx \
+    supervisor \
+    gnupg \
     # Playwright dependencies
     libnss3 \
     libnspr4 \
@@ -55,6 +57,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -fv
 
+# Install Node.js 20 from NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python dependencies directly (no build stage)
 COPY requirements-deploy.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
@@ -70,11 +77,14 @@ COPY pyproject.toml setup.py README.md ./
 # Install package
 RUN pip install --no-cache-dir -e .
 
-# Copy Chronicle web static files from builder
+# Copy Chronicle SSR build from builder
 COPY --from=web-builder /web/dist /app/chronicle
 
 # Create knowledge directory
 RUN mkdir -p /app/knowledges
+
+# Copy supervisor config
+COPY scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Make start script executable
 RUN chmod +x /app/scripts/start_services.sh
@@ -82,6 +92,8 @@ RUN chmod +x /app/scripts/start_services.sh
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV AVATARFACTORY_KB_PATH=/app/knowledges
+ENV API_BASE_URL=http://127.0.0.1:8000
+ENV CHRONICLE_PORT=4321
 
 # Expose port 80 (nginx reverse proxy)
 EXPOSE 80
@@ -90,5 +102,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost/health || exit 1
 
-# Start all services via script
-CMD ["/bin/bash", "/app/scripts/start_services.sh"]
+# Start all services via supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -1,4 +1,6 @@
 ---
+export const prerender = false;
+
 import PageLayout from '../layouts/PageLayout.astro';
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { AvatarCard } from '../components/avatar/AvatarCard';
@@ -7,16 +9,18 @@ import { Timeline } from '../components/timeline/Timeline';
 import { TaskList } from '../components/scheduler/TaskCard';
 import { getAllPersonas, getPersonaStats, getRecentContent, getGlobalStats, getTimelineEvents, getActiveTasks } from '../lib/data';
 
-const personas = getAllPersonas();
-const personasWithStats = personas.map(p => ({
-  persona: p,
-  stats: getPersonaStats(p.id)
-})).slice(0, 6);
+const personas = await getAllPersonas();
+const personasWithStats = await Promise.all(
+  personas.slice(0, 6).map(async (p) => ({
+    persona: p,
+    stats: await getPersonaStats(p.id)
+  }))
+);
 
-const recentContent = getRecentContent(6);
-const globalStats = getGlobalStats();
-const timelineEvents = getTimelineEvents(undefined, 10);
-const activeTasks = getActiveTasks().slice(0, 5);
+const recentContent = await getRecentContent(6);
+const globalStats = await getGlobalStats();
+const timelineEvents = await getTimelineEvents(undefined, 10);
+const activeTasks = (await getActiveTasks()).slice(0, 5);
 const base = import.meta.env.BASE_URL || '';
 ---
 

@@ -304,6 +304,10 @@ def create_app(
             # Multi-tenancy dependencies not installed
             pass
 
+    # Register Chronicle routes (for SSR website)
+    from avatarfactory.service.chronicle_routes import router as chronicle_router
+    application.include_router(chronicle_router)
+
     # Register routes
     register_routes(application)
 

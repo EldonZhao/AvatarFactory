@@ -1,13 +1,17 @@
 ---
+export const prerender = false;
+
 import PageLayout from '../../layouts/PageLayout.astro';
 import { AvatarCard } from '../../components/avatar/AvatarCard';
 import { getAllPersonas, getPersonaStats } from '../../lib/data';
 
-const personas = getAllPersonas();
-const personasWithStats = personas.map(p => ({
-  persona: p,
-  stats: getPersonaStats(p.id)
-}));
+const personas = await getAllPersonas();
+const personasWithStats = await Promise.all(
+  personas.map(async (p) => ({
+    persona: p,
+    stats: await getPersonaStats(p.id)
+  }))
+);
 ---
 
 <PageLayout title="Avatar 列表">

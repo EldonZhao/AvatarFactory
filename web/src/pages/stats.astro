@@ -1,4 +1,6 @@
 ---
+export const prerender = false;
+
 import PageLayout from '../layouts/PageLayout.astro';
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { ContentTrendChart, ScoreDistributionChart, ContentByPillarChart, ContentByPlatformChart } from '../components/stats/Charts';
@@ -6,12 +8,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { ScoreRing } from '../components/ui/Score';
 import { getGlobalStats, getAllPersonas, getPersonaStats } from '../lib/data';
 
-const globalStats = getGlobalStats();
-const personas = getAllPersonas();
-const personasWithStats = personas.map(p => ({
-  persona: p,
-  stats: getPersonaStats(p.id)
-}));
+const globalStats = await getGlobalStats();
+const personas = await getAllPersonas();
+const personasWithStats = await Promise.all(
+  personas.map(async (p) => ({
+    persona: p,
+    stats: await getPersonaStats(p.id)
+  }))
+);
 const base = import.meta.env.BASE_URL || '';
 
 // Aggregate content by pillar and platform

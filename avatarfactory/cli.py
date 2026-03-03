@@ -2005,5 +2005,213 @@ def migrate_storage(
         console.print("\n[green]✅ Migration complete![/green]")
 
 
+# =============================================================================
+# Recommendation Commands
+# =============================================================================
+
+@app.command()
+def recommendations(
+    limit: int = typer.Option(5, "--limit", "-n", help="Number of recommendations to show"),
+    domain: Optional[str] = typer.Option(None, "--domain", "-d", help="Filter by domain"),
+):
+    """
+    List recommended personas based on recent trends.
+
+    The system automatically discovers trending topics from social platforms
+    and generates persona recommendations daily.
+
+    Example:
+        avatarfactory recommendations
+        avatarfactory recommendations --limit 10
+        avatarfactory recommendations --domain tech
+    """
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+
+    recs = kb.get_recommended_personas(limit=limit, domain=domain)
+
+    if not recs:
+        console.print("[yellow]No recommendations found.[/yellow]")
+        console.print("\nThe system generates recommendations daily from trending topics.")
+        console.print("Run 'avatarfactory scan-trends' to generate recommendations now.")
+        return
+
+    table = Table(title=f"Recommended Personas ({len(recs)})")
+    table.add_column("ID", style="cyan", max_width=20)
+    table.add_column("Name", style="bold")
+    table.add_column("Domain", style="green")
+    table.add_column("Tagline", max_width=40)
+    table.add_column("Relevance", style="yellow", justify="right")
+    table.add_column("Potential", style="magenta", justify="right")
+
+    for rec in recs:
+        table.add_row(
+            rec.id,
+            rec.name,
+            rec.domain,
+            rec.tagline[:37] + "..." if len(rec.tagline) > 40 else rec.tagline,
+            f"{rec.relevance_score:.0f}",
+            f"{rec.potential_score:.0f}",
+        )
+
+    console.print(table)
+    console.print("\n[dim]Use 'avatarfactory adopt <ID>' to create a persona from a recommendation.[/dim]")
+
+
+@app.command()
+def adopt(
+    recommendation_id: str = typer.Argument(..., help="Recommendation ID to adopt"),
+):
+    """
+    Create a persona from a recommendation.
+
+    Example:
+        avatarfactory adopt rec_persona_abc123
+    """
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+
+    # Load recommendation
+    rec = kb.get_recommendation(recommendation_id)
+    if not rec:
+        console.print(f"[red]Recommendation {recommendation_id} not found.[/red]")
+        console.print("Use 'avatarfactory recommendations' to see available recommendations.")
+        raise typer.Exit(1)
+
+    console.print(Panel.fit(
+        f"Adopting recommendation: {rec.name}\n"
+        f"Domain: {rec.domain}\n"
+        f"Tagline: {rec.tagline}",
+        border_style="cyan"
+    ))
+
+    # Build description from recommendation
+    description = (
+        f"Create a {rec.domain} persona: {rec.name}. "
+        f"Positioning: {rec.tagline}. "
+        f"Target audience: {rec.target_audience}. "
+        f"Expertise areas: {', '.join(rec.expertise)}. "
+        f"Content pillars: {', '.join(rec.content_pillars)}. "
+        f"Tone: {rec.suggested_tone}."
+    )
+
+    orchestrator = get_orchestrator()
+
+    with console.status("[bold cyan]Creating persona from recommendation...", spinner="dots"):
+        message = AgentMessage(
+            sender="user",
+            receiver="orchestrator",
+            task_type=TaskType.CHAT,
+            payload={"user_input": description},
+            context={},
+        )
+
+        result = asyncio.run(orchestrator.process(message))
+
+    if result.get("status") == "success":
+        data = result.get("data", {})
+        persona = data.get("persona", {})
+
+        # Mark recommendation as adopted
+        kb.mark_recommendation_adopted(recommendation_id, persona.get("id", ""))
+
+        console.print("[green]✅ Persona created successfully![/green]")
+        console.print(f"  ID: {persona.get('id')}")
+        console.print(f"  Name: {persona['identity'].get('name')}")
+        console.print(f"  Tagline: {persona['identity'].get('tagline')}")
+        console.print(f"\n[dim]Based on recommendation: {rec.name}[/dim]")
+    else:
+        console.print(f"[red]Error: {result.get('message', 'Unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="scan-trends")
+def scan_trends(
+    platforms: Optional[str] = typer.Option(
+        "bluesky", "--platforms", "-p",
+        help="Comma-separated platforms to scan (bluesky,twitter,xiaohongshu)"
+    ),
+    generate_recs: bool = typer.Option(
+        True, "--generate-recommendations/--no-recommendations",
+        help="Generate persona recommendations after scanning"
+    ),
+):
+    """
+    Scan trending topics from social platforms and generate recommendations.
+
+    This is typically run automatically by the scheduler, but can be
+    triggered manually to get fresh recommendations.
+
+    Example:
+        avatarfactory scan-trends
+        avatarfactory scan-trends --platforms bluesky,twitter
+        avatarfactory scan-trends --no-recommendations
+    """
+    from avatarfactory.scheduler.tasks import (
+        run_trend_scan_task,
+        run_persona_recommendation_task,
+    )
+    from avatarfactory.scheduler.engine import ScheduledTask
+
+    platform_list = [p.strip() for p in platforms.split(",")]
+    console.print(Panel.fit(
+        f"Scanning trends from: {', '.join(platform_list)}",
+        border_style="cyan"
+    ))
+
+    # Create a mock task for the runner
+    scan_task = ScheduledTask(
+        id="manual_trend_scan",
+        name="Manual Trend Scan",
+        task_type="trend_scan",
+        schedule="manual",
+        extra_params={"platforms": platform_list, "limit": 30},
+    )
+
+    with console.status("[bold cyan]Scanning trending topics...", spinner="dots"):
+        result = asyncio.run(run_trend_scan_task(scan_task))
+
+    if result.get("success"):
+        console.print(f"[green]✅ Scanned {result.get('platforms_scanned', 0)} platform(s)[/green]")
+        console.print(f"   Snapshots saved: {result.get('snapshots_saved', 0)}")
+
+        # Show per-platform results
+        for platform, data in result.get("results", {}).items():
+            if data.get("success"):
+                console.print(
+                    f"   • {platform}: {data.get('post_count', 0)} posts, "
+                    f"{data.get('topics_count', 0)} topics"
+                )
+            else:
+                console.print(f"   • {platform}: [red]Failed - {data.get('error', 'Unknown')}[/red]")
+
+        # Generate recommendations if requested
+        if generate_recs:
+            console.print("\n[bold cyan]Generating persona recommendations...[/bold cyan]")
+
+            rec_task = ScheduledTask(
+                id="manual_persona_recommendation",
+                name="Manual Persona Recommendation",
+                task_type="persona_recommendation",
+                schedule="manual",
+                extra_params={"count": 3},
+            )
+
+            with console.status("[bold cyan]Analyzing trends...", spinner="dots"):
+                rec_result = asyncio.run(run_persona_recommendation_task(rec_task))
+
+            if rec_result.get("success"):
+                recs = rec_result.get("recommendations", [])
+                console.print(f"[green]✅ Generated {len(recs)} recommendation(s)[/green]")
+                for rec in recs:
+                    console.print(f"   • {rec.get('name')} ({rec.get('domain')})")
+                console.print("\n[dim]Use 'avatarfactory recommendations' to view details.[/dim]")
+            else:
+                console.print(f"[yellow]⚠️ Recommendation generation: {rec_result.get('error', 'Unknown')}[/yellow]")
+    else:
+        console.print(f"[red]Error: {result.get('error', 'Unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

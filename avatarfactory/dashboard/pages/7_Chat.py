@@ -139,11 +139,11 @@ with st.sidebar:
 
     # Handle no personas case
     if not personas:
-        st.warning("No personas found. Please create a persona first.")
+        st.info("No personas found. You can explore recommendations or create one.")
         st.session_state.chat_persona_id = None
     else:
-        # Build persona options without None option
-        persona_options = {}
+        # Build persona options with None option for exploration mode
+        persona_options = {"🔍 Explore / No Persona": None}
         for p in personas:
             persona_options[f"{p.get('name', 'Unknown')} ({p.get('id', '')[:12]}...)"] = p.get("id")
 
@@ -160,7 +160,8 @@ with st.sidebar:
             "Active Persona",
             current_labels,
             index=current_index,
-            key="chat_persona_select"
+            key="chat_persona_select",
+            help="Select 'Explore' to browse recommendations or get help"
         )
         st.session_state.chat_persona_id = persona_options[selected_label]
 
@@ -262,7 +263,7 @@ for message in st.session_state.chat_messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Quick actions - only show when persona is selected
+# Quick actions - different commands based on persona selection
 if st.session_state.chat_persona_id:
     st.markdown("##### Quick Commands")
     col1, col2, col3, col4 = st.columns(4)
@@ -282,6 +283,26 @@ if st.session_state.chat_persona_id:
     with col4:
         if st.button("🔄 Evolve", key="quick_suggestions", use_container_width=True):
             st.session_state.pending_message = "Show pending evolution suggestions"
+else:
+    # No persona selected - show exploration commands
+    st.markdown("##### 🔍 Explore Mode - Quick Commands")
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        if st.button("✨ Recommendations", key="quick_recs", use_container_width=True):
+            st.session_state.pending_message = "推荐角色"
+
+    with col2:
+        if st.button("📋 My Personas", key="quick_list", use_container_width=True):
+            st.session_state.pending_message = "列出所有角色"
+
+    with col3:
+        if st.button("🔥 Trends", key="quick_trends", use_container_width=True):
+            st.session_state.pending_message = "查看热点趋势"
+
+    with col4:
+        if st.button("❓ Help", key="quick_help", use_container_width=True):
+            st.session_state.pending_message = "帮助"
 
 # Process pending message from quick commands
 if st.session_state.pending_message:
@@ -303,10 +324,17 @@ if st.session_state.pending_message:
         st.markdown(assistant_message)
         st.session_state.chat_messages.append({"role": "assistant", "content": assistant_message})
 
+    # Rerun to refresh the page and show the messages in history
+    st.rerun()
+
 # Chat input (fixed at bottom by Streamlit)
-if not st.session_state.chat_persona_id:
-    st.info("Please create a persona first to start chatting.")
-elif prompt := st.chat_input("Type your message..."):
+# Allow chat in both modes: with persona or exploration mode
+placeholder_text = (
+    "Type your message..."
+    if st.session_state.chat_persona_id
+    else "Ask for recommendations, create a persona, or get help..."
+)
+if prompt := st.chat_input(placeholder_text):
     # Add user message to history
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
 

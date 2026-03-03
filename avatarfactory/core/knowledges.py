@@ -24,6 +24,8 @@ from avatarfactory.models.schemas import (
     EvolutionSuggestion,
     EvolutionFeedbackAnalysis,
     AgentConfig,
+    RecommendedPersona,
+    TrendSnapshot,
 )
 
 
@@ -45,6 +47,8 @@ class KnowledgeBase:
             self.base_path / "platform_rules",
             self.base_path / "user_feedback" / "comments",
             self.base_path / "user_feedback" / "dms",
+            self.base_path / "recommendations" / "personas",
+            self.base_path / "recommendations" / "trends",
         ]
         for dir_path in dirs:
             dir_path.mkdir(parents=True, exist_ok=True)
@@ -961,3 +965,243 @@ class KnowledgeBase:
             platforms.add(platform)
 
         return list(platforms)
+
+    # ========================================================================
+    # Recommended Personas
+    # ========================================================================
+
+    def _get_recommendations_dir(self, subdir: str = "personas") -> Path:
+        """Get recommendations directory."""
+        rec_dir = self.base_path / "recommendations" / subdir
+        rec_dir.mkdir(parents=True, exist_ok=True)
+        return rec_dir
+
+    def save_recommended_personas(
+        self,
+        personas: List[RecommendedPersona],
+        date: Optional[str] = None,
+    ) -> str:
+        """
+        Save recommended personas with date-based filename.
+
+        Args:
+            personas: List of RecommendedPersona to save
+            date: Date string (YYYY-MM-DD), defaults to today
+
+        Returns:
+            Path to saved file
+        """
+        rec_dir = self._get_recommendations_dir("personas")
+
+        if date is None:
+            date = datetime.now().strftime("%Y-%m-%d")
+
+        filename = f"{date}.json"
+        file_path = rec_dir / filename
+
+        data = [p.model_dump(mode="json") for p in personas]
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return str(file_path)
+
+    def get_recommended_personas(
+        self,
+        limit: int = 10,
+        domain: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[RecommendedPersona]:
+        """
+        Get recommended personas, optionally filtered.
+
+        Searches recent files and returns matching recommendations.
+
+        Args:
+            limit: Maximum number of recommendations to return
+            domain: Filter by domain (e.g., "tech", "lifestyle")
+            status: Filter by status (active, adopted, archived)
+
+        Returns:
+            List of RecommendedPersona, newest first
+        """
+        rec_dir = self._get_recommendations_dir("personas")
+
+        # Get all JSON files sorted by name (date) descending
+        files = sorted(rec_dir.glob("*.json"), reverse=True)
+
+        results = []
+        for file_path in files:
+            if len(results) >= limit:
+                break
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            for item in data:
+                if len(results) >= limit:
+                    break
+
+                rec = RecommendedPersona(**item)
+
+                # Apply filters
+                if domain and rec.domain.lower() != domain.lower():
+                    continue
+                if status and rec.status.value != status:
+                    continue
+
+                results.append(rec)
+
+        return results
+
+    def get_latest_recommendations(
+        self,
+        limit: int = 5,
+    ) -> List[RecommendedPersona]:
+        """
+        Get most recent active recommendations.
+
+        Args:
+            limit: Maximum number to return
+
+        Returns:
+            List of active RecommendedPersona from most recent batch
+        """
+        return self.get_recommended_personas(limit=limit, status="active")
+
+    def get_recommendation(self, rec_id: str) -> Optional[RecommendedPersona]:
+        """
+        Get a specific recommendation by ID.
+
+        Args:
+            rec_id: Recommendation ID
+
+        Returns:
+            RecommendedPersona or None if not found
+        """
+        rec_dir = self._get_recommendations_dir("personas")
+
+        # Search all files for the ID
+        for file_path in rec_dir.glob("*.json"):
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            for item in data:
+                if item.get("id") == rec_id:
+                    return RecommendedPersona(**item)
+
+        return None
+
+    def mark_recommendation_adopted(
+        self,
+        rec_id: str,
+        persona_id: str,
+    ) -> bool:
+        """
+        Mark a recommendation as adopted and link to created persona.
+
+        Args:
+            rec_id: Recommendation ID
+            persona_id: Created persona ID
+
+        Returns:
+            True if updated successfully
+        """
+        rec_dir = self._get_recommendations_dir("personas")
+
+        # Find and update the recommendation
+        for file_path in rec_dir.glob("*.json"):
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            updated = False
+            for i, item in enumerate(data):
+                if item.get("id") == rec_id:
+                    data[i]["status"] = "adopted"
+                    data[i]["adopted_persona_id"] = persona_id
+                    updated = True
+                    break
+
+            if updated:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                return True
+
+        return False
+
+    # ========================================================================
+    # Trend Snapshots
+    # ========================================================================
+
+    def save_trend_snapshot(self, snapshot: TrendSnapshot) -> str:
+        """
+        Save a trend snapshot.
+
+        Args:
+            snapshot: TrendSnapshot to save
+
+        Returns:
+            Path to saved file
+        """
+        trend_dir = self._get_recommendations_dir("trends")
+
+        # Filename: {date}_{platform}.json
+        date_str = snapshot.captured_at.strftime("%Y-%m-%d")
+        filename = f"{date_str}_{snapshot.platform}.json"
+        file_path = trend_dir / filename
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(snapshot.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
+
+        return str(file_path)
+
+    def get_latest_trend_snapshots(
+        self,
+        platform: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[TrendSnapshot]:
+        """
+        Get latest trend snapshots.
+
+        Args:
+            platform: Filter by platform (optional)
+            limit: Maximum number to return
+
+        Returns:
+            List of TrendSnapshot, newest first
+        """
+        trend_dir = self._get_recommendations_dir("trends")
+
+        if platform:
+            pattern = f"*_{platform}.json"
+        else:
+            pattern = "*.json"
+
+        files = sorted(trend_dir.glob(pattern), reverse=True)[:limit]
+
+        results = []
+        for file_path in files:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            results.append(TrendSnapshot(**data))
+
+        return results
+
+    def get_today_trend_snapshots(self) -> List[TrendSnapshot]:
+        """
+        Get all trend snapshots from today.
+
+        Returns:
+            List of TrendSnapshot from today
+        """
+        trend_dir = self._get_recommendations_dir("trends")
+        today = datetime.now().strftime("%Y-%m-%d")
+        pattern = f"{today}_*.json"
+
+        results = []
+        for file_path in trend_dir.glob(pattern):
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            results.append(TrendSnapshot(**data))
+
+        return results
+

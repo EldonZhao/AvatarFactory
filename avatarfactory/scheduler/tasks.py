@@ -498,6 +498,254 @@ async def run_retrospective(task: ScheduledTask) -> Dict[str, Any]:
 
 
 # =============================================================================
+# System-Level Task Runners (No Persona Required)
+# =============================================================================
+
+
+@TaskRegistry.register("trend_scan")
+async def run_trend_scan_task(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run system-level trend scan across all configured platforms.
+
+    This is a global task that doesn't require a persona - it scans trends
+    across platforms and saves snapshots for persona recommendation.
+
+    Expected task params:
+    - platforms: List[str] (default: ["bluesky"])
+    """
+    import os
+    import uuid
+    from datetime import datetime
+
+    from avatarfactory.connectors import ConnectorConfig, get_connector
+    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.llm_provider import LLMProviderFactory
+    from avatarfactory.models.schemas import TrendSnapshot
+
+    platforms = task.extra_params.get("platforms", ["bluesky"])
+    limit = task.extra_params.get("limit", 30)
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+    provider = LLMProviderFactory.from_env()
+
+    results = {}
+    snapshots = []
+
+    for platform in platforms:
+        try:
+            # Build connector config from environment
+            config = ConnectorConfig()
+            if platform.lower() == "bluesky":
+                config.username = os.getenv("BLUESKY_USERNAME")
+                config.password = os.getenv("BLUESKY_PASSWORD")
+            elif platform.lower() == "twitter":
+                config.api_key = os.getenv("TWITTER_API_KEY")
+                config.api_secret = os.getenv("TWITTER_API_SECRET")
+                config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+            elif platform.lower() == "xiaohongshu":
+                config.cookie = os.getenv("XIAOHONGSHU_COOKIE")
+                config.user_id = os.getenv("XIAOHONGSHU_USER_ID")
+
+            connector = get_connector(platform, config)
+            await connector.connect()
+
+            # Fetch trending content without specific query (general trending)
+            result = await connector.fetch_trending(limit=limit)
+
+            if result.success:
+                posts = result.data or []
+
+                # Extract trending topics and hashtags
+                topics = set()
+                hashtags = set()
+                for post in posts:
+                    body = post.get("body", "")
+                    # Extract hashtags
+                    import re
+                    tags = re.findall(r"#(\w+)", body)
+                    hashtags.update(tags)
+                    # Use first line or sentence as topic
+                    first_line = body.split("\n")[0][:100]
+                    if first_line:
+                        topics.add(first_line)
+
+                # Analyze trends with LLM
+                analysis = await _analyze_trends_for_snapshot(
+                    provider, posts[:20], platform
+                )
+
+                # Create snapshot
+                snapshot = TrendSnapshot(
+                    id=f"snap_{uuid.uuid4().hex[:8]}",
+                    platform=platform,
+                    captured_at=datetime.now(),
+                    trending_topics=list(topics)[:20],
+                    trending_hashtags=list(hashtags)[:20],
+                    top_posts=posts[:10],
+                    analysis_summary=analysis.get("summary", ""),
+                    key_themes=analysis.get("themes", []),
+                    content_patterns=analysis.get("patterns", []),
+                )
+
+                # Save snapshot
+                kb.save_trend_snapshot(snapshot)
+                snapshots.append(snapshot)
+
+                results[platform] = {
+                    "success": True,
+                    "post_count": len(posts),
+                    "topics_count": len(topics),
+                    "hashtags_count": len(hashtags),
+                }
+            else:
+                results[platform] = {
+                    "success": False,
+                    "error": result.error,
+                }
+
+            await connector.disconnect()
+
+        except Exception as e:
+            logger.error(f"Trend scan failed for {platform}: {e}")
+            results[platform] = {
+                "success": False,
+                "error": str(e),
+            }
+
+    return {
+        "success": any(r.get("success") for r in results.values()),
+        "platforms_scanned": len(platforms),
+        "results": results,
+        "snapshots_saved": len(snapshots),
+    }
+
+
+async def _analyze_trends_for_snapshot(
+    provider,
+    posts: list,
+    platform: str,
+) -> Dict[str, Any]:
+    """Analyze posts to extract themes and patterns for snapshot."""
+    if not posts:
+        return {"summary": "", "themes": [], "patterns": []}
+
+    # Build posts context
+    posts_text = "\n".join([
+        f"- {p.get('body', '')[:200]}" for p in posts[:15]
+    ])
+
+    prompt = f"""Analyze these trending posts from {platform} and extract:
+1. A brief summary of overall trends (2-3 sentences)
+2. Key themes (5-10 topics)
+3. Content patterns (structural or stylistic patterns)
+
+Posts:
+{posts_text}
+
+Return as JSON:
+```json
+{{
+  "summary": "string",
+  "themes": ["string"],
+  "patterns": ["string"]
+}}
+```"""
+
+    try:
+        response = await provider.generate(
+            prompt=prompt,
+            system="You are a social media trend analyst. Extract key trends and patterns.",
+            temperature=0.5,
+            max_tokens=1024,
+        )
+
+        # Parse JSON
+        import json
+        if "```json" in response:
+            start = response.find("```json") + 7
+            end = response.find("```", start)
+            json_str = response[start:end].strip()
+        elif "```" in response:
+            start = response.find("```") + 3
+            end = response.find("```", start)
+            json_str = response[start:end].strip()
+        else:
+            json_str = response
+
+        return json.loads(json_str)
+    except Exception as e:
+        logger.warning(f"Trend analysis failed: {e}")
+        return {"summary": "", "themes": [], "patterns": []}
+
+
+@TaskRegistry.register("persona_recommendation")
+async def run_persona_recommendation_task(task: ScheduledTask) -> Dict[str, Any]:
+    """
+    Run persona recommendation task - generates recommended personas from trends.
+
+    This is a system-level task that reads today's trend snapshots and
+    generates persona recommendations.
+
+    Expected task params:
+    - count: int (default: 3)
+    """
+    import os
+
+    from avatarfactory.agents.recommendation import RecommendationAgent
+    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.llm_provider import LLMProviderFactory
+
+    count = task.extra_params.get("count", 3)
+
+    kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+    kb = KnowledgeBase(kb_path)
+    provider = LLMProviderFactory.from_env()
+
+    # Get today's trend snapshots
+    snapshots = kb.get_today_trend_snapshots()
+
+    if not snapshots:
+        # Fallback: get latest snapshots
+        snapshots = kb.get_latest_trend_snapshots(limit=5)
+
+    if not snapshots:
+        return {
+            "success": False,
+            "error": "No trend snapshots available. Run trend_scan first.",
+        }
+
+    # Generate recommendations
+    agent = RecommendationAgent(knowledge_base=kb, llm_provider=provider)
+    recommendations = await agent.generate_recommendations(snapshots, count)
+
+    if recommendations:
+        # Save recommendations
+        kb.save_recommended_personas(recommendations)
+
+        return {
+            "success": True,
+            "recommendations_count": len(recommendations),
+            "recommendations": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "domain": r.domain,
+                    "tagline": r.tagline,
+                    "relevance_score": r.relevance_score,
+                    "potential_score": r.potential_score,
+                }
+                for r in recommendations
+            ],
+        }
+    else:
+        return {
+            "success": False,
+            "error": "Failed to generate recommendations",
+        }
+
+
+# =============================================================================
 # Publish Content Helper
 # =============================================================================
 

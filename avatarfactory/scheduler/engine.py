@@ -117,6 +117,9 @@ class Scheduler:
         # Load persisted state
         self._load_state()
 
+        # Ensure system-level tasks exist
+        self._ensure_system_tasks()
+
     def _load_state(self) -> None:
         """Load persisted scheduler state."""
         tasks_file = self._data_dir / "tasks.json"
@@ -145,6 +148,49 @@ class Scheduler:
                     self._publish_queue = [PublishQueueItem(**item) for item in data]
             except Exception as e:
                 logger.warning(f"Failed to load publish queue: {e}")
+
+    def _ensure_system_tasks(self) -> None:
+        """
+        Ensure system-level scheduled tasks exist.
+
+        These are global tasks that don't require a persona:
+        - trend_scan: Daily scan of trending topics across platforms
+        - persona_recommendation: Daily persona recommendations based on trends
+        """
+        system_tasks = [
+            {
+                "id": "system_trend_scan",
+                "name": "Daily Trend Scan",
+                "task_type": "trend_scan",
+                "schedule": "0 8 * * *",  # Daily at 8 AM
+                "enabled": True,
+                "persona_id": None,
+                "platform": None,
+                "extra_params": {"platforms": ["bluesky"]},
+            },
+            {
+                "id": "system_persona_recommendation",
+                "name": "Daily Persona Recommendation",
+                "task_type": "persona_recommendation",
+                "schedule": "0 9 * * *",  # Daily at 9 AM (1 hour after trend scan)
+                "enabled": True,
+                "persona_id": None,
+                "platform": None,
+                "extra_params": {"count": 3},
+            },
+        ]
+
+        added = False
+        for task_dict in system_tasks:
+            task_id = task_dict["id"]
+            if task_id not in self._tasks:
+                task = ScheduledTask(**task_dict)
+                self._tasks[task_id] = task
+                added = True
+                logger.info(f"Added system task: {task.name}")
+
+        if added:
+            self._save_state()
 
     def _save_state(self) -> None:
         """

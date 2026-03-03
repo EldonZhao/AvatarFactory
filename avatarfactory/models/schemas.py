@@ -540,6 +540,98 @@ class DiscoveryReport(BaseModel):
 
 
 # ============================================================================
+# Recommendation Models
+# ============================================================================
+
+
+class RecommendationStatus(str, Enum):
+    """Status of a recommended persona"""
+
+    ACTIVE = "active"
+    ADOPTED = "adopted"
+    ARCHIVED = "archived"
+
+
+class RecommendedPersona(BaseModel):
+    """Recommended persona template based on trending topics"""
+
+    id: str = Field(..., description="Unique recommendation ID (rec_persona_xxxxx)")
+    created_at: datetime = Field(default_factory=datetime.now)
+    source_platforms: List[str] = Field(
+        default_factory=list, description="Platforms where trends were discovered"
+    )
+    source_trends: List[str] = Field(
+        default_factory=list, description="Related trending topics"
+    )
+
+    # Core persona info
+    name: str = Field(..., description="Recommended persona name")
+    tagline: str = Field(..., description="One-line positioning statement")
+    domain: str = Field(..., description="Domain/niche (tech, lifestyle, finance, etc.)")
+    expertise: List[str] = Field(default_factory=list, description="Areas of expertise")
+
+    # Target audience
+    target_audience: str = Field(..., description="Primary target audience")
+    audience_pain_points: List[str] = Field(
+        default_factory=list, description="Audience pain points to address"
+    )
+
+    # Style suggestions
+    suggested_tone: str = Field(default="professional", description="Suggested tone")
+    content_types: List[str] = Field(
+        default_factory=list, description="Recommended content types"
+    )
+    content_pillars: List[str] = Field(
+        default_factory=list, description="Suggested content pillars"
+    )
+
+    # Scoring and rationale
+    relevance_score: float = Field(
+        default=0.0, ge=0, le=100, description="Trend relevance score (0-100)"
+    )
+    potential_score: float = Field(
+        default=0.0, ge=0, le=100, description="Growth potential score (0-100)"
+    )
+    rationale: str = Field(default="", description="Recommendation rationale")
+
+    # Status
+    status: RecommendationStatus = Field(
+        default=RecommendationStatus.ACTIVE, description="Recommendation status"
+    )
+    adopted_persona_id: Optional[str] = Field(
+        None, description="Created persona ID if adopted"
+    )
+
+
+class TrendSnapshot(BaseModel):
+    """Snapshot of trending topics from a platform"""
+
+    id: str = Field(..., description="Snapshot ID")
+    platform: str = Field(..., description="Source platform")
+    captured_at: datetime = Field(default_factory=datetime.now)
+
+    # Trending data
+    trending_topics: List[str] = Field(
+        default_factory=list, description="Top trending topics"
+    )
+    trending_hashtags: List[str] = Field(
+        default_factory=list, description="Trending hashtags"
+    )
+    top_posts: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Sample top posts"
+    )
+
+    # Analysis
+    analysis_summary: str = Field(default="", description="AI analysis summary")
+    key_themes: List[str] = Field(
+        default_factory=list, description="Identified key themes"
+    )
+    content_patterns: List[str] = Field(
+        default_factory=list, description="Observed content patterns"
+    )
+
+
+# ============================================================================
 # Evolution Models
 # ============================================================================
 

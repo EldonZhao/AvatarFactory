@@ -3,12 +3,15 @@
  * All data is fetched from the FastAPI backend via API calls.
  */
 
-const API_BASE_URL = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+// API base URL - use environment variable or default
+// In SSR mode, we need to call the backend directly
+const API_BASE_URL = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
 
 interface FetchOptions {
   method?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  cookie?: string; // For SSR - pass cookie header from request
 }
 
 async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
@@ -19,10 +22,16 @@ async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promis
     ...options.headers,
   };
 
+  // Pass cookie for SSR authentication
+  if (options.cookie) {
+    headers['Cookie'] = options.cookie;
+  }
+
   const response = await fetch(url, {
     method: options.method || 'GET',
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
+    credentials: 'include', // Include cookies for client-side requests
   });
 
   if (!response.ok) {
@@ -60,8 +69,8 @@ export interface DashboardData {
   scheduler_running: boolean;
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
-  return apiFetch<DashboardData>('/api/admin/dashboard');
+export async function getDashboardData(cookie?: string): Promise<DashboardData> {
+  return apiFetch<DashboardData>('/api/admin/dashboard', { cookie });
 }
 
 // Personas
@@ -80,8 +89,8 @@ export interface PersonasResponse {
   personas: PersonaSummary[];
 }
 
-export async function getPersonas(): Promise<PersonasResponse> {
-  return apiFetch<PersonasResponse>('/api/personas/');
+export async function getPersonas(cookie?: string): Promise<PersonasResponse> {
+  return apiFetch<PersonasResponse>('/api/admin/personas', { cookie });
 }
 
 export interface PersonaDetail {
@@ -97,8 +106,8 @@ export interface PersonaDetail {
   updated_at?: string;
 }
 
-export async function getPersona(id: string): Promise<PersonaDetail> {
-  return apiFetch<PersonaDetail>(`/api/personas/${id}`);
+export async function getPersona(id: string, cookie?: string): Promise<PersonaDetail> {
+  return apiFetch<PersonaDetail>(`/api/admin/personas/${id}`, { cookie });
 }
 
 // Content
@@ -107,6 +116,7 @@ export interface ContentFilters {
   status?: string;
   platform?: string;
   limit?: number;
+  cookie?: string;
 }
 
 export interface ContentSummary {
@@ -133,7 +143,7 @@ export async function getContents(params?: ContentFilters): Promise<ContentsResp
   if (params?.limit) searchParams.set('limit', params.limit.toString());
 
   const query = searchParams.toString();
-  return apiFetch<ContentsResponse>(`/api/contents/${query ? `?${query}` : ''}`);
+  return apiFetch<ContentsResponse>(`/api/admin/content${query ? `?${query}` : ''}`, { cookie: params?.cookie });
 }
 
 export interface ContentDetail {
@@ -154,8 +164,8 @@ export interface ContentDetail {
   updated_at?: string;
 }
 
-export async function getContent(id: string): Promise<ContentDetail> {
-  return apiFetch<ContentDetail>(`/api/contents/${id}`);
+export async function getContent(id: string, cookie?: string): Promise<ContentDetail> {
+  return apiFetch<ContentDetail>(`/api/admin/content/${id}`, { cookie });
 }
 
 // Scheduler
@@ -177,8 +187,8 @@ export interface SchedulerTasksResponse {
   tasks: SchedulerTask[];
 }
 
-export async function getSchedulerTasks(): Promise<SchedulerTasksResponse> {
-  return apiFetch<SchedulerTasksResponse>('/api/scheduler/tasks');
+export async function getSchedulerTasks(cookie?: string): Promise<SchedulerTasksResponse> {
+  return apiFetch<SchedulerTasksResponse>('/api/admin/scheduler/tasks', { cookie });
 }
 
 // Topics/Discoveries
@@ -194,8 +204,8 @@ export interface TopicsResponse {
   discoveries: TopicSummary[];
 }
 
-export async function getTopics(): Promise<TopicsResponse> {
-  return apiFetch<TopicsResponse>('/api/discoveries/');
+export async function getTopics(cookie?: string): Promise<TopicsResponse> {
+  return apiFetch<TopicsResponse>('/api/admin/topics', { cookie });
 }
 
 // Connectors
@@ -211,6 +221,6 @@ export interface ConnectorsResponse {
   connectors: ConnectorStatus[];
 }
 
-export async function getConnectors(): Promise<ConnectorsResponse> {
-  return apiFetch<ConnectorsResponse>('/api/connectors/');
+export async function getConnectors(cookie?: string): Promise<ConnectorsResponse> {
+  return apiFetch<ConnectorsResponse>('/api/admin/connectors', { cookie });
 }

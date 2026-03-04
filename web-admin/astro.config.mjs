@@ -7,6 +7,9 @@ import node from '@astrojs/node';
 const isProduction = process.env.NODE_ENV === 'production' || process.env.ASTRO_BASE;
 const base = isProduction ? '/admin' : '';
 
+// API base URL for development proxy
+const apiBase = process.env.ADMIN_API_BASE || 'http://localhost:8000';
+
 export default defineConfig({
   integrations: [react()],
   base: base,
@@ -15,6 +18,14 @@ export default defineConfig({
     resolve: {
       alias: {
         '@': '/src'
+      }
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: apiBase,
+          changeOrigin: true
+        }
       }
     }
   },

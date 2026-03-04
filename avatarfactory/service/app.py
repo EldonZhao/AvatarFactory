@@ -316,6 +316,10 @@ def create_app(
     from avatarfactory.service.admin_routes import router as admin_router
     application.include_router(admin_router)
 
+    # Register Admin auth routes (for Admin dashboard authentication)
+    from avatarfactory.service.auth_routes import router as auth_router
+    application.include_router(auth_router)
+
     # Register routes
     register_routes(application)
 

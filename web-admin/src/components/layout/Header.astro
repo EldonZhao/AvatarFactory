@@ -3,6 +3,9 @@
 const monitorUrl = import.meta.env.MONITOR_URL || (import.meta.env.DEV ? 'http://localhost:4321' : '/monitor/');
 // Journal URL: /journal/ in production, localhost in dev
 const journalUrl = import.meta.env.JOURNAL_URL || (import.meta.env.DEV ? 'http://localhost:4328' : '/journal/');
+
+// Get user from locals (set by middleware)
+const user = Astro.locals.user;
 ---
 
 <header class="h-16 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] flex items-center justify-between px-6">
@@ -56,14 +59,60 @@ const journalUrl = import.meta.env.JOURNAL_URL || (import.meta.env.DEV ? 'http:/
       </svg>
       <span class="hidden sm:inline">Monitor</span>
     </a>
+
+    <!-- User dropdown separator -->
+    <div class="h-6 w-px bg-[hsl(var(--border))]"></div>
+
+    <!-- User info and logout -->
+    {user ? (
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 px-2 py-1">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <span class="text-sm font-medium text-white">
+              {user.username.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <span class="hidden sm:inline text-sm font-medium text-[hsl(var(--foreground))]">
+            {user.username}
+          </span>
+        </div>
+        <button
+          id="logout-btn"
+          class="p-2 rounded-lg hover:bg-red-500/10 text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors"
+          title="Logout"
+        >
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
+    ) : (
+      <a
+        href="/login"
+        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-[hsl(var(--accent))] transition-colors text-[hsl(var(--muted-foreground))]"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+        </svg>
+        <span>Login</span>
+      </a>
+    )}
   </div>
 </header>
 
 <script>
+  import { logout } from '../../lib/auth';
+
   const themeToggle = document.getElementById('theme-toggle');
+  const logoutBtn = document.getElementById('logout-btn');
 
   themeToggle?.addEventListener('click', () => {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  });
+
+  logoutBtn?.addEventListener('click', async () => {
+    await logout();
+    window.location.href = '/login';
   });
 </script>

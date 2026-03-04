@@ -2,8 +2,11 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { ContentList } from '../../components/dashboard/ContentCard';
 
-const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
 const base = import.meta.env.BASE_URL || '';
+
+// Get cookie from request for SSR authentication
+const cookie = Astro.request.headers.get('cookie') || '';
 
 // Get query params
 const url = new URL(Astro.request.url);
@@ -23,14 +26,18 @@ try {
   if (filterPlatform) params.set('platform', filterPlatform);
   params.set('limit', '100');
 
-  const contentResponse = await fetch(`${API_BASE}/api/admin/content?${params}`);
+  const contentResponse = await fetch(`${API_BASE}/api/admin/content?${params}`, {
+    headers: { 'Cookie': cookie }
+  });
   if (contentResponse.ok) {
     const data = await contentResponse.json();
     contents = data.content || [];
   }
 
   // Fetch personas for filter dropdown
-  const personasResponse = await fetch(`${API_BASE}/api/admin/personas`);
+  const personasResponse = await fetch(`${API_BASE}/api/admin/personas`, {
+    headers: { 'Cookie': cookie }
+  });
   if (personasResponse.ok) {
     const data = await personasResponse.json();
     personas = data.personas || [];

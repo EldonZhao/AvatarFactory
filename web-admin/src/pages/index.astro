@@ -6,12 +6,15 @@ import { ConnectorList } from '../components/dashboard/ConnectorList';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { getDashboardData } from '../lib/data';
 
+// Get cookie from request for SSR authentication
+const cookie = Astro.request.headers.get('cookie') || '';
+
 // Fetch dashboard data
 let dashboard = null;
 let error = null;
 
 try {
-  dashboard = await getDashboardData();
+  dashboard = await getDashboardData(cookie);
 } catch (e) {
   error = `Failed to fetch: ${e}`;
 }

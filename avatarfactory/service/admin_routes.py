@@ -6,11 +6,40 @@ Provides aggregated endpoints for the admin dashboard UI.
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+
+# =============================================================================
+# Authentication Dependency
+# =============================================================================
+
+
+async def require_admin_auth(admin_token: Optional[str] = Cookie(None)) -> dict:
+    """
+    Dependency to require admin authentication.
+
+    Returns the current user info if authenticated, raises 401 otherwise.
+    """
+    if not admin_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    from avatarfactory.service.auth_routes import verify_token
+
+    payload = verify_token(admin_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    return {"username": payload.get("sub", "")}
 
 
 # =============================================================================
@@ -85,7 +114,7 @@ def get_scheduler():
 # =============================================================================
 
 
-@router.get("/dashboard", response_model=DashboardResponse)
+@router.get("/dashboard", response_model=DashboardResponse, dependencies=[Depends(require_admin_auth)])
 async def get_dashboard():
     """
     Get dashboard overview data.
@@ -194,7 +223,7 @@ async def get_dashboard():
     )
 
 
-@router.get("/personas")
+@router.get("/personas", dependencies=[Depends(require_admin_auth)])
 async def list_personas_admin():
     """
     List all personas with extended info for admin.
@@ -238,7 +267,7 @@ async def list_personas_admin():
     }
 
 
-@router.get("/personas/{persona_id}")
+@router.get("/personas/{persona_id}", dependencies=[Depends(require_admin_auth)])
 async def get_persona_admin(persona_id: str):
     """Get persona detail for admin."""
     orchestrator = get_orchestrator()
@@ -281,7 +310,7 @@ async def get_persona_admin(persona_id: str):
     }
 
 
-@router.get("/content")
+@router.get("/content", dependencies=[Depends(require_admin_auth)])
 async def list_content_admin(
     persona_id: Optional[str] = None,
     content_status: Optional[str] = None,
@@ -327,7 +356,7 @@ async def list_content_admin(
     }
 
 
-@router.get("/content/{content_id}")
+@router.get("/content/{content_id}", dependencies=[Depends(require_admin_auth)])
 async def get_content_admin(content_id: str):
     """Get content detail for admin."""
     orchestrator = get_orchestrator()
@@ -370,7 +399,7 @@ async def get_content_admin(content_id: str):
     }
 
 
-@router.delete("/content/{content_id}")
+@router.delete("/content/{content_id}", dependencies=[Depends(require_admin_auth)])
 async def delete_content_admin(content_id: str):
     """Delete a content item."""
     orchestrator = get_orchestrator()
@@ -394,7 +423,7 @@ async def delete_content_admin(content_id: str):
     return {"status": "deleted", "content_id": content_id}
 
 
-@router.get("/scheduler/tasks")
+@router.get("/scheduler/tasks", dependencies=[Depends(require_admin_auth)])
 async def list_scheduler_tasks_admin():
     """List all scheduler tasks grouped by persona."""
     orchestrator = get_orchestrator()
@@ -448,7 +477,7 @@ async def list_scheduler_tasks_admin():
     }
 
 
-@router.get("/topics")
+@router.get("/topics", dependencies=[Depends(require_admin_auth)])
 async def list_topics_admin(
     persona_id: Optional[str] = None,
     limit: int = 50,
@@ -491,7 +520,7 @@ async def list_topics_admin(
     }
 
 
-@router.get("/connectors")
+@router.get("/connectors", dependencies=[Depends(require_admin_auth)])
 async def list_connectors_admin():
     """Get detailed connector status for admin."""
     import os

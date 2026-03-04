@@ -77,8 +77,9 @@ COPY pyproject.toml setup.py README.md ./
 # Install package
 RUN pip install --no-cache-dir -e .
 
-# Copy Chronicle SSR build from builder
+# Copy Chronicle SSR build from builder (dist + node_modules for runtime deps)
 COPY --from=web-builder /web/dist /app/chronicle
+COPY --from=web-builder /web/node_modules /app/chronicle/node_modules
 
 # Create knowledge directory
 RUN mkdir -p /app/knowledges

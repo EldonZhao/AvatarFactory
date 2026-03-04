@@ -14,9 +14,10 @@ function buildHref(path: string): string {
 
 const navItems = [
   { href: buildHref('/'), label: 'Dashboard', icon: 'home' },
-  { href: buildHref('/avatars'), label: 'Avatars', icon: 'users' },
+  { href: buildHref('/personas'), label: 'Personas', icon: 'users' },
+  { href: buildHref('/content'), label: 'Content', icon: 'file-text' },
   { href: buildHref('/scheduler'), label: 'Scheduler', icon: 'clock' },
-  { href: buildHref('/stats'), label: 'Statistics', icon: 'chart' },
+  { href: buildHref('/topics'), label: 'Topics', icon: 'trending' },
 ];
 
 function isActive(href: string): boolean {
@@ -31,12 +32,12 @@ function isActive(href: string): boolean {
     <a href={buildHref('/')} class="flex items-center gap-3 group">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/25 transition-shadow">
         <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
         </svg>
       </div>
       <div>
-        <h1 class="font-bold text-lg gradient-text">Avatar Monitor</h1>
-        <p class="text-xs text-[hsl(var(--muted-foreground))]">Real-time Monitoring</p>
+        <h1 class="font-bold text-lg gradient-text">Avatar Admin</h1>
+        <p class="text-xs text-[hsl(var(--muted-foreground))]">Management Dashboard</p>
       </div>
     </a>
   </div>
@@ -64,14 +65,19 @@ function isActive(href: string): boolean {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             )}
+            {item.icon === 'file-text' && (
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
             {item.icon === 'clock' && (
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             )}
-            {item.icon === 'chart' && (
+            {item.icon === 'trending' && (
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             )}
             {item.label}
@@ -83,8 +89,8 @@ function isActive(href: string): boolean {
 
   <div class="px-3 pb-6">
     <div class="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
-      <p class="text-xs text-[hsl(var(--muted-foreground))] mb-2">Data Source</p>
-      <p class="text-sm font-medium">knowledges/</p>
+      <p class="text-xs text-[hsl(var(--muted-foreground))] mb-2">API Endpoint</p>
+      <p class="text-sm font-medium">/api/*</p>
     </div>
   </div>
 </aside>

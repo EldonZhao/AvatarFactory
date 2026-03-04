@@ -1,0 +1,187 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+let topicsData: any = null;
+let error = null;
+
+try {
+  const response = await fetch(`${API_BASE}/api/admin/topics`);
+  if (response.ok) {
+    topicsData = await response.json();
+  }
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+
+const grouped = topicsData?.grouped || {};
+const totalCount = topicsData?.count || 0;
+const personaCount = Object.keys(grouped).length;
+const ideasCount = Object.values(grouped).reduce((acc: number, g: any) => acc + (g.topics?.reduce((sum: number, t: any) => sum + (t.ideas?.length || 0), 0) || 0), 0);
+---
+
+<AdminLayout title="Topics">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">Topics</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          发现的热门话题和创意
+        </p>
+      </div>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : (
+      <>
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="rounded-xl border bg-[hsl(var(--card))] border-[hsl(var(--border))] overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">话题发现</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{totalCount}</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border bg-[hsl(var(--card))] border-[hsl(var(--border))] overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">Personas</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{personaCount}</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border bg-[hsl(var(--card))] border-[hsl(var(--border))] overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">内容创意</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{ideasCount}</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white shadow-lg">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {Object.keys(grouped).length > 0 ? (
+          <div class="space-y-6">
+            {Object.entries(grouped).map(([personaId, data]: [string, any]) => (
+              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                      {data.persona_name.charAt(0)}
+                    </div>
+                    <div>
+                      <h2 class="font-semibold">{data.persona_name}</h2>
+                      <p class="text-xs text-[hsl(var(--muted-foreground))]">{data.topics.length} 次发现</p>
+                    </div>
+                  </div>
+                  <a
+                    href={`${base}/personas/${personaId}`}
+                    class="text-sm text-[hsl(var(--primary))] hover:underline"
+                  >
+                    查看 Persona →
+                  </a>
+                </div>
+
+                <div class="space-y-4">
+                  {data.topics.map((discovery: any) => (
+                    <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                      <div class="flex items-start justify-between mb-2">
+                        <span class="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                          {discovery.platform}
+                        </span>
+                        <span class="text-xs text-[hsl(var(--muted-foreground))]">
+                          {discovery.discovered_at ? new Date(discovery.discovered_at).toLocaleString('zh-CN') : '-'}
+                        </span>
+                      </div>
+
+                      {discovery.topics && discovery.topics.length > 0 && (
+                        <div class="mb-3">
+                          <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">热门话题</p>
+                          <div class="flex flex-wrap gap-1">
+                            {discovery.topics.map((topic: string) => (
+                              <span class="text-xs px-2 py-0.5 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                                {topic}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {discovery.ideas && discovery.ideas.length > 0 && (
+                        <div>
+                          <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">内容创意</p>
+                          <ul class="space-y-1">
+                            {discovery.ideas.map((idea: string) => (
+                              <li class="flex items-start gap-2 text-sm">
+                                <svg class="w-4 h-4 text-[hsl(var(--primary))] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                                <span>{idea}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div class="p-12 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-center">
+            <div class="w-16 h-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">暂无话题发现</h3>
+            <p class="text-[hsl(var(--muted-foreground))] mb-4">
+              配置定时任务后，系统会自动发现热门话题
+            </p>
+            <a
+              href={`${base}/scheduler`}
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+            >
+              配置任务
+            </a>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+</AdminLayout>

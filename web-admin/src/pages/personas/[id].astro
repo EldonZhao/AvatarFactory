@@ -1,0 +1,273 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const { id } = Astro.params;
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+let persona: any = null;
+let error = null;
+
+try {
+  const response = await fetch(`${API_BASE}/api/admin/personas/${id}`);
+  if (response.ok) {
+    persona = await response.json();
+  } else if (response.status === 404) {
+    error = 'Persona 不存在';
+  } else {
+    error = `API error: ${response.status}`;
+  }
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+---
+
+<AdminLayout title={persona?.identity?.name || 'Persona'}>
+  <div class="space-y-6 animate-fade-in">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+      <a href={`${base}/personas`} class="hover:text-[hsl(var(--foreground))]">Personas</a>
+      <span>/</span>
+      <span class="text-[hsl(var(--foreground))]">{persona?.identity?.name || id}</span>
+    </nav>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : persona ? (
+      <>
+        <!-- Header -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <div class="flex items-start gap-4">
+            <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shrink-0">
+              {persona.identity?.name?.charAt(0) || '?'}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-3 mb-1">
+                <h1 class="text-2xl font-bold">{persona.identity?.name}</h1>
+                <span class="px-2 py-0.5 text-xs rounded bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))]">
+                  {persona.version}
+                </span>
+              </div>
+              <p class="text-[hsl(var(--muted-foreground))]">{persona.identity?.tagline}</p>
+              <div class="flex flex-wrap gap-2 mt-3">
+                {persona.platforms?.map((platform: string) => (
+                  <span class="px-3 py-1 text-sm rounded-full bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                    {platform}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              <button class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium">
+                编辑
+              </button>
+              <button class="px-4 py-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors text-sm font-medium">
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">总内容</p>
+            <p class="text-2xl font-bold mt-1">{persona.content_count}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">草稿</p>
+            <p class="text-2xl font-bold mt-1">{persona.draft_count}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">已发布</p>
+            <p class="text-2xl font-bold mt-1">{persona.published_count}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">版本历史</p>
+            <p class="text-2xl font-bold mt-1">{persona.versions?.length || 0}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Identity -->
+          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <h2 class="text-lg font-semibold mb-4">Identity</h2>
+            <div class="space-y-3">
+              <div>
+                <p class="text-sm text-[hsl(var(--muted-foreground))]">Name</p>
+                <p class="font-medium">{persona.identity?.name}</p>
+              </div>
+              <div>
+                <p class="text-sm text-[hsl(var(--muted-foreground))]">Tagline</p>
+                <p>{persona.identity?.tagline}</p>
+              </div>
+              {persona.identity?.expertise && persona.identity.expertise.length > 0 && (
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))]">Expertise</p>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    {persona.identity.expertise.map((exp: string) => (
+                      <span class="px-2 py-0.5 text-xs rounded bg-[hsl(var(--accent))]">{exp}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <!-- Voice Style -->
+          {persona.voice_style && (
+            <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+              <h2 class="text-lg font-semibold mb-4">Voice Style</h2>
+              <div class="space-y-3">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))]">Tone</p>
+                  <p class="font-medium">{persona.voice_style.tone}</p>
+                </div>
+                {persona.voice_style.emoji_usage && (
+                  <div>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Emoji Usage</p>
+                    <p>{persona.voice_style.emoji_usage}</p>
+                  </div>
+                )}
+                {persona.voice_style.language_patterns && persona.voice_style.language_patterns.length > 0 && (
+                  <div>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Language Patterns</p>
+                    <ul class="text-sm mt-1 space-y-1">
+                      {persona.voice_style.language_patterns.map((pattern: string) => (
+                        <li class="flex items-start gap-2">
+                          <span class="text-[hsl(var(--primary))]">•</span>
+                          <span>{pattern}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <!-- Target Audience -->
+          {persona.target_audience && (
+            <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+              <h2 class="text-lg font-semibold mb-4">Target Audience</h2>
+              <div class="space-y-3">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))]">Primary</p>
+                  <p>{persona.target_audience.primary}</p>
+                </div>
+                {persona.target_audience.pain_points && persona.target_audience.pain_points.length > 0 && (
+                  <div>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))]">Pain Points</p>
+                    <ul class="text-sm mt-1 space-y-1">
+                      {persona.target_audience.pain_points.map((point: string) => (
+                        <li class="flex items-start gap-2">
+                          <span class="text-red-500">•</span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <!-- Scheduled Tasks -->
+          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-semibold">Scheduled Tasks</h2>
+              <a href={`${base}/scheduler`} class="text-sm text-[hsl(var(--primary))] hover:underline">
+                管理任务
+              </a>
+            </div>
+            {persona.tasks && persona.tasks.length > 0 ? (
+              <div class="space-y-2">
+                {persona.tasks.map((task: any) => (
+                  <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+                    <div class="flex items-center justify-between">
+                      <span class="font-medium text-sm">{task.name}</span>
+                      <span class={`text-xs px-2 py-0.5 rounded ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-500'}`}>
+                        {task.enabled ? '启用' : '禁用'}
+                      </span>
+                    </div>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                      {task.schedule} • {task.task_type}
+                    </p>
+                    {task.last_run && (
+                      <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                        上次运行: {new Date(task.last_run).toLocaleString('zh-CN')}
+                        {task.last_status && (
+                          <span class={task.last_status === 'success' ? 'text-green-500' : 'text-red-500'}>
+                            {' '}({task.last_status})
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p class="text-sm text-[hsl(var(--muted-foreground))] text-center py-4">
+                暂无计划任务
+              </p>
+            )}
+          </div>
+        </div>
+
+        <!-- Content Pillars -->
+        {persona.content_pillars && persona.content_pillars.length > 0 && (
+          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <h2 class="text-lg font-semibold mb-4">Content Pillars</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {persona.content_pillars.map((pillar: any) => (
+                <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                  <h3 class="font-medium">{pillar.name}</h3>
+                  {pillar.description && (
+                    <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">{pillar.description}</p>
+                  )}
+                  {pillar.frequency && (
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+                      频率: {pillar.frequency}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Version History -->
+        {persona.versions && persona.versions.length > 0 && (
+          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <h2 class="text-lg font-semibold mb-4">Version History</h2>
+            <div class="space-y-2">
+              {persona.versions.map((version: string, index: number) => (
+                <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                  <div class="flex items-center gap-3">
+                    <span class={`w-2 h-2 rounded-full ${index === 0 ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                    <span class="font-medium">{version}</span>
+                    {index === 0 && (
+                      <span class="text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-600">当前</span>
+                    )}
+                  </div>
+                  {index !== 0 && (
+                    <button class="text-xs text-[hsl(var(--primary))] hover:underline">
+                      回滚
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    ) : (
+      <div class="p-8 text-center text-[hsl(var(--muted-foreground))]">
+        加载中...
+      </div>
+    )}
+  </div>
+</AdminLayout>

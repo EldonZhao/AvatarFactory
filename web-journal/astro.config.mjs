@@ -3,9 +3,9 @@ import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 import node from '@astrojs/node';
 
-// Check for production build with /monitor base
+// Check for production build with /journal base
 const isProduction = process.env.NODE_ENV === 'production' || process.env.ASTRO_BASE;
-const base = isProduction ? '/monitor' : '';
+const base = isProduction ? '/journal' : '';
 
 export default defineConfig({
   integrations: [react()],

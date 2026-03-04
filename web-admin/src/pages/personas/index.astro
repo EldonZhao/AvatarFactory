@@ -1,0 +1,75 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { PersonaList } from '../../components/dashboard/PersonaCard';
+
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+let personas: any[] = [];
+let error = null;
+
+try {
+  const response = await fetch(`${API_BASE}/api/admin/personas`);
+  if (response.ok) {
+    const data = await response.json();
+    personas = data.personas || [];
+  } else {
+    error = `API error: ${response.status}`;
+  }
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+---
+
+<AdminLayout title="Personas">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">Personas</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          管理 AI 人设配置
+        </p>
+      </div>
+      <a
+        href={`${base}/personas/new`}
+        class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        创建 Persona
+      </a>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : personas.length > 0 ? (
+      <PersonaList personas={personas} baseUrl={base} client:load />
+    ) : (
+      <div class="p-12 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-center">
+        <div class="w-16 h-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">暂无 Personas</h3>
+        <p class="text-[hsl(var(--muted-foreground))] mb-4">
+          创建你的第一个 AI 人设开始使用
+        </p>
+        <a
+          href={`${base}/personas/new`}
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          创建 Persona
+        </a>
+      </div>
+    )}
+  </div>
+</AdminLayout>

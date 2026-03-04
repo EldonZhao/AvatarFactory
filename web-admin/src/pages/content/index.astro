@@ -1,0 +1,149 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { ContentList } from '../../components/dashboard/ContentCard';
+
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+// Get query params
+const url = new URL(Astro.request.url);
+const filterPersona = url.searchParams.get('persona_id') || '';
+const filterStatus = url.searchParams.get('status') || '';
+const filterPlatform = url.searchParams.get('platform') || '';
+
+let contents: any[] = [];
+let personas: any[] = [];
+let error = null;
+
+try {
+  // Fetch content with filters
+  const params = new URLSearchParams();
+  if (filterPersona) params.set('persona_id', filterPersona);
+  if (filterStatus) params.set('content_status', filterStatus);
+  if (filterPlatform) params.set('platform', filterPlatform);
+  params.set('limit', '100');
+
+  const contentResponse = await fetch(`${API_BASE}/api/admin/content?${params}`);
+  if (contentResponse.ok) {
+    const data = await contentResponse.json();
+    contents = data.content || [];
+  }
+
+  // Fetch personas for filter dropdown
+  const personasResponse = await fetch(`${API_BASE}/api/admin/personas`);
+  if (personasResponse.ok) {
+    const data = await personasResponse.json();
+    personas = data.personas || [];
+  }
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+
+// Available platforms
+const platforms = ['xiaohongshu', 'bluesky', 'twitter', 'linkedin', 'threads'];
+---
+
+<AdminLayout title="Content">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">Content</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          管理生成的内容
+        </p>
+      </div>
+      <a
+        href={`${base}/content/new`}
+        class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        生成内容
+      </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+      <form class="flex flex-wrap gap-4" method="get">
+        <div class="flex-1 min-w-[150px]">
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">Persona</label>
+          <select
+            name="persona_id"
+            class="w-full px-3 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] text-sm"
+          >
+            <option value="">全部</option>
+            {personas.map((p) => (
+              <option value={p.id} selected={filterPersona === p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div class="w-32">
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">状态</label>
+          <select
+            name="status"
+            class="w-full px-3 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] text-sm"
+          >
+            <option value="">全部</option>
+            <option value="draft" selected={filterStatus === 'draft'}>草稿</option>
+            <option value="published" selected={filterStatus === 'published'}>已发布</option>
+          </select>
+        </div>
+
+        <div class="w-32">
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">平台</label>
+          <select
+            name="platform"
+            class="w-full px-3 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] text-sm"
+          >
+            <option value="">全部</option>
+            {platforms.map((p) => (
+              <option value={p} selected={filterPlatform === p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
+        <div class="flex items-end">
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+          >
+            筛选
+          </button>
+        </div>
+      </form>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : contents.length > 0 ? (
+      <ContentList contents={contents} baseUrl={base} client:load />
+    ) : (
+      <div class="p-12 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-center">
+        <div class="w-16 h-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">暂无内容</h3>
+        <p class="text-[hsl(var(--muted-foreground))] mb-4">
+          为 Persona 生成内容开始使用
+        </p>
+        <a
+          href={`${base}/content/new`}
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          生成内容
+        </a>
+      </div>
+    )}
+  </div>
+</AdminLayout>

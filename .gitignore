@@ -50,3 +50,21 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Astro / Vite
+web/dist/
+web/.astro/
+web-admin/dist/
+web-admin/.astro/
+web-journal/dist/
+web-journal/.astro/
+
+# Temporary files
+*.zip
+nul

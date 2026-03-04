@@ -1,0 +1,178 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+// Fetch personas for dropdown
+let personas: any[] = [];
+try {
+  const response = await fetch(`${API_BASE}/api/admin/personas`);
+  if (response.ok) {
+    const data = await response.json();
+    personas = data.personas || [];
+  }
+} catch (e) {
+  // Ignore
+}
+
+const platforms = ['xiaohongshu', 'bluesky', 'twitter', 'linkedin', 'threads'];
+---
+
+<AdminLayout title="生成内容">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+      <a
+        href={`${base}/content`}
+        class="p-2 rounded-lg hover:bg-[hsl(var(--accent))] transition-colors"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">生成内容</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          为 Persona 生成新内容
+        </p>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+      <form id="generate-content-form" class="space-y-6">
+        <!-- Persona Selection -->
+        <div>
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">选择 Persona *</label>
+          <select
+            name="persona_id"
+            required
+            class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+          >
+            <option value="">-- 选择 Persona --</option>
+            {personas.map((p) => (
+              <option value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <!-- Platform -->
+        <div>
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">目标平台 *</label>
+          <select
+            name="platform"
+            required
+            class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+          >
+            <option value="">-- 选择平台 --</option>
+            {platforms.map((p) => (
+              <option value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
+        <!-- Topic -->
+        <div>
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">话题/主题 *</label>
+          <input
+            type="text"
+            name="topic"
+            required
+            class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+            placeholder="例如：AI 如何改变我们的工作方式"
+          />
+        </div>
+
+        <!-- Content Type -->
+        <div>
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">内容类型</label>
+          <select
+            name="content_type"
+            class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+          >
+            <option value="post">帖子</option>
+            <option value="thread">长文/话题</option>
+            <option value="story">故事</option>
+          </select>
+        </div>
+
+        <!-- Additional Instructions -->
+        <div>
+          <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">额外说明（可选）</label>
+          <textarea
+            name="instructions"
+            rows="3"
+            class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] resize-none"
+            placeholder="任何额外的创作要求或约束"
+          ></textarea>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-4 pt-4">
+          <button
+            type="submit"
+            id="submit-btn"
+            class="px-6 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium"
+          >
+            生成内容
+          </button>
+          <a
+            href={`${base}/content`}
+            class="px-6 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity font-medium"
+          >
+            取消
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  const form = document.getElementById('generate-content-form');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form as HTMLFormElement);
+    const data = {
+      persona_id: formData.get('persona_id'),
+      platform: formData.get('platform'),
+      topic: formData.get('topic'),
+      content_type: formData.get('content_type'),
+      instructions: formData.get('instructions') || undefined,
+    };
+
+    if (submitBtn) {
+      submitBtn.textContent = '生成中...';
+      submitBtn.setAttribute('disabled', 'true');
+    }
+
+    try {
+      const response = await fetch('/api/admin/content/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        window.location.href = `/content/${result.id || ''}`;
+      } else {
+        alert('生成失败: ' + response.statusText);
+        if (submitBtn) {
+          submitBtn.textContent = '生成内容';
+          submitBtn.removeAttribute('disabled');
+        }
+      }
+    } catch (err) {
+      alert('生成失败: ' + err);
+      if (submitBtn) {
+        submitBtn.textContent = '生成内容';
+        submitBtn.removeAttribute('disabled');
+      }
+    }
+  });
+</script>

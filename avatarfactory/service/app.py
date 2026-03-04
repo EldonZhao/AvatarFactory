@@ -308,6 +308,14 @@ def create_app(
     from avatarfactory.service.chronicle_routes import router as chronicle_router
     application.include_router(chronicle_router)
 
+    # Register Journal routes (for Avatar养成记 blog)
+    from avatarfactory.service.journal_routes import router as journal_router
+    application.include_router(journal_router)
+
+    # Register Admin routes (for Admin dashboard)
+    from avatarfactory.service.admin_routes import router as admin_router
+    application.include_router(admin_router)
+
     # Register routes
     register_routes(application)
 

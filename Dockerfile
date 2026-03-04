@@ -1,8 +1,8 @@
-# AvatarFactory Dockerfile - Full Version with Dashboard + Chronicle SSR
+# AvatarFactory Dockerfile - Full Version with Monitor + Journal + Admin SSR
 # For Azure deployment
 
-# Stage 1: Build the Chronicle SSR website
-FROM node:20-alpine AS web-builder
+# Stage 1: Build the Monitor SSR website
+FROM node:20-alpine AS monitor-builder
 
 WORKDIR /web
 
@@ -15,11 +15,47 @@ RUN npm ci --silent
 # Copy source
 COPY web/ ./
 
-# Fix permissions and build SSR with /chronicle base path
-ENV ASTRO_BASE=/chronicle
+# Fix permissions and build SSR with /monitor base path
+ENV ASTRO_BASE=/monitor
 RUN chmod -R +x node_modules/.bin && npm run build
 
-# Stage 2: Main application
+# Stage 2: Build the Journal SSR website
+FROM node:20-alpine AS journal-builder
+
+WORKDIR /web-journal
+
+# Copy package files
+COPY web-journal/package*.json ./
+
+# Install dependencies
+RUN npm ci --silent
+
+# Copy source
+COPY web-journal/ ./
+
+# Fix permissions and build SSR with /journal base path
+ENV ASTRO_BASE=/journal
+RUN chmod -R +x node_modules/.bin && npm run build
+
+# Stage 3: Build the Admin SSR website
+FROM node:20-alpine AS admin-builder
+
+WORKDIR /web-admin
+
+# Copy package files
+COPY web-admin/package*.json ./
+
+# Install dependencies
+RUN npm ci --silent
+
+# Copy source
+COPY web-admin/ ./
+
+# Fix permissions and build SSR with /admin base path
+ENV ASTRO_BASE=/admin
+RUN chmod -R +x node_modules/.bin && npm run build
+
+# Stage 4: Main application
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -77,9 +113,17 @@ COPY pyproject.toml setup.py README.md ./
 # Install package
 RUN pip install --no-cache-dir -e .
 
-# Copy Chronicle SSR build from builder (dist + node_modules for runtime deps)
-COPY --from=web-builder /web/dist /app/chronicle
-COPY --from=web-builder /web/node_modules /app/chronicle/node_modules
+# Copy Monitor SSR build from builder (dist + node_modules for runtime deps)
+COPY --from=monitor-builder /web/dist /app/monitor
+COPY --from=monitor-builder /web/node_modules /app/monitor/node_modules
+
+# Copy Journal SSR build from builder (dist + node_modules for runtime deps)
+COPY --from=journal-builder /web-journal/dist /app/journal
+COPY --from=journal-builder /web-journal/node_modules /app/journal/node_modules
+
+# Copy Admin SSR build from builder (dist + node_modules for runtime deps)
+COPY --from=admin-builder /web-admin/dist /app/admin
+COPY --from=admin-builder /web-admin/node_modules /app/admin/node_modules
 
 # Create knowledge directory
 RUN mkdir -p /app/knowledges
@@ -94,7 +138,9 @@ RUN chmod +x /app/scripts/start_services.sh
 ENV PYTHONUNBUFFERED=1
 ENV AVATARFACTORY_KB_PATH=/app/knowledges
 ENV API_BASE_URL=http://127.0.0.1:8000
-ENV CHRONICLE_PORT=4321
+ENV MONITOR_PORT=4321
+ENV JOURNAL_PORT=4322
+ENV ADMIN_PORT=4323
 
 # Expose port 80 (nginx reverse proxy)
 EXPOSE 80

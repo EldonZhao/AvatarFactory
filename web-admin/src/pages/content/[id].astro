@@ -1,0 +1,290 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const { id } = Astro.params;
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+let content: any = null;
+let error = null;
+
+try {
+  const response = await fetch(`${API_BASE}/api/admin/content/${id}`);
+  if (response.ok) {
+    content = await response.json();
+  } else if (response.status === 404) {
+    error = '内容不存在';
+  } else {
+    error = `API error: ${response.status}`;
+  }
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+
+// Calculate overall score
+function getScoreColor(score: number): string {
+  if (score >= 80) return 'text-green-500';
+  if (score >= 60) return 'text-yellow-500';
+  return 'text-red-500';
+}
+---
+
+<AdminLayout title={content?.title || 'Content'}>
+  <div class="space-y-6 animate-fade-in">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+      <a href={`${base}/content`} class="hover:text-[hsl(var(--foreground))]">Content</a>
+      <span>/</span>
+      <span class="text-[hsl(var(--foreground))] line-clamp-1">{content?.title || id}</span>
+    </nav>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : content ? (
+      <>
+        <!-- Header -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <span class={`px-3 py-1 text-sm rounded ${content.status === 'draft' ? 'bg-yellow-500/10 text-yellow-600' : 'bg-green-500/10 text-green-600'}`}>
+                  {content.status === 'draft' ? '草稿' : '已发布'}
+                </span>
+                <span class="px-3 py-1 text-sm rounded bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                  {content.platform}
+                </span>
+                {content.pillar && (
+                  <span class="px-3 py-1 text-sm rounded bg-[hsl(var(--accent))]">
+                    {content.pillar}
+                  </span>
+                )}
+              </div>
+              <h1 class="text-2xl font-bold">{content.title}</h1>
+              <p class="text-[hsl(var(--muted-foreground))] mt-1">
+                <a href={`${base}/personas/${content.persona_id}`} class="text-[hsl(var(--primary))] hover:underline">
+                  {content.persona_name}
+                </a>
+                <span class="mx-2">·</span>
+                {content.created_at && new Date(content.created_at).toLocaleString('zh-CN')}
+              </p>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              <a
+                href={`/content/${id}/view`}
+                target="_blank"
+                class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                预览
+              </a>
+              <button
+                class="px-4 py-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors text-sm font-medium"
+                id="delete-btn"
+                data-content-id={id}
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Content Body -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+              <h2 class="text-lg font-semibold mb-4">内容</h2>
+              <div class="prose dark:prose-invert max-w-none">
+                <div class="whitespace-pre-wrap text-sm leading-relaxed">
+                  {content.body}
+                </div>
+              </div>
+            </div>
+
+            <!-- Tags -->
+            {content.tags && content.tags.length > 0 && (
+              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+                <h2 class="text-lg font-semibold mb-4">标签</h2>
+                <div class="flex flex-wrap gap-2">
+                  {content.tags.map((tag: string) => (
+                    <span class="px-3 py-1 text-sm rounded-full bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <!-- Image Prompts -->
+            {content.image_prompts && content.image_prompts.length > 0 && (
+              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+                <h2 class="text-lg font-semibold mb-4">配图建议</h2>
+                <div class="space-y-2">
+                  {content.image_prompts.map((prompt: string, index: number) => (
+                    <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+                      <span class="text-xs text-[hsl(var(--muted-foreground))]">图片 {index + 1}</span>
+                      <p class="text-sm mt-1">{prompt}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <!-- Sidebar -->
+          <div class="space-y-6">
+            <!-- Review Score -->
+            {content.review_score !== null && content.review_score !== undefined && (
+              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+                <h2 class="text-lg font-semibold mb-4">评审分数</h2>
+                <div class="text-center mb-4">
+                  <div class={`text-5xl font-bold ${getScoreColor(content.review_score)}`}>
+                    {content.review_score}
+                  </div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mt-1">综合评分</p>
+                </div>
+
+                {content.review_details && (
+                  <div class="space-y-3">
+                    <div>
+                      <div class="flex justify-between text-sm mb-1">
+                        <span>Persona 一致性</span>
+                        <span class={getScoreColor(content.review_details.persona_consistency || 0)}>
+                          {content.review_details.persona_consistency || 0}
+                        </span>
+                      </div>
+                      <div class="h-2 rounded-full bg-[hsl(var(--accent))] overflow-hidden">
+                        <div
+                          class="h-full bg-[hsl(var(--primary))] rounded-full"
+                          style={`width: ${content.review_details.persona_consistency || 0}%`}
+                        ></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-sm mb-1">
+                        <span>平台适配度</span>
+                        <span class={getScoreColor(content.review_details.platform_fit || 0)}>
+                          {content.review_details.platform_fit || 0}
+                        </span>
+                      </div>
+                      <div class="h-2 rounded-full bg-[hsl(var(--accent))] overflow-hidden">
+                        <div
+                          class="h-full bg-[hsl(var(--primary))] rounded-full"
+                          style={`width: ${content.review_details.platform_fit || 0}%`}
+                        ></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-sm mb-1">
+                        <span>合规性</span>
+                        <span class={getScoreColor(content.review_details.compliance || 0)}>
+                          {content.review_details.compliance || 0}
+                        </span>
+                      </div>
+                      <div class="h-2 rounded-full bg-[hsl(var(--accent))] overflow-hidden">
+                        <div
+                          class="h-full bg-[hsl(var(--primary))] rounded-full"
+                          style={`width: ${content.review_details.compliance || 0}%`}
+                        ></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-sm mb-1">
+                        <span>互动潜力</span>
+                        <span class={getScoreColor(content.review_details.engagement_potential || 0)}>
+                          {content.review_details.engagement_potential || 0}
+                        </span>
+                      </div>
+                      <div class="h-2 rounded-full bg-[hsl(var(--accent))] overflow-hidden">
+                        <div
+                          class="h-full bg-[hsl(var(--primary))] rounded-full"
+                          style={`width: ${content.review_details.engagement_potential || 0}%`}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <!-- Review Issues -->
+            {content.review_issues && content.review_issues.length > 0 && (
+              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+                <h2 class="text-lg font-semibold mb-4">改进建议</h2>
+                <ul class="space-y-2">
+                  {content.review_issues.map((issue: string) => (
+                    <li class="flex items-start gap-2 text-sm">
+                      <svg class="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>{issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <!-- Export Options -->
+            <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+              <h2 class="text-lg font-semibold mb-4">导出</h2>
+              <div class="space-y-2">
+                <a
+                  href={`/content/${id}/image`}
+                  target="_blank"
+                  class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  导出为图片
+                </a>
+                <a
+                  href={`/content/${id}/images?format=xiaohongshu`}
+                  target="_blank"
+                  class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  小红书图片包
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    ) : (
+      <div class="p-8 text-center text-[hsl(var(--muted-foreground))]">
+        加载中...
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  const deleteBtn = document.getElementById('delete-btn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      const contentId = deleteBtn.getAttribute('data-content-id');
+      if (!confirm('确定要删除这个内容吗？')) return;
+
+      try {
+        const response = await fetch(`/api/admin/content/${contentId}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          window.location.href = '/admin/content';
+        } else {
+          alert('删除失败');
+        }
+      } catch (e) {
+        alert('删除失败: ' + e);
+      }
+    });
+  }
+</script>

@@ -1,0 +1,100 @@
+---
+export const prerender = false;
+
+import BlogLayout from '../layouts/BlogLayout.astro';
+import { getRecentEvents, getJournalStats } from '../lib/api/client';
+import TimelineCard from '../components/TimelineCard.astro';
+
+const events = await getRecentEvents(50);
+const stats = await getJournalStats();
+
+// Group events by date
+const eventsByDate = events.reduce((acc, event) => {
+  const date = new Date(event.timestamp).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  if (!acc[date]) acc[date] = [];
+  acc[date].push(event);
+  return acc;
+}, {} as Record<string, typeof events>);
+---
+
+<BlogLayout title="首页">
+  <div class="space-y-8 animate-fade-in">
+    <!-- Hero section -->
+    <div class="text-center py-6">
+      <h1 class="text-3xl font-bold gradient-text mb-3">Avatar养成日记</h1>
+      <p class="text-[hsl(var(--muted-foreground))] max-w-xl mx-auto">
+        记录每一个AI人设的诞生、成长与蜕变。点击事件卡片查看详细内容。
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-4 gap-3">
+      <div class="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-3 text-center">
+        <div class="text-2xl font-bold gradient-text">{stats.total_personas}</div>
+        <div class="text-xs text-[hsl(var(--muted-foreground))]">人设</div>
+      </div>
+      <div class="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-3 text-center">
+        <div class="text-2xl font-bold gradient-text">{stats.total_content}</div>
+        <div class="text-xs text-[hsl(var(--muted-foreground))]">内容</div>
+      </div>
+      <div class="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-3 text-center">
+        <div class="text-2xl font-bold gradient-text">{stats.total_published}</div>
+        <div class="text-xs text-[hsl(var(--muted-foreground))]">已发布</div>
+      </div>
+      <div class="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-3 text-center">
+        <div class="text-2xl font-bold gradient-text">{stats.total_events}</div>
+        <div class="text-xs text-[hsl(var(--muted-foreground))]">事件</div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <section>
+      <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
+        <svg class="w-5 h-5 text-[hsl(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        成长时间线
+      </h2>
+
+      <div class="space-y-8">
+        {Object.entries(eventsByDate).map(([date, dayEvents]) => (
+          <div class="relative">
+            <!-- Date header -->
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold">{date}</h3>
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">
+                {dayEvents.length} 个事件
+              </span>
+            </div>
+
+            <!-- Events for this date -->
+            <div class="space-y-3 ml-5 pl-8 border-l-2 border-[hsl(var(--border))]">
+              {dayEvents.map((event) => (
+                <TimelineCard event={event} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {events.length === 0 && (
+        <div class="text-center py-16 text-[hsl(var(--muted-foreground))]">
+          <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-lg">暂无事件记录</p>
+          <p class="text-sm mt-1">创建人设或生成内容后，事件将在这里显示</p>
+        </div>
+      )}
+    </section>
+  </div>
+</BlogLayout>

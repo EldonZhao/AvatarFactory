@@ -1,0 +1,179 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { StatsOverview } from '../components/dashboard/StatsOverview';
+import { PersonaCard } from '../components/dashboard/PersonaCard';
+import { ConnectorList } from '../components/dashboard/ConnectorList';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { getDashboardData } from '../lib/data';
+
+// Fetch dashboard data
+let dashboard = null;
+let error = null;
+
+try {
+  dashboard = await getDashboardData();
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+
+const base = import.meta.env.BASE_URL || '';
+---
+
+<AdminLayout title="Dashboard">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">Dashboard</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          AvatarFactory 管理概览
+        </p>
+      </div>
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">
+        {new Date().toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+      </div>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : dashboard ? (
+      <>
+        <!-- Stats Overview -->
+        <StatsOverview stats={dashboard.stats} baseUrl={base} client:load />
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left Column - Personas -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- Recent Personas -->
+            <Card client:load>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>最近的 Personas</CardTitle>
+                <a href={`${base}/personas`} class="text-sm text-[hsl(var(--primary))] hover:underline">
+                  查看全部 →
+                </a>
+              </CardHeader>
+              <CardContent>
+                {dashboard.recent_personas.length > 0 ? (
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    {dashboard.recent_personas.slice(0, 4).map((persona: any, index: number) => (
+                      <PersonaCard
+                        persona={persona}
+                        index={index}
+                        baseUrl={base}
+                        client:load
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p class="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                    暂无 Personas
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <!-- Quick Actions -->
+            <div class="p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+              <h2 class="text-lg font-semibold mb-4">快速操作</h2>
+              <div class="flex flex-wrap gap-3">
+                <a
+                  href={`${base}/personas`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  创建 Persona
+                </a>
+                <a
+                  href={`${base}/content`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  生成内容
+                </a>
+                <a
+                  href={`${base}/scheduler`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  配置任务
+                </a>
+                <a
+                  href={`${base}/topics`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  查看话题
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column - Connectors & Status -->
+          <div class="space-y-6">
+            <!-- Connector Status -->
+            <ConnectorList connectors={dashboard.connectors} client:load />
+
+            <!-- Scheduler Status -->
+            <Card client:load>
+              <CardHeader>
+                <CardTitle>调度器状态</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div class="flex items-center gap-3">
+                  <span class={`w-3 h-3 rounded-full ${dashboard.scheduler_running ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                  <div>
+                    <p class="font-medium">{dashboard.scheduler_running ? '运行中' : '已停止'}</p>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                      {dashboard.stats.active_tasks_count} 个活跃任务
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={`${base}/scheduler`}
+                  class="mt-4 block w-full text-center px-4 py-2 rounded-lg bg-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/80 transition-colors text-sm"
+                >
+                  管理调度任务
+                </a>
+              </CardContent>
+            </Card>
+
+            <!-- System Info -->
+            <Card client:load>
+              <CardHeader>
+                <CardTitle>系统信息</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div class="space-y-3 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-[hsl(var(--muted-foreground))]">Persona 数量</span>
+                    <span class="font-medium">{dashboard.stats.personas_count}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[hsl(var(--muted-foreground))]">内容总数</span>
+                    <span class="font-medium">{dashboard.stats.contents_count}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[hsl(var(--muted-foreground))]">已发布</span>
+                    <span class="font-medium text-green-500">{dashboard.stats.published_count}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[hsl(var(--muted-foreground))]">草稿</span>
+                    <span class="font-medium text-yellow-500">{dashboard.stats.draft_count}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[hsl(var(--muted-foreground))]">调度任务</span>
+                    <span class="font-medium">{dashboard.stats.tasks_count}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </>
+    ) : (
+      <div class="p-8 text-center text-[hsl(var(--muted-foreground))]">
+        加载中...
+      </div>
+    )}
+  </div>
+</AdminLayout>

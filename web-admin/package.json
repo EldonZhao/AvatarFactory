@@ -1,12 +1,12 @@
 {
-  "name": "avatar-monitor",
+  "name": "avatar-admin",
   "type": "module",
   "version": "1.0.0",
-  "description": "Avatar Monitor - Real-time monitoring for AI personas",
+  "description": "Avatar Admin - Admin dashboard for AvatarFactory",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "astro dev --port 4323",
     "build": "astro build",
-    "preview": "astro preview",
+    "preview": "astro preview --port 4323",
     "astro": "astro"
   },
   "dependencies": {

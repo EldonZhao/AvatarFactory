@@ -1,0 +1,253 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+
+const API_BASE = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+const base = import.meta.env.BASE_URL || '';
+
+let tasksData: any = null;
+let schedulerStatus: any = null;
+let error = null;
+
+try {
+  const [tasksResponse, statusResponse] = await Promise.all([
+    fetch(`${API_BASE}/api/admin/scheduler/tasks`),
+    fetch(`${API_BASE}/scheduler/status`),
+  ]);
+
+  if (tasksResponse.ok) {
+    tasksData = await tasksResponse.json();
+  }
+  if (statusResponse.ok) {
+    schedulerStatus = await statusResponse.json();
+  }
+} catch (e) {
+  error = `Failed to fetch: ${e}`;
+}
+
+const grouped = tasksData?.grouped || {};
+const taskCount = tasksData?.count || 0;
+---
+
+<AdminLayout title="Scheduler">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">Scheduler</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          管理定时任务
+        </p>
+      </div>
+      <div class="flex items-center gap-4">
+        {schedulerStatus && (
+          <div class="flex items-center gap-2">
+            <span class={`w-2 h-2 rounded-full ${schedulerStatus.running ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">
+              {schedulerStatus.running ? '运行中' : '已停止'}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : (
+      <>
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="rounded-xl border bg-[hsl(var(--card))] border-[hsl(var(--border))] overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">总任务数</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{taskCount}</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border bg-[hsl(var(--card))] border-[hsl(var(--border))] overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">Personas</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{Object.keys(grouped).filter(k => k !== 'system').length}</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border bg-[hsl(var(--card))] border-[hsl(var(--border))] overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">下次运行</p>
+                  <p class="text-lg font-bold text-[hsl(var(--foreground))]">
+                    {schedulerStatus?.next_run ? new Date(schedulerStatus.next_run).toLocaleString('zh-CN') : '-'}
+                  </p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white shadow-lg">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tasks by Persona -->
+        {Object.keys(grouped).length > 0 ? (
+          <div class="space-y-6">
+            {Object.entries(grouped).map(([personaId, data]: [string, any]) => (
+              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                      {data.persona_name.charAt(0)}
+                    </div>
+                    <div>
+                      <h2 class="font-semibold">{data.persona_name}</h2>
+                      <p class="text-xs text-[hsl(var(--muted-foreground))]">{data.tasks.length} 个任务</p>
+                    </div>
+                  </div>
+                  {personaId !== 'system' && (
+                    <a
+                      href={`${base}/personas/${personaId}`}
+                      class="text-sm text-[hsl(var(--primary))] hover:underline"
+                    >
+                      查看 Persona →
+                    </a>
+                  )}
+                </div>
+
+                <div class="space-y-3">
+                  {data.tasks.map((task: any) => (
+                    <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                      <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2 mb-1">
+                            <span class={`w-2 h-2 rounded-full ${task.enabled ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                            <span class="font-medium">{task.name}</span>
+                            <span class={`text-xs px-2 py-0.5 rounded ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-500'}`}>
+                              {task.enabled ? '启用' : '禁用'}
+                            </span>
+                          </div>
+                          <div class="flex flex-wrap gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+                            <span class="px-2 py-0.5 rounded bg-[hsl(var(--card))]">
+                              {task.task_type}
+                            </span>
+                            <span class="px-2 py-0.5 rounded bg-[hsl(var(--card))]">
+                              {task.schedule}
+                            </span>
+                            {task.platform && (
+                              <span class="px-2 py-0.5 rounded bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                                {task.platform}
+                              </span>
+                            )}
+                          </div>
+                          {task.last_run && (
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+                              上次运行: {new Date(task.last_run).toLocaleString('zh-CN')}
+                              {task.last_status && (
+                                <span class={`ml-2 ${task.last_status === 'success' ? 'text-green-500' : 'text-red-500'}`}>
+                                  ({task.last_status})
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {task.last_error && (
+                            <p class="text-xs text-red-500 mt-1">
+                              错误: {task.last_error}
+                            </p>
+                          )}
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                          <button
+                            class="run-task-btn px-3 py-1.5 rounded text-xs font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+                            data-task-id={task.id}
+                          >
+                            运行
+                          </button>
+                          <button
+                            class="px-3 py-1.5 rounded text-xs font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div class="p-12 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-center">
+            <div class="w-16 h-16 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">暂无计划任务</h3>
+            <p class="text-[hsl(var(--muted-foreground))] mb-4">
+              为 Persona 配置定时任务开始自动化
+            </p>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  const runButtons = document.querySelectorAll('.run-task-btn');
+  runButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const taskId = btn.getAttribute('data-task-id');
+      if (!taskId) return;
+
+      btn.textContent = '运行中...';
+      btn.setAttribute('disabled', 'true');
+
+      try {
+        const response = await fetch(`/scheduler/tasks/${taskId}/run`, {
+          method: 'POST',
+        });
+        if (response.ok) {
+          btn.textContent = '已触发';
+          setTimeout(() => {
+            btn.textContent = '运行';
+            btn.removeAttribute('disabled');
+          }, 3000);
+        } else {
+          btn.textContent = '失败';
+          setTimeout(() => {
+            btn.textContent = '运行';
+            btn.removeAttribute('disabled');
+          }, 3000);
+        }
+      } catch (e) {
+        btn.textContent = '错误';
+        setTimeout(() => {
+          btn.textContent = '运行';
+          btn.removeAttribute('disabled');
+        }, 3000);
+      }
+    });
+  });
+</script>

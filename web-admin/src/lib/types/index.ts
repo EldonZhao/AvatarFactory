@@ -1,0 +1,23 @@
+// Re-export API types
+export type {
+  DashboardStats,
+  PersonaSummary,
+  PersonasResponse,
+  PersonaDetail,
+  NotificationConfig,
+  CreatePersonaRequest,
+  ContentFilters,
+  ContentSummary,
+  ContentsResponse,
+  ContentDetail,
+  ContentScores,
+  GenerateContentRequest,
+  SchedulerTask,
+  SchedulerTasksResponse,
+  SetupTaskRequest,
+  TaskRunResponse,
+  TopicSummary,
+  TopicsResponse,
+  ConnectorStatus,
+  ConnectorsResponse,
+} from '../api/client';

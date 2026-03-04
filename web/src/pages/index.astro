@@ -24,12 +24,12 @@ const activeTasks = (await getActiveTasks()).slice(0, 5);
 const base = import.meta.env.BASE_URL || '';
 ---
 
-<PageLayout title="仪表板">
+<PageLayout title="Dashboard">
   <div class="space-y-8 animate-fade-in">
     <!-- Header -->
     <div>
-      <h1 class="text-3xl font-bold gradient-text">Avatar养成记</h1>
-      <p class="text-[hsl(var(--muted-foreground))] mt-1">记录每一个人设的成长历程</p>
+      <h1 class="text-3xl font-bold gradient-text">Avatar Monitor</h1>
+      <p class="text-[hsl(var(--muted-foreground))] mt-1">Monitor Avatar status and content in real-time</p>
     </div>
 
     <!-- Stats Overview -->

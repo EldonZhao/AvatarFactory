@@ -129,7 +129,11 @@ const platforms = ['xiaohongshu', 'bluesky', 'twitter', 'linkedin', 'threads'];
   </div>
 </AdminLayout>
 
+<!-- Hidden element to pass base URL to client script -->
+<div id="app-config" data-base-url={base} style="display:none;"></div>
+
 <script>
+  const baseUrl = document.getElementById('app-config')?.dataset.baseUrl || '';
   const form = document.getElementById('generate-content-form');
   const submitBtn = document.getElementById('submit-btn');
 
@@ -159,7 +163,7 @@ const platforms = ['xiaohongshu', 'bluesky', 'twitter', 'linkedin', 'threads'];
 
       if (response.ok) {
         const result = await response.json();
-        window.location.href = `/content/${result.id || ''}`;
+        window.location.href = `${baseUrl}/content/${result.id || ''}`;
       } else {
         alert('生成失败: ' + response.statusText);
         if (submitBtn) {

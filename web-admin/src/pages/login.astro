@@ -1,8 +1,12 @@
 ---
 import AuthLayout from '../layouts/AuthLayout.astro';
+
+const base = import.meta.env.BASE_URL || '';
 ---
 
 <AuthLayout title="Login">
+  <!-- Hidden element to pass base URL to client script -->
+  <div id="app-config" data-base-url={base} style="display:none;"></div>
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md">
       <!-- Logo and title -->
@@ -81,6 +85,7 @@ import AuthLayout from '../layouts/AuthLayout.astro';
 <script>
   import { login } from '../lib/auth';
 
+  const baseUrl = document.getElementById('app-config')?.dataset.baseUrl || '';
   const form = document.getElementById('loginForm') as HTMLFormElement;
   const errorMessage = document.getElementById('errorMessage') as HTMLDivElement;
   const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
@@ -120,7 +125,7 @@ import AuthLayout from '../layouts/AuthLayout.astro';
 
       if (result.success) {
         // Redirect to dashboard
-        window.location.href = '/';
+        window.location.href = `${baseUrl}/`;
       } else {
         showError(result.message);
       }

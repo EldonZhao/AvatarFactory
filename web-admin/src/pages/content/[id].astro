@@ -78,7 +78,7 @@ function getScoreColor(score: number): string {
             </div>
             <div class="flex gap-2 shrink-0">
               <a
-                href={`/content/${id}/view`}
+                href={`${base}/content/${id}/view`}
                 target="_blank"
                 class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
               >
@@ -239,7 +239,7 @@ function getScoreColor(score: number): string {
               <h2 class="text-lg font-semibold mb-4">导出</h2>
               <div class="space-y-2">
                 <a
-                  href={`/content/${id}/image`}
+                  href={`${base}/content/${id}/image`}
                   target="_blank"
                   class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
                 >
@@ -249,7 +249,7 @@ function getScoreColor(score: number): string {
                   导出为图片
                 </a>
                 <a
-                  href={`/content/${id}/images?format=xiaohongshu`}
+                  href={`${base}/content/${id}/images?format=xiaohongshu`}
                   target="_blank"
                   class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
                 >
@@ -271,7 +271,11 @@ function getScoreColor(score: number): string {
   </div>
 </AdminLayout>
 
+<!-- Hidden element to pass base URL to client script -->
+<div id="app-config" data-base-url={base} style="display:none;"></div>
+
 <script>
+  const baseUrl = document.getElementById('app-config')?.dataset.baseUrl || '';
   const deleteBtn = document.getElementById('delete-btn');
   if (deleteBtn) {
     deleteBtn.addEventListener('click', async () => {
@@ -283,7 +287,7 @@ function getScoreColor(score: number): string {
           method: 'DELETE',
         });
         if (response.ok) {
-          window.location.href = '/admin/content';
+          window.location.href = `${baseUrl}/content`;
         } else {
           alert('删除失败');
         }

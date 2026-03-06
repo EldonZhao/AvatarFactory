@@ -709,8 +709,10 @@ async def get_dashboard() -> Dict[str, Any]:
                     "persona_id": c.get("persona_id"),
                     "created_at": c.get("created_at"),
                     "title": c.get("title", ""),
+                    "body": c.get("body", ""),
                     "pillar": c.get("pillar"),
                     "platform": platform,
+                    "tags": c.get("tags", []),
                     "review_score": c.get("review", {}).get("overall_score") if c.get("review") else c.get("review_score"),
                     "status": c.get("_status", "draft"),
                 })

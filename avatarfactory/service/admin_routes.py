@@ -310,6 +310,54 @@ async def get_persona_admin(persona_id: str):
     }
 
 
+class UpdateNotificationRequest(BaseModel):
+    """Request to update persona notification settings."""
+    enabled: bool = Field(..., description="Enable notifications")
+    notify_on_content: bool = Field(default=True, description="Notify on content generation")
+    notify_on_discovery: bool = Field(default=True, description="Notify on discovery completion")
+    notify_on_review: bool = Field(default=True, description="Notify on review completion")
+
+
+@router.put("/personas/{persona_id}/notification", dependencies=[Depends(require_admin_auth)])
+async def update_persona_notification(persona_id: str, request: UpdateNotificationRequest):
+    """
+    Update persona notification settings.
+
+    Enables/disables webhook notifications for content generation, discovery, etc.
+    """
+    from datetime import datetime
+
+    orchestrator = get_orchestrator()
+    kb = orchestrator.kb
+
+    persona = kb.load_persona(persona_id)
+    if not persona:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Persona {persona_id} not found",
+        )
+
+    # Update notification settings
+    from avatarfactory.models.schemas import NotificationConfig
+
+    persona.notification = NotificationConfig(
+        enabled=request.enabled,
+        notify_on_content=request.notify_on_content,
+        notify_on_discovery=request.notify_on_discovery,
+        notify_on_review=request.notify_on_review,
+    )
+    persona.updated_at = datetime.now()
+
+    # Save persona
+    kb.save_persona(persona)
+
+    return {
+        "status": "updated",
+        "persona_id": persona_id,
+        "notification": persona.notification.model_dump(),
+    }
+
+
 @router.get("/content", dependencies=[Depends(require_admin_auth)])
 async def list_content_admin(
     persona_id: Optional[str] = None,

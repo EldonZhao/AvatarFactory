@@ -16,6 +16,19 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some(route => relativePath.startsWith(route) || relativePath === route);
 }
 
+// Build login URL with optional returnUrl parameter
+function buildLoginUrl(returnPath?: string): string {
+  const loginUrl = BASE_PATH ? `${BASE_PATH}/login` : '/login';
+  if (returnPath && returnPath !== '/' && returnPath !== BASE_PATH && returnPath !== `${BASE_PATH}/`) {
+    // Encode the return path relative to base
+    const relativePath = BASE_PATH && returnPath.startsWith(BASE_PATH)
+      ? returnPath.slice(BASE_PATH.length)
+      : returnPath;
+    return `${loginUrl}?returnUrl=${encodeURIComponent(relativePath)}`;
+  }
+  return loginUrl;
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
 
@@ -27,12 +40,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Get the admin_token cookie
   const token = context.cookies.get('admin_token')?.value;
 
-  // Build login redirect URL with base path
-  const loginUrl = BASE_PATH ? `${BASE_PATH}/login` : '/login';
-
-  // If no token, redirect to login
+  // If no token, redirect to login with return URL
   if (!token) {
-    return context.redirect(loginUrl);
+    return context.redirect(buildLoginUrl(pathname));
   }
 
   // Verify the token by calling the backend API
@@ -46,7 +56,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
 
     if (!response.ok) {
-      return context.redirect(loginUrl);
+      return context.redirect(buildLoginUrl(pathname));
     }
 
     const data = await response.json();
@@ -54,7 +64,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (!data.valid) {
       // Clear invalid cookie and redirect to login
       context.cookies.delete('admin_token', { path: '/' });
-      return context.redirect(loginUrl);
+      return context.redirect(buildLoginUrl(pathname));
     }
 
     // Store user info in locals for use in pages
@@ -65,7 +75,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   } catch (error) {
     // On verification error, redirect to login
     console.error('Auth verification error:', error);
-    return context.redirect(loginUrl);
+    return context.redirect(buildLoginUrl(pathname));
   }
 
   return next();

@@ -1,0 +1,164 @@
+---
+export const prerender = false;
+
+import BlogLayout from '../../layouts/BlogLayout.astro';
+import { getContent } from '../../lib/api/client';
+
+const { id } = Astro.params;
+
+let content = null;
+let error = null;
+
+try {
+  content = await getContent(id || '');
+} catch (e: any) {
+  console.error(`[Journal Content] Failed to fetch content ${id}:`, e);
+  error = e.message || 'Failed to load content';
+}
+
+// Format date
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return '';
+  try {
+    return new Date(dateStr).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
+// Get score color
+const getScoreColor = (score: number | null) => {
+  if (!score) return 'text-gray-400';
+  if (score >= 80) return 'text-green-500';
+  if (score >= 60) return 'text-yellow-500';
+  return 'text-red-500';
+};
+---
+
+<BlogLayout title={content?.title || '内容详情'}>
+  <div class="max-w-3xl mx-auto animate-fade-in">
+    {error ? (
+      <div class="text-center py-16">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+          <svg class="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h1 class="text-2xl font-bold mb-2">加载失败</h1>
+        <p class="text-[hsl(var(--muted-foreground))]">{error}</p>
+        <a href="/journal/" class="inline-block mt-6 px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-lg hover:opacity-90 transition-opacity">
+          返回首页
+        </a>
+      </div>
+    ) : !content ? (
+      <div class="text-center py-16">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[hsl(var(--muted))]/20 flex items-center justify-center">
+          <svg class="w-8 h-8 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h1 class="text-2xl font-bold mb-2">内容不存在</h1>
+        <p class="text-[hsl(var(--muted-foreground))]">请求的内容已被删除或不存在</p>
+        <a href="/journal/" class="inline-block mt-6 px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-lg hover:opacity-90 transition-opacity">
+          返回首页
+        </a>
+      </div>
+    ) : (
+      <article>
+        <!-- Header -->
+        <header class="mb-8">
+          <h1 class="text-3xl font-bold mb-4">{content.title}</h1>
+
+          <div class="flex flex-wrap items-center gap-3 text-sm text-[hsl(var(--muted-foreground))]">
+            <!-- Author -->
+            <div class="flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>{content.persona_name}</span>
+            </div>
+
+            <!-- Platform -->
+            <span class="text-[hsl(var(--border))]">|</span>
+            <div class="flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="capitalize">{content.platform}</span>
+            </div>
+
+            <!-- Pillar -->
+            {content.pillar && (
+              <>
+                <span class="text-[hsl(var(--border))]">|</span>
+                <span class="px-2 py-0.5 bg-[hsl(var(--accent))] rounded text-xs">{content.pillar}</span>
+              </>
+            )}
+
+            <!-- Score -->
+            {content.review_score && (
+              <>
+                <span class="text-[hsl(var(--border))]">|</span>
+                <div class={`flex items-center gap-1 ${getScoreColor(content.review_score)}`}>
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>评分: {content.review_score}/100</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <!-- Date -->
+          {content.created_at && (
+            <div class="mt-3 text-sm text-[hsl(var(--muted-foreground))]">
+              <time datetime={content.created_at}>{formatDate(content.created_at)}</time>
+            </div>
+          )}
+
+          <!-- Status badge -->
+          <div class="mt-4">
+            {content.status === 'published' ? (
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-sm">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                已发布
+              </span>
+            ) : (
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-full text-sm">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                </svg>
+                草稿
+              </span>
+            )}
+          </div>
+        </header>
+
+        <!-- Content body -->
+        <div class="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-6 md:p-8">
+          <div class="prose prose-neutral dark:prose-invert max-w-none">
+            <pre class="whitespace-pre-wrap font-sans text-base leading-relaxed bg-transparent p-0 m-0 overflow-visible">{content.body}</pre>
+          </div>
+        </div>
+
+        <!-- Back link -->
+        <div class="mt-8 text-center">
+          <a href="/journal/" class="inline-flex items-center gap-2 text-[hsl(var(--primary))] hover:underline">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            返回养成日记
+          </a>
+        </div>
+      </article>
+    )}
+  </div>
+</BlogLayout>

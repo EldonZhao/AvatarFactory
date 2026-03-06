@@ -4,11 +4,14 @@ import AuthLayout from '../layouts/AuthLayout.astro';
 // Remove trailing slash from BASE_URL for consistent path joining
 const rawBase = import.meta.env.BASE_URL || '';
 const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+// Get returnUrl from query parameters
+const returnUrl = Astro.url.searchParams.get('returnUrl') || '';
 ---
 
 <AuthLayout title="Login">
-  <!-- Hidden element to pass base URL to client script -->
-  <div id="app-config" data-base-url={base} style="display:none;"></div>
+  <!-- Hidden element to pass config to client script -->
+  <div id="app-config" data-base-url={base} data-return-url={returnUrl} style="display:none;"></div>
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md">
       <!-- Logo and title -->
@@ -87,7 +90,9 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 <script>
   import { login } from '../lib/auth';
 
-  const baseUrl = document.getElementById('app-config')?.dataset.baseUrl || '';
+  const appConfig = document.getElementById('app-config');
+  const baseUrl = appConfig?.dataset.baseUrl || '';
+  const returnUrl = appConfig?.dataset.returnUrl || '';
   const form = document.getElementById('loginForm') as HTMLFormElement;
   const errorMessage = document.getElementById('errorMessage') as HTMLDivElement;
   const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
@@ -126,8 +131,12 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
       const result = await login(username, password);
 
       if (result.success) {
-        // Redirect to dashboard
-        window.location.href = `${baseUrl}/`;
+        // Redirect to returnUrl if provided, otherwise to dashboard
+        if (returnUrl) {
+          window.location.href = `${baseUrl}${returnUrl}`;
+        } else {
+          window.location.href = `${baseUrl}/`;
+        }
       } else {
         showError(result.message);
       }

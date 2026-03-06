@@ -620,13 +620,14 @@ async def _send_admin_content_notification(
     else:
         description = body_preview
 
-    # Build URL
+    # Build URL - use Journal public page instead of Admin dashboard
+    # This allows viewing content without login
     dashboard_url = os.getenv("AVATARFACTORY_DASHBOARD_URL", "").rstrip("/")
     if not dashboard_url:
         dashboard_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
 
     if dashboard_url and content_id:
-        url = f"{dashboard_url}/admin/content/{content_id}"
+        url = f"{dashboard_url}/journal/content/{content_id}"
     else:
         url = ""
 

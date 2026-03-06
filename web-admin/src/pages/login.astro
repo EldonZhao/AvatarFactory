@@ -1,7 +1,9 @@
 ---
 import AuthLayout from '../layouts/AuthLayout.astro';
 
-const base = import.meta.env.BASE_URL || '';
+// Remove trailing slash from BASE_URL for consistent path joining
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 ---
 
 <AuthLayout title="Login">

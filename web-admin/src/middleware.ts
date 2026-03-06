@@ -3,8 +3,9 @@ import { defineMiddleware } from 'astro:middleware';
 // Routes that don't require authentication (relative to base path)
 const PUBLIC_ROUTES = ['/login', '/api/'];
 
-// Get base path from environment or import.meta.url
-const BASE_PATH = import.meta.env.BASE_URL || '';
+// Get base path from environment, remove trailing slash for consistent path joining
+const rawBasePath = import.meta.env.BASE_URL || '';
+const BASE_PATH = rawBasePath.endsWith('/') ? rawBasePath.slice(0, -1) : rawBasePath;
 
 // Check if a route is public
 function isPublicRoute(pathname: string): boolean {

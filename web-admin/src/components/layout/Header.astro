@@ -3,8 +3,9 @@
 const monitorUrl = import.meta.env.MONITOR_URL || (import.meta.env.DEV ? 'http://localhost:4321' : '/monitor/');
 // Journal URL: /journal/ in production, localhost in dev
 const journalUrl = import.meta.env.JOURNAL_URL || (import.meta.env.DEV ? 'http://localhost:4328' : '/journal/');
-// Base URL for admin routes
-const base = import.meta.env.BASE_URL || '';
+// Base URL for admin routes (remove trailing slash for consistent path joining)
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
 // Get user from locals (set by middleware)
 const user = Astro.locals.user;

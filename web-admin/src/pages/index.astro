@@ -19,7 +19,9 @@ try {
   error = `Failed to fetch: ${e}`;
 }
 
-const base = import.meta.env.BASE_URL || '';
+// Remove trailing slash from BASE_URL for consistent path joining
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 ---
 
 <AdminLayout title="Dashboard">
@@ -152,20 +154,12 @@ const base = import.meta.env.BASE_URL || '';
                     <span class="font-medium">{dashboard.stats.personas_count}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-[hsl(var(--muted-foreground))]">内容总数</span>
-                    <span class="font-medium">{dashboard.stats.contents_count}</span>
+                    <span class="text-[hsl(var(--muted-foreground))]">调度任务（活跃/总数）</span>
+                    <span class="font-medium">{dashboard.stats.active_tasks_count}/{dashboard.stats.tasks_count}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-[hsl(var(--muted-foreground))]">已发布</span>
-                    <span class="font-medium text-green-500">{dashboard.stats.published_count}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-[hsl(var(--muted-foreground))]">草稿</span>
-                    <span class="font-medium text-yellow-500">{dashboard.stats.draft_count}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-[hsl(var(--muted-foreground))]">调度任务</span>
-                    <span class="font-medium">{dashboard.stats.tasks_count}</span>
+                    <span class="text-[hsl(var(--muted-foreground))]">内容（已发布/总数）</span>
+                    <span class="font-medium">{dashboard.stats.published_count}/{dashboard.stats.contents_count}</span>
                   </div>
                 </div>
               </CardContent>

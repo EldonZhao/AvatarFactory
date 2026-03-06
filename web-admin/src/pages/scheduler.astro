@@ -2,7 +2,9 @@
 import AdminLayout from '../layouts/AdminLayout.astro';
 
 const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
-const base = import.meta.env.BASE_URL || '';
+// Remove trailing slash from BASE_URL for consistent path joining
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
 // Get cookie from request for SSR authentication
 const cookie = Astro.request.headers.get('cookie') || '';

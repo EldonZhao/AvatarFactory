@@ -247,6 +247,128 @@ async def lifespan(app: FastAPI):
 
 
 # =============================================================================
+# Content Notification Helper
+# =============================================================================
+
+
+async def _send_content_notification(
+    persona: Any,
+    content_id: str,
+    content_title: str,
+    content_body: str,
+    review_score: Optional[int],
+    platform: str,
+) -> None:
+    """
+    Send webhook notification when content is generated via API.
+
+    Checks persona notification settings and sends to AVATARFACTORY_WEBHOOK_URL.
+    """
+    import logging
+    import httpx
+
+    logger = logging.getLogger("avatarfactory.service")
+
+    # Check if webhook is configured
+    webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
+    if not webhook_url:
+        logger.debug("No AVATARFACTORY_WEBHOOK_URL configured, skipping notification")
+        return
+
+    # Check persona notification settings
+    if persona.notification is None or not persona.notification.enabled:
+        logger.debug(f"Notifications disabled for persona {persona.id}")
+        return
+
+    if not persona.notification.notify_on_content:
+        logger.debug(f"Content notifications disabled for persona {persona.id}")
+        return
+
+    # Build notification
+    persona_name = persona.identity.name if persona.identity else persona.id
+
+    # Build description
+    description_parts = []
+    if persona_name:
+        description_parts.append(f"👤 {persona_name}")
+    if platform:
+        description_parts.append(f"📱 {platform}")
+    if review_score is not None:
+        if review_score >= 80:
+            description_parts.append(f"✅ 评分: {review_score:.0f}/100")
+        elif review_score >= 60:
+            description_parts.append(f"⚠️ 评分: {review_score:.0f}/100")
+        else:
+            description_parts.append(f"❌ 评分: {review_score:.0f}/100")
+
+    # Content preview
+    body_preview = content_body[:300] if content_body else ''
+    if len(content_body) > 300:
+        body_preview += "..."
+
+    if description_parts:
+        description = " | ".join(description_parts) + "\n\n" + body_preview
+    else:
+        description = body_preview
+
+    # Build URL - link directly to the content preview page
+    dashboard_url = os.getenv("AVATARFACTORY_DASHBOARD_URL", "").rstrip("/")
+    if not dashboard_url:
+        dashboard_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
+
+    if dashboard_url and content_id:
+        url = f"{dashboard_url}/admin/content/{content_id}"
+    else:
+        url = ""
+
+    title = f"📝 {content_title}"
+    if len(title) > 60:
+        title = title[:57] + "..."
+
+    # Build payload - use news card format if URL available
+    if not url:
+        payload = {
+            "msgtype": "markdown",
+            "markdown": {
+                "content": f"### {title}\n\n{description}"
+            }
+        }
+    else:
+        payload = {
+            "msgtype": "news",
+            "news": {
+                "articles": [
+                    {
+                        "title": title,
+                        "description": description[:512],
+                        "url": url,
+                        "picurl": "",
+                    }
+                ]
+            }
+        }
+
+    # Send notification
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                webhook_url,
+                json=payload,
+                timeout=10.0,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("errcode") == 0:
+                    logger.info(f"Sent content notification for {content_id}")
+                else:
+                    logger.warning(f"Content notification failed: {data.get('errmsg')}")
+            else:
+                logger.warning(f"Content notification HTTP error: {response.status_code}")
+    except Exception as e:
+        logger.warning(f"Failed to send content notification: {e}")
+
+
+# =============================================================================
 # Application Factory
 # =============================================================================
 
@@ -573,7 +695,7 @@ def register_routes(app: FastAPI):
     # -------------------------------------------------------------------------
 
     @app.post("/content/generate", response_model=ContentResponse, tags=["Content"])
-    async def generate_content(request: ContentRequest):
+    async def generate_content(request: ContentRequest, background_tasks: BackgroundTasks):
         """Generate content for a persona."""
         orchestrator = get_orchestrator()
 
@@ -609,6 +731,18 @@ def register_routes(app: FastAPI):
 
         try:
             content = await orchestrator.content_agent.process(message)
+
+            # Send webhook notification in background
+            background_tasks.add_task(
+                _send_content_notification,
+                persona=persona,
+                content_id=content.id,
+                content_title=content.title,
+                content_body=content.body,
+                review_score=content.review_score,
+                platform=content.platform.value,
+            )
+
             return ContentResponse(
                 id=content.id,
                 title=content.title,

@@ -423,6 +423,212 @@ async def delete_content_admin(content_id: str):
     return {"status": "deleted", "content_id": content_id}
 
 
+# =============================================================================
+# Content Generation Request Model
+# =============================================================================
+
+
+class GenerateContentAdminRequest(BaseModel):
+    """Content generation request for admin dashboard."""
+    persona_id: str = Field(..., description="Persona ID")
+    topic: Optional[str] = Field(None, description="Content topic")
+    platform: Optional[str] = Field(None, description="Target platform")
+    content_type: Optional[str] = Field(None, description="Content type/template")
+    instructions: Optional[str] = Field(None, description="Additional instructions")
+
+
+@router.post("/content/generate", dependencies=[Depends(require_admin_auth)])
+async def generate_content_admin(request: GenerateContentAdminRequest):
+    """
+    Generate content for a persona via Admin dashboard.
+
+    This endpoint wraps the main content generation API and adds notification support.
+    """
+    import os
+    import httpx
+    import logging
+
+    logger = logging.getLogger("avatarfactory.service.admin")
+
+    orchestrator = get_orchestrator()
+    kb = orchestrator.kb
+
+    # Verify persona exists
+    persona = kb.load_persona(request.persona_id)
+    if not persona:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Persona {request.persona_id} not found",
+        )
+
+    # Determine pillar
+    pillar = None
+    if persona.content_pillars:
+        pillar = persona.content_pillars[0].name
+
+    from avatarfactory.models.schemas import AgentMessage, TaskType
+
+    message = AgentMessage(
+        sender="admin_api",
+        receiver="content",
+        task_type=TaskType.GENERATE_CONTENT,
+        payload={
+            "persona_id": request.persona_id,
+            "pillar": pillar,
+            "topic": request.topic or request.instructions or "latest trends",
+            "template": request.content_type or "comparison",
+            "use_trending": True,
+            "variant_count": 1,
+        },
+        context={},
+    )
+
+    try:
+        content = await orchestrator.content_agent.process(message)
+
+        # Send webhook notification
+        await _send_admin_content_notification(
+            persona=persona,
+            content_id=content.id,
+            content_title=content.title,
+            content_body=content.body,
+            review_score=content.review_score,
+            platform=content.platform.value,
+        )
+
+        return {
+            "id": content.id,
+            "title": content.title,
+            "body": content.body,
+            "tags": content.tags,
+            "platform": content.platform.value,
+            "review_score": content.review_score,
+            "persona_id": request.persona_id,
+        }
+    except Exception as e:
+        logger.error(f"Content generation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+async def _send_admin_content_notification(
+    persona: Any,
+    content_id: str,
+    content_title: str,
+    content_body: str,
+    review_score: Optional[int],
+    platform: str,
+) -> None:
+    """
+    Send webhook notification when content is generated via Admin API.
+    """
+    import os
+    import logging
+    import httpx
+
+    logger = logging.getLogger("avatarfactory.service.admin")
+
+    # Check if webhook is configured
+    webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")
+    if not webhook_url:
+        logger.debug("No AVATARFACTORY_WEBHOOK_URL configured, skipping notification")
+        return
+
+    # Check persona notification settings
+    if persona.notification is None or not persona.notification.enabled:
+        logger.debug(f"Notifications disabled for persona {persona.id}")
+        return
+
+    if not persona.notification.notify_on_content:
+        logger.debug(f"Content notifications disabled for persona {persona.id}")
+        return
+
+    # Build notification
+    persona_name = persona.identity.name if persona.identity else persona.id
+
+    # Build description
+    description_parts = []
+    if persona_name:
+        description_parts.append(f"👤 {persona_name}")
+    if platform:
+        description_parts.append(f"📱 {platform}")
+    if review_score is not None:
+        if review_score >= 80:
+            description_parts.append(f"✅ 评分: {review_score}/100")
+        elif review_score >= 60:
+            description_parts.append(f"⚠️ 评分: {review_score}/100")
+        else:
+            description_parts.append(f"❌ 评分: {review_score}/100")
+
+    # Content preview
+    body_preview = content_body[:300] if content_body else ''
+    if len(content_body) > 300:
+        body_preview += "..."
+
+    if description_parts:
+        description = " | ".join(description_parts) + "\n\n" + body_preview
+    else:
+        description = body_preview
+
+    # Build URL
+    dashboard_url = os.getenv("AVATARFACTORY_DASHBOARD_URL", "").rstrip("/")
+    if not dashboard_url:
+        dashboard_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
+
+    if dashboard_url and content_id:
+        url = f"{dashboard_url}/admin/content/{content_id}"
+    else:
+        url = ""
+
+    title = f"📝 {content_title}"
+    if len(title) > 60:
+        title = title[:57] + "..."
+
+    # Build payload
+    if not url:
+        payload = {
+            "msgtype": "markdown",
+            "markdown": {
+                "content": f"### {title}\n\n{description}"
+            }
+        }
+    else:
+        payload = {
+            "msgtype": "news",
+            "news": {
+                "articles": [
+                    {
+                        "title": title,
+                        "description": description[:512],
+                        "url": url,
+                        "picurl": "",
+                    }
+                ]
+            }
+        }
+
+    # Send notification
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                webhook_url,
+                json=payload,
+                timeout=10.0,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("errcode") == 0:
+                    logger.info(f"Sent content notification for {content_id}")
+                else:
+                    logger.warning(f"Content notification failed: {data.get('errmsg')}")
+            else:
+                logger.warning(f"Content notification HTTP error: {response.status_code}")
+    except Exception as e:
+        logger.warning(f"Failed to send content notification: {e}")
+
+
 @router.get("/scheduler/tasks", dependencies=[Depends(require_admin_auth)])
 async def list_scheduler_tasks_admin():
     """List all scheduler tasks grouped by persona."""

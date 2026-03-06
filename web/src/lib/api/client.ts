@@ -276,3 +276,51 @@ export async function getGlobalStats(): Promise<GlobalStats> {
     personas_stats: [],
   };
 }
+
+// =============================================================================
+// Dashboard (Optimized - Single API call)
+// =============================================================================
+
+/**
+ * Dashboard data structure
+ */
+export interface DashboardData {
+  personas: Array<{
+    persona: Persona;
+    stats: PersonaStats;
+  }>;
+  recentContent: Content[];
+  timeline: TimelineEvent[];
+  tasks: ScheduledTask[];
+  stats: GlobalStats;
+}
+
+/**
+ * Get all dashboard data in a single API call
+ *
+ * This is the optimized endpoint that combines:
+ * - Personas with stats
+ * - Recent content
+ * - Timeline events
+ * - Active tasks
+ * - Global stats
+ */
+export async function getDashboardData(): Promise<DashboardData> {
+  const data = await fetchAPI<DashboardData>('/dashboard');
+  return data || {
+    personas: [],
+    recentContent: [],
+    timeline: [],
+    tasks: [],
+    stats: {
+      total_personas: 0,
+      total_content: 0,
+      total_published: 0,
+      total_drafts: 0,
+      avg_review_score: 0,
+      active_tasks: 0,
+      content_by_day: [],
+      personas_stats: [],
+    },
+  };
+}

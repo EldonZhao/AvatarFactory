@@ -12,6 +12,12 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from avatarfactory.service.cache import (
+    dashboard_cache,
+    timeline_cache,
+    get_or_set_async,
+)
+
 router = APIRouter(prefix="/api/journal", tags=["Journal"])
 logger = logging.getLogger(__name__)
 
@@ -447,3 +453,222 @@ async def get_journal_stats() -> Dict[str, Any]:
         "events_by_type": events_by_type,
         "events_by_day": [{"date": date, "count": count} for date, count in events_by_day.items()],
     }
+
+
+# =============================================================================
+# Dashboard Endpoint (Optimized - Single API call)
+# =============================================================================
+
+
+@router.get("/dashboard")
+async def get_journal_dashboard() -> Dict[str, Any]:
+    """
+    Get all journal dashboard data in a single API call.
+
+    Returns events, stats, and recent content optimized for the homepage.
+    Uses caching to reduce repeated computation (30 second TTL).
+    """
+    cache_key = "journal_dashboard"
+
+    async def build_dashboard():
+        orchestrator = _get_orchestrator()
+
+        # Use batch loading for stats
+        batch_stats = orchestrator.kb.get_batch_persona_stats()
+        persona_summaries = orchestrator.kb.list_personas_summary()
+
+        # Calculate totals from batch stats
+        total_content = sum(s.get("total_content", 0) for s in batch_stats.values())
+        total_published = sum(s.get("published_content", 0) for s in batch_stats.values())
+
+        # Build events using cached/optimized method
+        all_events = await _build_all_events_optimized(orchestrator)
+
+        # Count events by type
+        events_by_type: Dict[str, int] = {}
+        for event in all_events:
+            event_type = event["type"]
+            events_by_type[event_type] = events_by_type.get(event_type, 0) + 1
+
+        # Events by day (last 30 days)
+        now = datetime.now()
+        events_by_day: Dict[str, int] = {}
+        for i in range(29, -1, -1):
+            date = now - timedelta(days=i)
+            date_str = date.strftime("%Y-%m-%d")
+            events_by_day[date_str] = 0
+
+        for event in all_events:
+            if event.get("timestamp"):
+                try:
+                    event_date = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
+                    date_str = event_date.strftime("%Y-%m-%d")
+                    if date_str in events_by_day:
+                        events_by_day[date_str] += 1
+                except Exception:
+                    pass
+
+        stats = {
+            "total_events": len(all_events),
+            "total_personas": len(persona_summaries),
+            "total_content": total_content,
+            "total_published": total_published,
+            "events_by_type": events_by_type,
+            "events_by_day": [{"date": date, "count": count} for date, count in events_by_day.items()],
+        }
+
+        return {
+            "events": all_events[:50],  # Limit to 50 events
+            "stats": stats,
+        }
+
+    return await get_or_set_async(dashboard_cache, cache_key, build_dashboard)
+
+
+async def _build_all_events_optimized(
+    orchestrator,
+    persona_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Build all timeline events using batch loading for better performance.
+
+    Uses batch review loading to avoid N+1 queries.
+    """
+    from avatarfactory.service.app import get_scheduler
+
+    events: List[Dict[str, Any]] = []
+
+    try:
+        # Get personas to process
+        if persona_id:
+            persona_ids = [persona_id]
+        else:
+            persona_ids = orchestrator.kb.list_personas()
+
+        # Build persona name map using batch loading
+        persona_names: Dict[str, str] = {}
+        persona_summaries = orchestrator.kb.list_personas_summary()
+        for summary in persona_summaries:
+            persona_names[summary["id"]] = summary["name"]
+
+        # Batch load all reviews
+        all_reviews = orchestrator.kb.get_all_reviews_batch(persona_id)
+
+        for pid in persona_ids:
+            try:
+                # Add persona version events from history
+                history = orchestrator.kb.get_persona_history(pid)
+                for version in history:
+                    timestamp = version.timestamp.isoformat() if hasattr(version.timestamp, 'isoformat') else str(version.timestamp)
+                    event_type = "persona_created" if version.version == "v1.0" else "persona_updated"
+                    title = f"人设诞生：{persona_names.get(pid, pid)}" if version.version == "v1.0" else f"人设进化：{persona_names.get(pid, pid)} → {version.version}"
+                    description = f"原因：{version.reason}" if version.reason else (", ".join(version.changes) if version.changes else "")
+
+                    events.append({
+                        "id": f"{pid}-{version.version}",
+                        "type": event_type,
+                        "timestamp": timestamp,
+                        "title": title,
+                        "description": description,
+                        "persona_id": pid,
+                        "persona_name": persona_names.get(pid, pid),
+                        "metadata": {
+                            "version": version.version,
+                            "changes": version.changes,
+                            "reason": version.reason,
+                            "author": version.author,
+                        },
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to load history for persona {pid}: {e}")
+
+            try:
+                # Add content events
+                drafts = orchestrator.kb.list_content(persona_id=pid, status="draft")
+                published = orchestrator.kb.list_content(persona_id=pid, status="published")
+
+                published_ids = {c.id for c in published}
+
+                for content in drafts:
+                    if content.id not in published_ids:
+                        timestamp = content.created_at.isoformat() if content.created_at else ""
+                        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+                        events.append({
+                            "id": f"content-{content.id}",
+                            "type": "content_created",
+                            "timestamp": timestamp,
+                            "title": f"创作新内容：{content.title[:30]}..." if len(content.title) > 30 else f"创作新内容：{content.title}",
+                            "description": f"平台: {platform} | 栏目: {content.pillar}",
+                            "persona_id": pid,
+                            "persona_name": persona_names.get(pid, pid),
+                            "content_id": content.id,
+                            "content": content.body,
+                            "metadata": {"platform": platform, "pillar": content.pillar},
+                        })
+
+                for content in published:
+                    timestamp = content.created_at.isoformat() if content.created_at else ""
+                    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+                    events.append({
+                        "id": f"publish-{content.id}",
+                        "type": "content_published",
+                        "timestamp": timestamp,
+                        "title": f"内容发布：{content.title[:30]}..." if len(content.title) > 30 else f"内容发布：{content.title}",
+                        "description": f"成功发布到 {platform}",
+                        "persona_id": pid,
+                        "persona_name": persona_names.get(pid, pid),
+                        "content_id": content.id,
+                        "content": content.body,
+                        "metadata": {"platform": platform, "pillar": content.pillar},
+                    })
+
+                # Add review events using batch-loaded reviews (no N+1!)
+                contents = drafts + published
+                for content in contents:
+                    review = all_reviews.get(content.id)
+                    if review:
+                        reviewed_at = review.get("reviewed_at", "")
+                        if hasattr(reviewed_at, "isoformat"):
+                            timestamp = reviewed_at.isoformat()
+                        else:
+                            timestamp = str(reviewed_at)
+                        events.append({
+                            "id": f"review-{content.id}",
+                            "type": "review_completed",
+                            "timestamp": timestamp,
+                            "title": f"质量评审：{review.get('overall_score', 0)}分",
+                            "description": f"内容《{content.title[:20]}》通过质量评审",
+                            "persona_id": pid,
+                            "persona_name": persona_names.get(pid, pid),
+                            "content_id": content.id,
+                            "metadata": {"score": review.get("overall_score", 0)},
+                        })
+            except Exception as e:
+                logger.warning(f"Failed to load content/reviews for persona {pid}: {e}")
+
+        # Add task execution events
+        scheduler = get_scheduler()
+        if scheduler:
+            for task in scheduler.list_tasks():
+                if task.last_run:
+                    if persona_id and task.persona_id != persona_id:
+                        continue
+                    timestamp = task.last_run.isoformat()
+                    success = task.last_status == "success"
+                    events.append({
+                        "id": f"task-{task.id}-{timestamp}",
+                        "type": "task_executed",
+                        "timestamp": timestamp,
+                        "title": f"任务执行：{task.name}",
+                        "description": "执行成功" if success else f"执行失败: {task.last_error}",
+                        "persona_id": task.persona_id,
+                        "persona_name": persona_names.get(task.persona_id, task.persona_id) if task.persona_id else None,
+                        "metadata": {"task_type": task.task_type, "status": task.last_status},
+                    })
+
+    except Exception as e:
+        logger.error(f"Failed to build timeline events: {e}")
+
+    # Sort by timestamp descending
+    events.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return events

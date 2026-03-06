@@ -6,10 +6,16 @@ These endpoints return data for server-side rendering via the Astro framework.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
+
+from avatarfactory.service.cache import (
+    dashboard_cache,
+    stats_cache,
+    get_or_set_async,
+)
 
 router = APIRouter(prefix="/api/chronicle", tags=["Chronicle"])
 logger = logging.getLogger(__name__)
@@ -617,6 +623,305 @@ async def get_task_stats() -> Dict[str, Any]:
         "byType": by_type,
         "successRate": round((success_count / total_runs) * 100) if total_runs > 0 else 0,
     }
+
+
+# =============================================================================
+# Dashboard Endpoint (Optimized - Single API call)
+# =============================================================================
+
+
+@router.get("/dashboard")
+async def get_dashboard() -> Dict[str, Any]:
+    """
+    Get all dashboard data in a single API call.
+
+    This endpoint combines personas, stats, recent content, timeline,
+    and tasks into a single response to minimize network roundtrips.
+
+    Returns cached data when available (30 second TTL).
+    """
+    cache_key = "dashboard"
+
+    async def build_dashboard():
+        from avatarfactory.service.app import get_scheduler
+
+        orchestrator = _get_orchestrator()
+        scheduler = get_scheduler()
+
+        # Use batch loading methods for efficiency
+        persona_summaries = orchestrator.kb.list_personas_summary()
+        batch_stats = orchestrator.kb.get_batch_persona_stats()
+
+        # Build personas with stats
+        personas_with_stats = []
+        for summary in persona_summaries[:6]:  # Limit to 6 for dashboard
+            pid = summary["id"]
+            stats = batch_stats.get(pid, {
+                "persona_id": pid,
+                "total_content": 0,
+                "published_content": 0,
+                "draft_content": 0,
+                "avg_review_score": 0,
+                "content_by_pillar": {},
+                "content_by_platform": {},
+                "score_distribution": {
+                    "persona_consistency": 0,
+                    "platform_fit": 0,
+                    "compliance": 0,
+                    "engagement_potential": 0,
+                },
+            })
+            personas_with_stats.append({
+                "persona": {
+                    "id": summary["id"],
+                    "version": summary.get("version", "v1.0"),
+                    "created_at": summary.get("created_at"),
+                    "updated_at": summary.get("updated_at"),
+                    "identity": {
+                        "name": summary["name"],
+                        "tagline": summary.get("tagline", ""),
+                        "expertise": summary.get("expertise", []),
+                    },
+                    "platforms": summary.get("platforms", []),
+                },
+                "stats": stats,
+            })
+
+        # Get recent content with reviews using batch loading
+        recent_content_raw = orchestrator.kb.list_content_with_reviews_batch(
+            status="draft", limit=20
+        )
+        recent_content_raw += orchestrator.kb.list_content_with_reviews_batch(
+            status="published", limit=20
+        )
+
+        # Deduplicate and sort
+        seen_ids = set()
+        recent_content = []
+        for c in sorted(recent_content_raw, key=lambda x: x.get("created_at") or "", reverse=True):
+            if c["id"] not in seen_ids:
+                seen_ids.add(c["id"])
+                platform = c.get("platform", "")
+                if hasattr(platform, "value"):
+                    platform = platform.value
+                recent_content.append({
+                    "id": c["id"],
+                    "persona_id": c.get("persona_id"),
+                    "created_at": c.get("created_at"),
+                    "title": c.get("title", ""),
+                    "pillar": c.get("pillar"),
+                    "platform": platform,
+                    "review_score": c.get("review", {}).get("overall_score") if c.get("review") else c.get("review_score"),
+                    "status": c.get("_status", "draft"),
+                })
+                if len(recent_content) >= 6:
+                    break
+
+        # Build timeline events efficiently
+        timeline_events = await _build_timeline_events_optimized(orchestrator, limit=10)
+
+        # Get active tasks
+        active_tasks = []
+        if scheduler:
+            tasks = [t for t in scheduler.list_tasks() if t.enabled]
+            for t in tasks[:5]:
+                active_tasks.append({
+                    "id": t.id,
+                    "name": t.name,
+                    "task_type": t.task_type,
+                    "schedule": t.schedule,
+                    "enabled": t.enabled,
+                    "persona_id": t.persona_id,
+                    "platform": t.platform,
+                    "last_run": t.last_run.isoformat() if t.last_run else None,
+                    "last_status": t.last_status,
+                    "run_count": t.run_count,
+                })
+
+        # Calculate global stats from batch stats
+        total_content = sum(s.get("total_content", 0) for s in batch_stats.values())
+        total_published = sum(s.get("published_content", 0) for s in batch_stats.values())
+        total_drafts = sum(s.get("draft_content", 0) for s in batch_stats.values())
+        total_score = sum(s.get("avg_review_score", 0) for s in batch_stats.values())
+        score_count = sum(1 for s in batch_stats.values() if s.get("avg_review_score", 0) > 0)
+
+        # Content by day (last 30 days)
+        now = datetime.now()
+        content_by_day: Dict[str, int] = {}
+        for i in range(29, -1, -1):
+            date = now - timedelta(days=i)
+            date_str = date.strftime("%Y-%m-%d")
+            content_by_day[date_str] = 0
+
+        for c in recent_content_raw:
+            created_at = c.get("created_at")
+            if created_at:
+                if isinstance(created_at, str):
+                    date_str = created_at[:10]  # Extract YYYY-MM-DD
+                else:
+                    date_str = created_at.strftime("%Y-%m-%d")
+                if date_str in content_by_day:
+                    content_by_day[date_str] += 1
+
+        global_stats = {
+            "total_personas": len(persona_summaries),
+            "total_content": total_content,
+            "total_published": total_published,
+            "total_drafts": total_drafts,
+            "avg_review_score": round(total_score / score_count) if score_count > 0 else 0,
+            "active_tasks": len(active_tasks),
+            "content_by_day": [{"date": date, "count": count} for date, count in content_by_day.items()],
+        }
+
+        return {
+            "personas": personas_with_stats,
+            "recentContent": recent_content,
+            "timeline": timeline_events,
+            "tasks": active_tasks,
+            "stats": global_stats,
+        }
+
+    return await get_or_set_async(dashboard_cache, cache_key, build_dashboard)
+
+
+async def _build_timeline_events_optimized(
+    orchestrator,
+    persona_id: Optional[str] = None,
+    limit: int = 50
+) -> List[Dict[str, Any]]:
+    """
+    Build timeline events using batch loading for better performance.
+
+    Avoids N+1 queries by loading all reviews in batch.
+    """
+    from avatarfactory.service.app import get_scheduler
+
+    events: List[Dict[str, Any]] = []
+
+    try:
+        # Get personas to process
+        if persona_id:
+            persona_ids = [persona_id]
+        else:
+            persona_ids = orchestrator.kb.list_personas()
+
+        # Batch load all reviews
+        all_reviews = orchestrator.kb.get_all_reviews_batch(persona_id)
+
+        for pid in persona_ids:
+            try:
+                # Add persona version events from history
+                history = orchestrator.kb.get_persona_history(pid)
+                for version in history:
+                    timestamp = version.timestamp.isoformat() if hasattr(version.timestamp, 'isoformat') else str(version.timestamp)
+                    events.append({
+                        "id": f"{pid}-{version.version}",
+                        "type": "persona_created" if version.version == "v1.0" else "persona_updated",
+                        "timestamp": timestamp,
+                        "title": "创建人设" if version.version == "v1.0" else f"更新至 {version.version}",
+                        "description": ", ".join(version.changes) if version.changes else "",
+                        "persona_id": pid,
+                        "metadata": {"reason": version.reason, "author": version.author},
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to load history for persona {pid}: {e}")
+
+            try:
+                # Add content events
+                drafts = orchestrator.kb.list_content(persona_id=pid, status="draft")
+                published = orchestrator.kb.list_content(persona_id=pid, status="published")
+
+                published_ids = {c.id for c in published}
+
+                for content in drafts:
+                    if content.id not in published_ids:
+                        timestamp = content.created_at.isoformat() if content.created_at else ""
+                        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+                        events.append({
+                            "id": f"content-{content.id}",
+                            "type": "content_created",
+                            "timestamp": timestamp,
+                            "title": "创建草稿",
+                            "description": content.title,
+                            "persona_id": pid,
+                            "content_id": content.id,
+                            "metadata": {"platform": platform, "pillar": content.pillar},
+                        })
+
+                for content in published:
+                    timestamp = content.created_at.isoformat() if content.created_at else ""
+                    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+                    events.append({
+                        "id": f"content-{content.id}",
+                        "type": "content_published",
+                        "timestamp": timestamp,
+                        "title": "发布内容",
+                        "description": content.title,
+                        "persona_id": pid,
+                        "content_id": content.id,
+                        "metadata": {"platform": platform, "pillar": content.pillar},
+                    })
+
+                # Add review events using batch-loaded reviews (no N+1!)
+                contents = drafts + published
+                for content in contents:
+                    review = all_reviews.get(content.id)
+                    if review:
+                        reviewed_at = review.get("reviewed_at", "")
+                        if hasattr(reviewed_at, "isoformat"):
+                            timestamp = reviewed_at.isoformat()
+                        else:
+                            timestamp = str(reviewed_at)
+                        events.append({
+                            "id": f"review-{content.id}",
+                            "type": "review_completed",
+                            "timestamp": timestamp,
+                            "title": "审核完成",
+                            "description": f"评分: {review.get('overall_score', 0)}",
+                            "persona_id": pid,
+                            "content_id": content.id,
+                            "metadata": {"score": review.get("overall_score", 0)},
+                        })
+            except Exception as e:
+                logger.warning(f"Failed to load content/reviews for persona {pid}: {e}")
+
+        # Add task events
+        scheduler = get_scheduler()
+        if scheduler:
+            for task in scheduler.list_tasks():
+                if task.last_run and (not persona_id or task.persona_id == persona_id):
+                    timestamp = task.last_run.isoformat() if task.last_run else ""
+                    events.append({
+                        "id": f"task-{task.id}-{timestamp}",
+                        "type": "task_executed",
+                        "timestamp": timestamp,
+                        "title": f"执行任务: {task.name}",
+                        "description": "成功" if task.last_status == "success" else f"失败: {task.last_error}",
+                        "persona_id": task.persona_id,
+                        "metadata": {"task_type": task.task_type, "status": task.last_status},
+                    })
+
+    except Exception as e:
+        logger.error(f"Failed to build timeline events: {e}")
+
+    # Sort by timestamp descending and limit
+    events.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return events[:limit]
+
+
+@router.post("/personas/batch-stats")
+async def get_batch_persona_stats(persona_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Get statistics for multiple personas in a single request.
+
+    Args:
+        persona_ids: List of persona IDs (optional, defaults to all)
+
+    Returns:
+        Dict mapping persona_id to stats
+    """
+    orchestrator = _get_orchestrator()
+    return orchestrator.kb.get_batch_persona_stats(persona_ids)
 
 
 # =============================================================================

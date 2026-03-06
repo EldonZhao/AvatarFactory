@@ -2,11 +2,13 @@
 export const prerender = false;
 
 import BlogLayout from '../layouts/BlogLayout.astro';
-import { getRecentEvents, getJournalStats } from '../lib/api/client';
+import { getDashboardData } from '../lib/api/client';
 import TimelineCard from '../components/TimelineCard.astro';
 
-const events = await getRecentEvents(50);
-const stats = await getJournalStats();
+// Single API call to get all dashboard data
+const dashboardData = await getDashboardData();
+const events = dashboardData.events;
+const stats = dashboardData.stats;
 
 // Group events by date
 const eventsByDate = events.reduce((acc, event) => {

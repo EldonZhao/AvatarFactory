@@ -1205,3 +1205,290 @@ class KnowledgeBase:
 
         return results
 
+    # ========================================================================
+    # Batch Loading Methods (Performance Optimization)
+    # ========================================================================
+
+    def list_personas_summary(self) -> List[Dict[str, Any]]:
+        """
+        Batch load all persona summaries in a single directory traversal.
+
+        Returns minimal data needed for listings, avoiding full persona parsing.
+
+        Returns:
+            List of persona summary dicts with id, name, tagline, platforms, created_at
+        """
+        personas_dir = self.base_path / "personas"
+        if not personas_dir.exists():
+            return []
+
+        summaries = []
+        for persona_dir in personas_dir.iterdir():
+            if not persona_dir.is_dir():
+                continue
+
+            config_path = persona_dir / "config.yaml"
+            if not config_path.exists():
+                continue
+
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+
+                identity = data.get("identity", {})
+                summaries.append({
+                    "id": data.get("id", persona_dir.name),
+                    "name": identity.get("name", "Unknown"),
+                    "tagline": identity.get("tagline", ""),
+                    "expertise": identity.get("expertise", []),
+                    "platforms": data.get("platforms", []),
+                    "created_at": data.get("created_at"),
+                    "updated_at": data.get("updated_at"),
+                    "version": data.get("version", "v1.0"),
+                })
+            except Exception:
+                continue
+
+        # Sort by created_at descending
+        summaries.sort(
+            key=lambda x: x.get("created_at") or "",
+            reverse=True
+        )
+        return summaries
+
+    def list_content_with_reviews_batch(
+        self,
+        persona_id: Optional[str] = None,
+        status: str = "draft",
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Batch load content with their reviews to avoid N+1 queries.
+
+        Args:
+            persona_id: Optional persona ID to filter by
+            status: Content status (draft or published)
+            limit: Maximum number of items to return
+
+        Returns:
+            List of content dicts with embedded review data
+        """
+        folder = "drafts" if status == "draft" else "published"
+        contents = []
+
+        if persona_id:
+            persona_ids = [persona_id]
+        else:
+            personas_dir = self.base_path / "personas"
+            if not personas_dir.exists():
+                return []
+            persona_ids = [d.name for d in personas_dir.iterdir() if d.is_dir()]
+
+        for pid in persona_ids:
+            content_dir = self.base_path / "personas" / pid / "content" / folder
+            reviews_dir = self.base_path / "personas" / pid / "reviews"
+
+            if not content_dir.exists():
+                continue
+
+            # Batch load all reviews for this persona into a dict
+            reviews_map: Dict[str, Dict[str, Any]] = {}
+            if reviews_dir.exists():
+                for review_path in reviews_dir.glob("*.json"):
+                    try:
+                        content_id = review_path.stem
+                        with open(review_path, "r", encoding="utf-8") as f:
+                            reviews_map[content_id] = json.load(f)
+                    except Exception:
+                        continue
+
+            # Load content files
+            for file_path in content_dir.glob("*.json"):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content_data = json.load(f)
+
+                    content_id = content_data.get("id", "")
+                    review_data = reviews_map.get(content_id)
+
+                    # Embed review summary
+                    if review_data:
+                        content_data["review"] = {
+                            "overall_score": review_data.get("overall_score", 0),
+                            "reviewed_at": review_data.get("reviewed_at"),
+                            "persona_consistency": review_data.get("persona_consistency", {}).get("score", 0),
+                            "platform_fit": review_data.get("platform_fit", {}).get("score", 0),
+                            "compliance": review_data.get("compliance", {}).get("score", 0),
+                            "engagement_potential": review_data.get("engagement_potential", {}).get("score", 0),
+                        }
+                    else:
+                        content_data["review"] = None
+
+                    content_data["_status"] = status
+                    contents.append(content_data)
+                except Exception:
+                    continue
+
+        # Sort by created_at descending
+        contents.sort(
+            key=lambda x: x.get("created_at") or "",
+            reverse=True
+        )
+        return contents[:limit]
+
+    def get_batch_persona_stats(
+        self,
+        persona_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Batch calculate statistics for multiple personas efficiently.
+
+        Minimizes file I/O by loading data once per persona directory.
+
+        Args:
+            persona_ids: List of persona IDs (None = all personas)
+
+        Returns:
+            Dict mapping persona_id to stats dict
+        """
+        if persona_ids is None:
+            personas_dir = self.base_path / "personas"
+            if not personas_dir.exists():
+                return {}
+            persona_ids = [d.name for d in personas_dir.iterdir() if d.is_dir()]
+
+        stats: Dict[str, Dict[str, Any]] = {}
+
+        for pid in persona_ids:
+            persona_dir = self.base_path / "personas" / pid
+
+            # Count content
+            drafts_dir = persona_dir / "content" / "drafts"
+            published_dir = persona_dir / "content" / "published"
+            reviews_dir = persona_dir / "reviews"
+
+            draft_count = 0
+            published_count = 0
+            content_by_pillar: Dict[str, int] = {}
+            content_by_platform: Dict[str, int] = {}
+
+            # Count drafts and collect metadata
+            draft_ids = set()
+            if drafts_dir.exists():
+                for f in drafts_dir.glob("*.json"):
+                    try:
+                        with open(f, "r", encoding="utf-8") as fp:
+                            data = json.load(fp)
+                        draft_ids.add(data.get("id"))
+                        draft_count += 1
+                        pillar = data.get("pillar", "unknown")
+                        platform = data.get("platform", "unknown")
+                        content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
+                        content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
+                    except Exception:
+                        continue
+
+            # Count published (subtract from drafts to avoid double counting)
+            published_ids = set()
+            if published_dir.exists():
+                for f in published_dir.glob("*.json"):
+                    try:
+                        with open(f, "r", encoding="utf-8") as fp:
+                            data = json.load(fp)
+                        content_id = data.get("id")
+                        published_ids.add(content_id)
+                        # Only count if not already counted as draft
+                        if content_id not in draft_ids:
+                            published_count += 1
+                            pillar = data.get("pillar", "unknown")
+                            platform = data.get("platform", "unknown")
+                            content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
+                            content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
+                        else:
+                            published_count += 1
+                            draft_count -= 1  # Don't count as draft if published
+                    except Exception:
+                        continue
+
+            # Calculate review scores
+            total_consistency = 0
+            total_platform_fit = 0
+            total_compliance = 0
+            total_engagement = 0
+            review_count = 0
+
+            if reviews_dir.exists():
+                for f in reviews_dir.glob("*.json"):
+                    try:
+                        with open(f, "r", encoding="utf-8") as fp:
+                            review = json.load(fp)
+                        total_consistency += review.get("persona_consistency", {}).get("score", 0)
+                        total_platform_fit += review.get("platform_fit", {}).get("score", 0)
+                        total_compliance += review.get("compliance", {}).get("score", 0)
+                        total_engagement += review.get("engagement_potential", {}).get("score", 0)
+                        review_count += 1
+                    except Exception:
+                        continue
+
+            avg_score = 0
+            if review_count > 0:
+                avg_score = (total_consistency + total_platform_fit + total_compliance + total_engagement) / (review_count * 4)
+
+            stats[pid] = {
+                "persona_id": pid,
+                "total_content": draft_count + published_count,
+                "published_content": published_count,
+                "draft_content": draft_count,
+                "avg_review_score": round(avg_score),
+                "content_by_pillar": content_by_pillar,
+                "content_by_platform": content_by_platform,
+                "score_distribution": {
+                    "persona_consistency": round(total_consistency / review_count) if review_count > 0 else 0,
+                    "platform_fit": round(total_platform_fit / review_count) if review_count > 0 else 0,
+                    "compliance": round(total_compliance / review_count) if review_count > 0 else 0,
+                    "engagement_potential": round(total_engagement / review_count) if review_count > 0 else 0,
+                },
+            }
+
+        return stats
+
+    def get_all_reviews_batch(
+        self,
+        persona_id: Optional[str] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Batch load all reviews across personas.
+
+        Args:
+            persona_id: Optional persona ID to filter by
+
+        Returns:
+            Dict mapping content_id to review data
+        """
+        if persona_id:
+            persona_ids = [persona_id]
+        else:
+            personas_dir = self.base_path / "personas"
+            if not personas_dir.exists():
+                return {}
+            persona_ids = [d.name for d in personas_dir.iterdir() if d.is_dir()]
+
+        reviews: Dict[str, Dict[str, Any]] = {}
+
+        for pid in persona_ids:
+            reviews_dir = self.base_path / "personas" / pid / "reviews"
+            if not reviews_dir.exists():
+                continue
+
+            for review_path in reviews_dir.glob("*.json"):
+                try:
+                    content_id = review_path.stem
+                    with open(review_path, "r", encoding="utf-8") as f:
+                        review_data = json.load(f)
+                    review_data["_persona_id"] = pid
+                    reviews[content_id] = review_data
+                except Exception:
+                    continue
+
+        return reviews
+

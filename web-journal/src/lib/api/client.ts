@@ -153,3 +153,37 @@ export async function getJournalStats(): Promise<JournalStats> {
     events_by_day: [],
   };
 }
+
+// =============================================================================
+// Dashboard (Optimized - Single API call)
+// =============================================================================
+
+/**
+ * Dashboard data structure
+ */
+export interface JournalDashboard {
+  events: TimelineEvent[];
+  stats: JournalStats;
+}
+
+/**
+ * Get all journal dashboard data in a single API call
+ *
+ * This is the optimized endpoint that combines:
+ * - Timeline events
+ * - Stats
+ */
+export async function getDashboardData(): Promise<JournalDashboard> {
+  const data = await fetchAPI<JournalDashboard>('/dashboard');
+  return data || {
+    events: [],
+    stats: {
+      total_events: 0,
+      total_personas: 0,
+      total_content: 0,
+      total_published: 0,
+      events_by_type: {},
+      events_by_day: [],
+    },
+  };
+}

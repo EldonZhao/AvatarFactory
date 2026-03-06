@@ -7,20 +7,12 @@ import { AvatarCard } from '../components/avatar/AvatarCard';
 import { ContentCard } from '../components/content/ContentCard';
 import { Timeline } from '../components/timeline/Timeline';
 import { TaskList } from '../components/scheduler/TaskCard';
-import { getAllPersonas, getPersonaStats, getRecentContent, getGlobalStats, getTimelineEvents, getActiveTasks } from '../lib/data';
+import { getDashboardData } from '../lib/data';
 
-const personas = await getAllPersonas();
-const personasWithStats = await Promise.all(
-  personas.slice(0, 6).map(async (p) => ({
-    persona: p,
-    stats: await getPersonaStats(p.id)
-  }))
-);
+// Single API call to get all dashboard data
+const dashboardData = await getDashboardData();
+const { personas: personasWithStats, recentContent, timeline: timelineEvents, tasks: activeTasks, stats: globalStats } = dashboardData;
 
-const recentContent = await getRecentContent(6);
-const globalStats = await getGlobalStats();
-const timelineEvents = await getTimelineEvents(undefined, 10);
-const activeTasks = (await getActiveTasks()).slice(0, 5);
 const base = import.meta.env.BASE_URL || '';
 ---
 

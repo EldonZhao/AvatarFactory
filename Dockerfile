@@ -60,7 +60,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install runtime dependencies + build tools for pip packages + nginx + playwright deps + fonts
+# Install runtime dependencies + build tools for pip packages + nginx + playwright deps + fonts + locales
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gcc \
@@ -68,6 +68,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     supervisor \
     gnupg \
+    locales \
     # Playwright dependencies
     libnss3 \
     libnspr4 \
@@ -92,6 +93,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -fv
+
+# Generate zh_CN locale for Chinese date formatting
+RUN sed -i '/zh_CN.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
 # Install Node.js 20 from NodeSource
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -141,6 +145,8 @@ ENV API_BASE_URL=http://127.0.0.1:8000
 ENV MONITOR_PORT=4321
 ENV JOURNAL_PORT=4322
 ENV ADMIN_PORT=4323
+ENV LANG=zh_CN.UTF-8
+ENV LC_ALL=zh_CN.UTF-8
 
 # Expose port 80 (nginx reverse proxy)
 EXPOSE 80

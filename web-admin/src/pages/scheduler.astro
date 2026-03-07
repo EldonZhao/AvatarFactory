@@ -34,6 +34,13 @@ try {
 const grouped = tasksData?.grouped || {};
 const taskCount = tasksData?.count || 0;
 
+// Sort persona IDs: non-system first, 'system' last
+const sortedPersonaIds = Object.keys(grouped).sort((a, b) => {
+  if (a === 'system') return 1;
+  if (b === 'system') return -1;
+  return 0;
+});
+
 // Calculate total run count from all tasks
 let totalRunCount = 0;
 Object.values(grouped).forEach((data: any) => {
@@ -124,7 +131,9 @@ Object.values(grouped).forEach((data: any) => {
         <!-- Tasks by Persona -->
         {Object.keys(grouped).length > 0 ? (
           <div class="space-y-6">
-            {Object.entries(grouped).map(([personaId, data]: [string, any]) => (
+            {sortedPersonaIds.map((personaId) => {
+              const data = grouped[personaId];
+              return (
               <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
                 <div class="flex items-center justify-between mb-4">
                   <div class="flex items-center gap-3">
@@ -215,7 +224,7 @@ Object.values(grouped).forEach((data: any) => {
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         ) : (
           <div class="p-12 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-center">

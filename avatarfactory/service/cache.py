@@ -191,3 +191,28 @@ async def get_or_set_async(cache: TTLCache, key: str, factory):
     value = await factory()
     cache.set(key, value)
     return value
+
+
+def invalidate_persona_caches() -> None:
+    """Invalidate all persona-related caches after persona mutations."""
+    persona_cache.invalidate_prefix("admin:personas")
+    persona_cache.invalidate_prefix("chronicle:personas")
+    dashboard_cache.clear()  # Dashboard includes persona data
+    stats_cache.invalidate_prefix("journal:stats")
+
+
+def invalidate_content_caches(persona_id: str = None) -> None:
+    """Invalidate all content-related caches after content mutations."""
+    stats_cache.invalidate_prefix("admin:content")
+    stats_cache.invalidate_prefix("chronicle:content")
+    timeline_cache.clear()  # Timeline includes content events
+    dashboard_cache.clear()  # Dashboard includes content data
+    stats_cache.invalidate_prefix("journal:stats")
+
+
+def invalidate_all_caches() -> None:
+    """Invalidate all caches (use sparingly)."""
+    dashboard_cache.clear()
+    stats_cache.clear()
+    persona_cache.clear()
+    timeline_cache.clear()

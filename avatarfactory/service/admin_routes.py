@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Cookie, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from avatarfactory.service.cache import persona_cache, stats_cache
+
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -227,44 +229,66 @@ async def get_dashboard():
 async def list_personas_admin():
     """
     List all personas with extended info for admin.
+    Uses batch methods to minimize file I/O.
     """
+    # Try to get from cache first
+    cache_key = "admin:personas:list"
+    cached = persona_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     orchestrator = get_orchestrator()
     kb = orchestrator.kb
     scheduler = get_scheduler()
 
-    persona_ids = kb.list_personas()
+    # Use batch loading for summaries and stats
+    summaries = kb.list_personas_summary()
+    persona_ids = [s["id"] for s in summaries]
+    batch_stats = kb.get_batch_persona_stats(persona_ids)
+
+    # Build task counts map (scheduler tasks are small, OK to iterate)
+    all_tasks = scheduler.list_tasks() if scheduler else []
+    task_counts: Dict[str, int] = {}
+    for task in all_tasks:
+        if task.persona_id:
+            task_counts[task.persona_id] = task_counts.get(task.persona_id, 0) + 1
+
     personas = []
+    for summary in summaries:
+        pid = summary["id"]
+        stats = batch_stats.get(pid, {})
 
-    for pid in persona_ids:
+        # For notification enabled, we need to load persona (lightweight check)
+        # TODO: Add notification to summary in future optimization
         persona = kb.load_persona(pid)
-        if persona:
-            draft_count = len(kb.list_content(persona_id=pid, status="draft"))
-            published_count = len(kb.list_content(persona_id=pid, status="published"))
+        notification_enabled = (
+            persona.notification.enabled if persona and persona.notification else False
+        )
 
-            # Get tasks for this persona
-            persona_tasks = [t for t in (scheduler.list_tasks() if scheduler else [])
-                           if t.persona_id == pid]
+        personas.append({
+            "id": pid,
+            "name": summary.get("name", ""),
+            "tagline": summary.get("tagline", ""),
+            "platforms": summary.get("platforms", []),
+            "expertise": summary.get("expertise", []),
+            "version": summary.get("version", "v1.0"),
+            "content_count": stats.get("total_content", 0),
+            "draft_count": stats.get("draft_content", 0),
+            "published_count": stats.get("published_content", 0),
+            "tasks_count": task_counts.get(pid, 0),
+            "notification_enabled": notification_enabled,
+            "created_at": summary.get("created_at"),
+            "updated_at": summary.get("updated_at"),
+        })
 
-            personas.append({
-                "id": persona.id,
-                "name": persona.identity.name,
-                "tagline": persona.identity.tagline,
-                "platforms": [pt.value for pt in persona.platforms],
-                "expertise": persona.identity.expertise,
-                "version": persona.version,
-                "content_count": draft_count + published_count,
-                "draft_count": draft_count,
-                "published_count": published_count,
-                "tasks_count": len(persona_tasks),
-                "notification_enabled": persona.notification.enabled if persona.notification else False,
-                "created_at": persona.created_at.isoformat() if persona.created_at else None,
-                "updated_at": persona.updated_at.isoformat() if persona.updated_at else None,
-            })
-
-    return {
+    result = {
         "count": len(personas),
         "personas": personas,
     }
+
+    # Cache the result
+    persona_cache.set(cache_key, result)
+    return result
 
 
 @router.get("/personas/{persona_id}", dependencies=[Depends(require_admin_auth)])
@@ -368,6 +392,12 @@ async def list_content_admin(
     """
     List content items with filtering for admin.
     """
+    # Try to get from cache first (using filter params as key)
+    cache_key = f"admin:content:{persona_id or 'all'}:{content_status or 'all'}:{platform or 'all'}:{limit}"
+    cached = stats_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     orchestrator = get_orchestrator()
     kb = orchestrator.kb
 
@@ -397,11 +427,15 @@ async def list_content_admin(
     # Sort by created_at descending
     all_contents.sort(key=lambda x: x.get("created_at") or "", reverse=True)
 
-    return {
+    result = {
         "count": len(all_contents[:limit]),
         "total": len(all_contents),
         "content": all_contents[:limit],
     }
+
+    # Cache the result
+    stats_cache.set(cache_key, result)
+    return result
 
 
 @router.get("/content/{content_id}", dependencies=[Depends(require_admin_auth)])

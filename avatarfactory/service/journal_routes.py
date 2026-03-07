@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from avatarfactory.service.cache import (
     dashboard_cache,
     timeline_cache,
+    stats_cache,
     get_or_set_async,
 )
 
@@ -181,6 +182,18 @@ async def _build_all_events(orchestrator, persona_id: Optional[str] = None) -> L
     return events
 
 
+async def _get_cached_events(orchestrator, persona_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Get timeline events with caching."""
+    cache_key = f"events:{persona_id or 'all'}"
+    cached = timeline_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    events = await _build_all_events(orchestrator, persona_id)
+    timeline_cache.set(cache_key, events)
+    return events
+
+
 @router.get("/events")
 async def list_events(
     page: int = Query(1, ge=1),
@@ -188,7 +201,7 @@ async def list_events(
 ) -> Dict[str, Any]:
     """Get paginated timeline events."""
     orchestrator = _get_orchestrator()
-    all_events = await _build_all_events(orchestrator)
+    all_events = await _get_cached_events(orchestrator)
 
     total = len(all_events)
     pages = math.ceil(total / limit) if total > 0 else 0
@@ -209,7 +222,7 @@ async def get_recent_events(
 ) -> List[Dict[str, Any]]:
     """Get most recent events."""
     orchestrator = _get_orchestrator()
-    all_events = await _build_all_events(orchestrator)
+    all_events = await _get_cached_events(orchestrator)
     return all_events[:limit]
 
 
@@ -217,7 +230,7 @@ async def get_recent_events(
 async def get_events_by_type(event_type: str) -> List[Dict[str, Any]]:
     """Get events filtered by type."""
     orchestrator = _get_orchestrator()
-    all_events = await _build_all_events(orchestrator)
+    all_events = await _get_cached_events(orchestrator)
     return [e for e in all_events if e["type"] == event_type]
 
 
@@ -225,14 +238,14 @@ async def get_events_by_type(event_type: str) -> List[Dict[str, Any]]:
 async def get_events_by_persona(persona_id: str) -> List[Dict[str, Any]]:
     """Get events for a specific persona."""
     orchestrator = _get_orchestrator()
-    return await _build_all_events(orchestrator, persona_id=persona_id)
+    return await _get_cached_events(orchestrator, persona_id=persona_id)
 
 
 @router.get("/events/{event_id}")
 async def get_event(event_id: str) -> Optional[Dict[str, Any]]:
     """Get a single event by ID."""
     orchestrator = _get_orchestrator()
-    all_events = await _build_all_events(orchestrator)
+    all_events = await _get_cached_events(orchestrator)
 
     for event in all_events:
         if event["id"] == event_id:
@@ -401,7 +414,13 @@ async def get_content(content_id: str) -> Optional[Dict[str, Any]]:
 
 @router.get("/stats")
 async def get_journal_stats() -> Dict[str, Any]:
-    """Get journal statistics."""
+    """Get journal statistics (cached)."""
+    # Try cache first
+    cache_key = "journal:stats"
+    cached = stats_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     from avatarfactory.service.app import get_scheduler
 
     orchestrator = _get_orchestrator()
@@ -420,8 +439,8 @@ async def get_journal_stats() -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Build events and count by type
-    all_events = await _build_all_events(orchestrator)
+    # Use cached events
+    all_events = await _get_cached_events(orchestrator)
     events_by_type: Dict[str, int] = {}
     for event in all_events:
         event_type = event["type"]
@@ -445,7 +464,7 @@ async def get_journal_stats() -> Dict[str, Any]:
             except Exception:
                 pass
 
-    return {
+    result = {
         "total_events": len(all_events),
         "total_personas": len(persona_ids),
         "total_content": total_content,
@@ -453,6 +472,10 @@ async def get_journal_stats() -> Dict[str, Any]:
         "events_by_type": events_by_type,
         "events_by_day": [{"date": date, "count": count} for date, count in events_by_day.items()],
     }
+
+    # Cache the result
+    stats_cache.set(cache_key, result)
+    return result
 
 
 # =============================================================================

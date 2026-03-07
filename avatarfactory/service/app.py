@@ -12,6 +12,11 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from avatarfactory.service.cache import (
+    invalidate_persona_caches,
+    invalidate_content_caches,
+)
+
 # FastAPI imports with graceful fallback
 try:
     from fastapi import BackgroundTasks, FastAPI, HTTPException, status
@@ -407,6 +412,41 @@ def create_app(
             allow_headers=["*"],
         )
 
+    # Add Cache-Control middleware for API responses
+    from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+    from starlette.requests import Request
+    from starlette.responses import Response
+
+    class CacheControlMiddleware(BaseHTTPMiddleware):
+        """Add Cache-Control headers to read-only API endpoints."""
+
+        async def dispatch(
+            self, request: Request, call_next: RequestResponseEndpoint
+        ) -> Response:
+            response = await call_next(request)
+
+            # Only cache GET requests
+            if request.method != "GET":
+                return response
+
+            path = request.url.path
+
+            # Cache read-only API endpoints (short TTL for freshness)
+            if path.startswith("/api/chronicle/") or path.startswith("/api/journal/"):
+                # Dashboard and list endpoints: cache for 30 seconds
+                if "dashboard" in path or path.endswith("/personas") or path.endswith("/content"):
+                    response.headers["Cache-Control"] = "public, max-age=30"
+                # Individual items: cache for 60 seconds
+                else:
+                    response.headers["Cache-Control"] = "public, max-age=60"
+            elif path == "/health":
+                # Health check: no cache
+                response.headers["Cache-Control"] = "no-store"
+
+            return response
+
+    application.add_middleware(CacheControlMiddleware)
+
     # Add multi-tenancy support (opt-in, disabled by default)
     if enable_multi_tenancy:
         try:
@@ -631,6 +671,9 @@ def register_routes(app: FastAPI):
             if hasattr(updated_at, 'isoformat'):
                 updated_at = updated_at.isoformat()
 
+            # Invalidate persona caches after successful creation
+            invalidate_persona_caches()
+
             return PersonaResponse(
                 id=persona_data.get("id", ""),
                 version=persona_data.get("version", "v1.0"),
@@ -679,6 +722,10 @@ def register_routes(app: FastAPI):
 
         # Delete persona and content
         result = orchestrator.kb.delete_persona(persona_id, delete_content=not keep_content)
+
+        # Invalidate caches after deletion
+        invalidate_persona_caches()
+        invalidate_content_caches()
 
         return {
             "status": "success",
@@ -731,6 +778,9 @@ def register_routes(app: FastAPI):
 
         try:
             content = await orchestrator.content_agent.process(message)
+
+            # Invalidate content caches after generation
+            invalidate_content_caches(request.persona_id)
 
             # Send webhook notification in background
             background_tasks.add_task(

@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from avatarfactory.service.cache import (
     dashboard_cache,
     stats_cache,
+    persona_cache,
     get_or_set_async,
 )
 
@@ -43,7 +44,13 @@ def _get_orchestrator():
 
 @router.get("/personas")
 async def list_personas() -> Dict[str, Any]:
-    """Get all personas with basic info."""
+    """Get all personas with basic info (cached)."""
+    # Try cache first
+    cache_key = "chronicle:personas:list"
+    cached = persona_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     orchestrator = _get_orchestrator()
     persona_ids = orchestrator.kb.list_personas()
     personas = []
@@ -88,10 +95,14 @@ async def list_personas() -> Dict[str, Any]:
                 "notification": persona.notification.model_dump() if persona.notification else None,
             })
 
-    return {
+    result = {
         "count": len(personas),
         "personas": personas,
     }
+
+    # Cache the result
+    persona_cache.set(cache_key, result)
+    return result
 
 
 @router.get("/personas/ids")
@@ -349,7 +360,13 @@ def _content_to_dict(content, status: str) -> Dict[str, Any]:
 async def list_all_content(
     limit: int = Query(100, ge=1, le=500)
 ) -> List[Dict[str, Any]]:
-    """Get all content across all personas."""
+    """Get all content across all personas (cached)."""
+    # Try cache first
+    cache_key = f"chronicle:content:list:{limit}"
+    cached = stats_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     orchestrator = _get_orchestrator()
     persona_ids = orchestrator.kb.list_personas()
 
@@ -368,7 +385,11 @@ async def list_all_content(
 
     # Sort by created_at descending
     all_content.sort(key=lambda x: x.get("created_at", "") or "", reverse=True)
-    return all_content[:limit]
+    result = all_content[:limit]
+
+    # Cache the result
+    stats_cache.set(cache_key, result)
+    return result
 
 
 @router.get("/content/ids")

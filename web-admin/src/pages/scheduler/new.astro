@@ -1,0 +1,197 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+// Remove trailing slash from BASE_URL for consistent path joining
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+// Get cookie from request for SSR authentication
+const cookie = Astro.request.headers.get('cookie') || '';
+
+let personasData: any = null;
+let error = null;
+
+try {
+  const personasResponse = await fetch(`${API_BASE}/api/admin/personas`, {
+    headers: { 'Cookie': cookie }
+  });
+  if (personasResponse.ok) {
+    personasData = await personasResponse.json();
+  }
+} catch (e) {
+  error = `Failed to fetch personas: ${e}`;
+}
+
+const personas = personasData?.personas || [];
+---
+
+<AdminLayout title="创建定时任务">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+      <a
+        href={`${base}/scheduler`}
+        class="p-2 rounded-lg hover:bg-[hsl(var(--accent))] transition-colors"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">创建定时任务</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          为 Persona 配置自动化任务
+        </p>
+      </div>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : (
+      <!-- Form -->
+      <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+        <form id="create-task-form" class="space-y-6">
+          <!-- Persona Selection -->
+          <div class="space-y-4">
+            <h2 class="text-lg font-semibold">选择 Persona</h2>
+
+            <div>
+              <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">关联 Persona *</label>
+              <select
+                name="persona_id"
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+              >
+                <option value="">选择一个 Persona</option>
+                {personas.map((p: any) => (
+                  <option value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">任务名称将根据 Persona 和任务类型自动生成</p>
+            </div>
+          </div>
+
+          <!-- Task Config -->
+          <div class="space-y-4">
+            <h2 class="text-lg font-semibold">任务配置</h2>
+
+            <div>
+              <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">任务类型 *</label>
+              <select
+                name="task_type"
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+              >
+                <option value="discovery">Discovery - 发现热门话题</option>
+                <option value="content">Content - 生成内容草稿</option>
+                <option value="publish">Publish - 发布内容</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm text-[hsl(var(--muted-foreground))] mb-1">Cron 表达式 *</label>
+              <input
+                type="text"
+                name="schedule"
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] border border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+                placeholder="0 9 * * *"
+              />
+              <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">格式: 分 时 日 月 周。例如: 0 9 * * * = 每天早上 9 点</p>
+            </div>
+          </div>
+
+          <!-- Platform -->
+          <div class="space-y-4">
+            <h2 class="text-lg font-semibold">目标平台（可选）</h2>
+            <div class="flex flex-wrap gap-3">
+              {['xiaohongshu', 'bluesky', 'twitter', 'linkedin'].map((platform) => (
+                <label class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--accent))] cursor-pointer hover:bg-[hsl(var(--accent))]/80 transition-colors">
+                  <input type="radio" name="platform" value={platform} class="rounded" />
+                  <span class="text-sm">{platform}</span>
+                </label>
+              ))}
+              <label class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--accent))] cursor-pointer hover:bg-[hsl(var(--accent))]/80 transition-colors">
+                <input type="radio" name="platform" value="" checked class="rounded" />
+                <span class="text-sm">使用 Persona 默认</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-4 pt-4">
+            <button
+              type="submit"
+              id="submit-btn"
+              class="px-6 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium"
+            >
+              创建任务
+            </button>
+            <a
+              href={`${base}/scheduler`}
+              class="px-6 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity font-medium"
+            >
+              取消
+            </a>
+          </div>
+        </form>
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<!-- Hidden element to pass base URL to client script -->
+<div id="app-config" data-base-url={base} style="display:none;"></div>
+
+<script>
+  const baseUrl = document.getElementById('app-config')?.dataset.baseUrl || '';
+  const form = document.getElementById('create-task-form');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form as HTMLFormElement);
+    const data = {
+      persona_id: formData.get('persona_id'),
+      task_type: formData.get('task_type'),
+      schedule: formData.get('schedule'),
+      platform: formData.get('platform') || undefined,
+      enabled: true,
+    };
+
+    if (submitBtn) {
+      submitBtn.textContent = '创建中...';
+      submitBtn.setAttribute('disabled', 'true');
+    }
+
+    try {
+      const response = await fetch('/api/admin/scheduler/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        window.location.href = `${baseUrl}/scheduler`;
+      } else {
+        const errorText = await response.text();
+        alert('创建失败: ' + errorText);
+        if (submitBtn) {
+          submitBtn.textContent = '创建任务';
+          submitBtn.removeAttribute('disabled');
+        }
+      }
+    } catch (err) {
+      alert('创建失败: ' + err);
+      if (submitBtn) {
+        submitBtn.textContent = '创建任务';
+        submitBtn.removeAttribute('disabled');
+      }
+    }
+  });
+</script>

@@ -87,6 +87,7 @@ class DashboardResponse(BaseModel):
     connectors: List[ConnectorStatusResponse]
     scheduler_running: bool
     next_task_run: Optional[str] = None
+    model_info: Optional[str] = None
 
 
 # =============================================================================
@@ -207,6 +208,11 @@ async def get_dashboard():
     next_runs = scheduler.get_next_runs() if scheduler else []
     next_task_run = next_runs[0].get("next_run") if next_runs else None
 
+    # Model info
+    model = os.getenv("AVATARFACTORY_MODEL", "")
+    provider = os.getenv("AVATARFACTORY_LLM_PROVIDER", "")
+    model_info = f"{provider}/{model}" if provider and model else (model or provider or None)
+
     return DashboardResponse(
         stats=DashboardStatsResponse(
             personas_count=personas_count,
@@ -222,7 +228,99 @@ async def get_dashboard():
         connectors=connectors,
         scheduler_running=scheduler_running,
         next_task_run=next_task_run,
+        model_info=model_info,
     )
+
+
+# =============================================================================
+# Create Persona Request Model
+# =============================================================================
+
+
+class CreatePersonaRequest(BaseModel):
+    """Request to create a new persona."""
+    name: str = Field(..., description="Persona name")
+    tagline: Optional[str] = Field(None, description="Short tagline")
+    description: str = Field(..., description="Persona description")
+    platforms: List[str] = Field(default_factory=list, description="Target platforms")
+    expertise: List[str] = Field(default_factory=list, description="Areas of expertise")
+
+
+@router.post("/personas", dependencies=[Depends(require_admin_auth)])
+async def create_persona_admin(request: CreatePersonaRequest):
+    """
+    Create a new persona via Admin dashboard.
+    """
+    import uuid
+    from datetime import datetime
+    from avatarfactory.models.schemas import (
+        Persona,
+        Identity,
+        VoiceStyle,
+        TargetAudience,
+        Boundaries,
+        PlatformType,
+    )
+    from avatarfactory.service.cache import invalidate_persona_caches
+
+    orchestrator = get_orchestrator()
+    kb = orchestrator.kb
+
+    # Generate persona ID
+    persona_id = f"persona_{uuid.uuid4().hex[:8]}"
+
+    # Parse platforms
+    valid_platforms = []
+    for p in request.platforms:
+        try:
+            valid_platforms.append(PlatformType(p))
+        except ValueError:
+            pass  # Skip invalid platforms
+
+    # Create persona with defaults
+    tagline = request.tagline or ""
+    if not tagline and request.description:
+        tagline = request.description[:50]
+
+    persona = Persona(
+        id=persona_id,
+        identity=Identity(
+            name=request.name,
+            tagline=tagline,
+            expertise=request.expertise if request.expertise else [],
+        ),
+        target_audience=TargetAudience(
+            primary="通用受众",
+            pain_points=[],
+            goals=[],
+        ),
+        voice_style=VoiceStyle(
+            tone="informative",
+            language_patterns=[],
+            emoji_usage="moderate",
+        ),
+        content_pillars=[],
+        boundaries=Boundaries(
+            avoid=[],
+            compliance=[],
+        ),
+        platforms=valid_platforms if valid_platforms else [PlatformType.XIAOHONGSHU],
+        version="v1.0",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+
+    # Save persona
+    kb.save_persona(persona)
+
+    # Invalidate cache
+    invalidate_persona_caches()
+
+    return {
+        "id": persona.id,
+        "name": persona.identity.name,
+        "status": "created",
+    }
 
 
 @router.get("/personas", dependencies=[Depends(require_admin_auth)])
@@ -461,6 +559,20 @@ async def get_content_admin(content_id: str):
     persona = kb.load_persona(content.persona_id)
     persona_name = persona.identity.name if persona else content.persona_id
 
+    # Load review report for detailed scores
+    review_details = None
+    try:
+        review = kb.load_review_report(content_id, content.persona_id)
+        if review:
+            review_details = {
+                "persona_consistency": review.persona_consistency.score,
+                "platform_fit": review.platform_fit.score,
+                "compliance": review.compliance.score,
+                "engagement_potential": review.engagement_potential.score,
+            }
+    except Exception:
+        pass  # Review report may not exist
+
     return {
         "id": content.id,
         "title": content.title,
@@ -473,7 +585,7 @@ async def get_content_admin(content_id: str):
         "status": content_status,
         "review_score": content.review_score,
         "review_issues": content.review_issues,
-        "review_details": content.review_details.model_dump() if content.review_details else None,
+        "review_details": review_details,
         "created_at": content.created_at.isoformat() if content.created_at else None,
         "metadata": content.metadata,
         "media": [m.model_dump() for m in content.media] if content.media else [],
@@ -543,8 +655,8 @@ async def generate_content_admin(request: GenerateContentAdminRequest):
             detail=f"Persona {request.persona_id} not found",
         )
 
-    # Determine pillar
-    pillar = None
+    # Determine pillar (use first content pillar or default)
+    pillar = "General"
     if persona.content_pillars:
         pillar = persona.content_pillars[0].name
 
@@ -724,6 +836,10 @@ async def list_scheduler_tasks_admin():
 
     tasks = scheduler.list_tasks()
 
+    # Get next run times for each task
+    next_runs = scheduler.get_next_runs() if scheduler.is_running() else []
+    next_run_map = {nr["task_id"]: nr["next_run"] for nr in next_runs}
+
     # Group by persona
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for t in tasks:
@@ -738,6 +854,7 @@ async def list_scheduler_tasks_admin():
             "last_status": t.last_status,
             "last_error": t.last_error,
             "run_count": t.run_count,
+            "next_run_time": next_run_map.get(t.id),
         }
 
         persona_id = t.persona_id or "system"
@@ -763,6 +880,73 @@ async def list_scheduler_tasks_admin():
     return {
         "count": len(tasks),
         "grouped": result,
+    }
+
+
+class CreateSchedulerTaskRequest(BaseModel):
+    """Request to create a new scheduler task."""
+    name: Optional[str] = Field(None, description="Task name (auto-generated if not provided)")
+    task_type: str = Field(..., description="Task type (discovery, content, publish)")
+    persona_id: str = Field(..., description="Persona ID")
+    schedule: str = Field(..., description="Cron schedule expression")
+    platform: Optional[str] = Field(None, description="Target platform")
+    enabled: bool = Field(default=True, description="Whether task is enabled")
+
+
+@router.post("/scheduler/tasks", dependencies=[Depends(require_admin_auth)])
+async def create_scheduler_task_admin(request: CreateSchedulerTaskRequest):
+    """
+    Create a new scheduler task via Admin dashboard.
+    """
+    import uuid
+
+    orchestrator = get_orchestrator()
+    kb = orchestrator.kb
+    scheduler = get_scheduler()
+
+    if not scheduler:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler not available",
+        )
+
+    # Verify persona exists
+    persona = kb.load_persona(request.persona_id)
+    if not persona:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Persona {request.persona_id} not found",
+        )
+
+    # Generate task name if not provided
+    task_type_names = {
+        "discovery": "发现话题",
+        "content": "生成内容",
+        "publish": "发布内容",
+    }
+    task_name = request.name
+    if not task_name:
+        type_name = task_type_names.get(request.task_type, request.task_type)
+        task_name = f"{persona.identity.name} - {type_name}"
+
+    # Generate task ID
+    task_id = f"{request.task_type}_{uuid.uuid4().hex[:8]}"
+
+    # Create task via scheduler
+    task = scheduler.add_task_from_dict({
+        "id": task_id,
+        "name": task_name,
+        "task_type": request.task_type,
+        "schedule": request.schedule,
+        "persona_id": request.persona_id,
+        "platform": request.platform,
+        "enabled": request.enabled,
+    })
+
+    return {
+        "id": task.id,
+        "name": task.name,
+        "status": "created",
     }
 
 

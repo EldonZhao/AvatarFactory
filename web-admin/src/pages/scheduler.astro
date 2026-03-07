@@ -33,6 +33,14 @@ try {
 
 const grouped = tasksData?.grouped || {};
 const taskCount = tasksData?.count || 0;
+
+// Calculate total run count from all tasks
+let totalRunCount = 0;
+Object.values(grouped).forEach((data: any) => {
+  data.tasks?.forEach((task: any) => {
+    totalRunCount += task.run_count || 0;
+  });
+});
 ---
 
 <AdminLayout title="Scheduler">
@@ -46,14 +54,12 @@ const taskCount = tasksData?.count || 0;
         </p>
       </div>
       <div class="flex items-center gap-4">
-        {schedulerStatus && (
-          <div class="flex items-center gap-2">
-            <span class={`w-2 h-2 rounded-full ${schedulerStatus.running ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">
-              {schedulerStatus.running ? '运行中' : '已停止'}
-            </span>
-          </div>
-        )}
+        <a
+          href={`${base}/scheduler/new`}
+          class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+        >
+          创建任务
+        </a>
       </div>
     </div>
 
@@ -102,10 +108,8 @@ const taskCount = tasksData?.count || 0;
             <div class="p-6">
               <div class="flex items-start justify-between">
                 <div>
-                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">下次运行</p>
-                  <p class="text-lg font-bold text-[hsl(var(--foreground))]">
-                    {schedulerStatus?.next_run ? new Date(schedulerStatus.next_run).toLocaleString('zh-CN') : '-'}
-                  </p>
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">总运行次数</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{totalRunCount}</p>
                 </div>
                 <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white shadow-lg">
                   <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -166,6 +170,11 @@ const taskCount = tasksData?.count || 0;
                                 {task.platform}
                               </span>
                             )}
+                            {task.run_count !== undefined && task.run_count > 0 && (
+                              <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                                已运行 {task.run_count} 次
+                              </span>
+                            )}
                           </div>
                           {task.last_run && (
                             <p class="text-xs text-[hsl(var(--muted-foreground))] mt-2">
@@ -175,11 +184,14 @@ const taskCount = tasksData?.count || 0;
                                   ({task.last_status})
                                 </span>
                               )}
+                              {task.last_error && (
+                                <span class="ml-2 text-red-500">- {task.last_error}</span>
+                              )}
                             </p>
                           )}
-                          {task.last_error && (
-                            <p class="text-xs text-red-500 mt-1">
-                              错误: {task.last_error}
+                          {task.next_run_time && (
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                              <span class="text-green-600">下次运行:</span> {new Date(task.next_run_time).toLocaleString('zh-CN')}
                             </p>
                           )}
                         </div>
@@ -191,7 +203,9 @@ const taskCount = tasksData?.count || 0;
                             运行
                           </button>
                           <button
-                            class="px-3 py-1.5 rounded text-xs font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors"
+                            class="delete-task-btn px-3 py-1.5 rounded text-xs font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors"
+                            data-task-id={task.id}
+                            data-persona-id={personaId}
                           >
                             删除
                           </button>
@@ -232,7 +246,7 @@ const taskCount = tasksData?.count || 0;
       btn.setAttribute('disabled', 'true');
 
       try {
-        const response = await fetch(`/scheduler/tasks/${taskId}/run`, {
+        const response = await fetch(`/api/scheduler/tasks/${taskId}/run`, {
           method: 'POST',
         });
         if (response.ok) {
@@ -252,6 +266,41 @@ const taskCount = tasksData?.count || 0;
         btn.textContent = '错误';
         setTimeout(() => {
           btn.textContent = '运行';
+          btn.removeAttribute('disabled');
+        }, 3000);
+      }
+    });
+  });
+
+  const deleteButtons = document.querySelectorAll('.delete-task-btn');
+  deleteButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const taskId = btn.getAttribute('data-task-id');
+      const personaId = btn.getAttribute('data-persona-id');
+      if (!taskId || !personaId) return;
+
+      if (!confirm('确定要删除此任务吗？')) return;
+
+      btn.textContent = '删除中...';
+      btn.setAttribute('disabled', 'true');
+
+      try {
+        const response = await fetch(`/api/scheduler/tasks/${personaId}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          window.location.reload();
+        } else {
+          btn.textContent = '失败';
+          setTimeout(() => {
+            btn.textContent = '删除';
+            btn.removeAttribute('disabled');
+          }, 3000);
+        }
+      } catch (e) {
+        btn.textContent = '错误';
+        setTimeout(() => {
+          btn.textContent = '删除';
           btn.removeAttribute('disabled');
         }, 3000);
       }

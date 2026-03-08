@@ -86,22 +86,22 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
               <h2 class="text-lg font-semibold mb-4">快速操作</h2>
               <div class="flex flex-wrap gap-3">
                 <a
-                  href={`${base}/personas`}
+                  href={`${base}/personas/new`}
                   class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
                 >
                   创建 Persona
                 </a>
                 <a
-                  href={`${base}/content`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  生成内容
-                </a>
-                <a
-                  href={`${base}/scheduler`}
+                  href={`${base}/scheduler/new`}
                   class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
                 >
                   配置任务
+                </a>
+                <a
+                  href={`${base}/content/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  生成内容
                 </a>
                 <a
                   href={`${base}/topics`}
@@ -149,6 +149,12 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
               </CardHeader>
               <CardContent>
                 <div class="space-y-3 text-sm">
+                  {dashboard.model_info && (
+                    <div class="flex justify-between">
+                      <span class="text-[hsl(var(--muted-foreground))]">LLM 模型</span>
+                      <span class="font-medium font-mono text-xs">{dashboard.model_info}</span>
+                    </div>
+                  )}
                   <div class="flex justify-between">
                     <span class="text-[hsl(var(--muted-foreground))]">Persona 数量</span>
                     <span class="font-medium">{dashboard.stats.personas_count}</span>

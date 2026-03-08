@@ -187,6 +187,22 @@ async def get_dashboard():
             "env_keys": ["LINKEDIN_ACCESS_TOKEN"],
             "description": "LinkedIn OAuth 2.0",
         },
+        "weibo": {
+            "env_keys": ["WEIBO_ACCESS_TOKEN"],
+            "description": "Weibo (微博) OAuth 2.0",
+        },
+        "zhihu": {
+            "env_keys": ["ZHIHU_COOKIE"],
+            "description": "Zhihu (知乎) Q&A platform",
+        },
+        "brave_search": {
+            "env_keys": ["BRAVE_SEARCH_API_KEY"],
+            "description": "Brave Search API",
+        },
+        "bing_search": {
+            "env_keys": ["BING_SEARCH_API_KEY"],
+            "description": "Bing Search API (Azure)",
+        },
     }
 
     connectors = []
@@ -1104,6 +1120,18 @@ async def list_connectors_admin():
         "mastodon": {
             "env_keys": ["MASTODON_ACCESS_TOKEN", "MASTODON_INSTANCE_URL"],
             "description": "Mastodon/Fediverse",
+        },
+        "zhihu": {
+            "env_keys": ["ZHIHU_COOKIE"],
+            "description": "Zhihu (知乎) Q&A platform",
+        },
+        "brave_search": {
+            "env_keys": ["BRAVE_SEARCH_API_KEY"],
+            "description": "Brave Search API",
+        },
+        "bing_search": {
+            "env_keys": ["BING_SEARCH_API_KEY"],
+            "description": "Bing Search API (Azure)",
         },
     }
 

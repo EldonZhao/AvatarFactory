@@ -24,6 +24,9 @@ from avatarfactory.connectors import twitter, bluesky, xiaohongshu, wecom
 # Import new connectors
 from avatarfactory.connectors import linkedin, threads, instagram, weibo, mastodon, toutiao
 
+# Import search connectors
+from avatarfactory.connectors import brave_search, bing_search, zhihu
+
 __all__ = [
     "BasePlatformConnector",
     "ConnectorConfig",

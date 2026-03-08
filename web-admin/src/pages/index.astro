@@ -81,43 +81,12 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
               </CardContent>
             </Card>
 
-            <!-- Quick Actions -->
-            <div class="p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
-              <h2 class="text-lg font-semibold mb-4">快速操作</h2>
-              <div class="flex flex-wrap gap-3">
-                <a
-                  href={`${base}/personas/new`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  创建 Persona
-                </a>
-                <a
-                  href={`${base}/scheduler/new`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  配置任务
-                </a>
-                <a
-                  href={`${base}/content/new`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  生成内容
-                </a>
-                <a
-                  href={`${base}/topics`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  查看话题
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Column - Connectors & Status -->
-          <div class="space-y-6">
             <!-- Connector Status -->
             <ConnectorList connectors={dashboard.connectors} client:load />
+          </div>
 
+          <!-- Right Column - Status -->
+          <div class="space-y-6">
             <!-- Scheduler Status -->
             <Card client:load>
               <CardHeader>
@@ -170,6 +139,37 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
                 </div>
               </CardContent>
             </Card>
+
+            <!-- Quick Actions -->
+            <div class="p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+              <h2 class="text-lg font-semibold mb-4">快速操作</h2>
+              <div class="flex flex-wrap gap-3">
+                <a
+                  href={`${base}/personas/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  创建 Persona
+                </a>
+                <a
+                  href={`${base}/scheduler/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  配置任务
+                </a>
+                <a
+                  href={`${base}/content/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  生成内容
+                </a>
+                <a
+                  href={`${base}/topics`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  查看话题
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </>

@@ -11,7 +11,7 @@ const { title, description } = Astro.props;
 // Monitor URL: use environment variable or default based on mode
 const monitorUrl = import.meta.env.MONITOR_URL || (import.meta.env.DEV ? 'http://localhost:4321' : '/monitor/');
 // Admin URL: use environment variable or default based on mode
-const adminUrl = import.meta.env.ADMIN_URL || (import.meta.env.DEV ? 'http://localhost:4334' : '/admin/');
+const adminUrl = import.meta.env.ADMIN_URL || (import.meta.env.DEV ? 'http://localhost:4323' : '/admin/');
 ---
 
 <BaseLayout title={title} description={description}>

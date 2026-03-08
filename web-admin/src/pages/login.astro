@@ -132,7 +132,9 @@ const returnUrl = Astro.url.searchParams.get('returnUrl') || '';
 
       if (result.success) {
         // Redirect to returnUrl if provided, otherwise to dashboard
-        if (returnUrl) {
+        // Avoid redirecting back to login page
+        const validReturnUrl = returnUrl && !returnUrl.includes('/login') && returnUrl !== '/';
+        if (validReturnUrl) {
           window.location.href = `${baseUrl}${returnUrl}`;
         } else {
           window.location.href = `${baseUrl}/`;

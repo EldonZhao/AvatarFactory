@@ -31,7 +31,7 @@ const personas = personasData?.personas || [];
     <!-- Header -->
     <div class="flex items-center gap-4">
       <a
-        href={`${base}/scheduler`}
+        href={`${base}/schedulers`}
         class="p-2 rounded-lg hover:bg-[hsl(var(--accent))] transition-colors"
       >
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +132,7 @@ const personas = personasData?.personas || [];
               创建任务
             </button>
             <a
-              href={`${base}/scheduler`}
+              href={`${base}/schedulers`}
               class="px-6 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity font-medium"
             >
               取消
@@ -177,7 +177,7 @@ const personas = personasData?.personas || [];
       });
 
       if (response.ok) {
-        window.location.href = `${baseUrl}/scheduler`;
+        window.location.href = `${baseUrl}/schedulers`;
       } else {
         const errorText = await response.text();
         alert('创建失败: ' + errorText);

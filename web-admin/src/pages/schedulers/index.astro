@@ -1,5 +1,5 @@
 ---
-import AdminLayout from '../layouts/AdminLayout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
 
 const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
 // Remove trailing slash from BASE_URL for consistent path joining
@@ -50,19 +50,19 @@ Object.values(grouped).forEach((data: any) => {
 });
 ---
 
-<AdminLayout title="Scheduler">
+<AdminLayout title="Schedulers">
   <div class="space-y-6 animate-fade-in">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold gradient-text">Scheduler</h1>
+        <h1 class="text-2xl font-bold gradient-text">Schedulers</h1>
         <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
           管理定时任务
         </p>
       </div>
       <div class="flex items-center gap-4">
         <a
-          href={`${base}/scheduler/new`}
+          href={`${base}/schedulers/new`}
           class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
         >
           创建任务

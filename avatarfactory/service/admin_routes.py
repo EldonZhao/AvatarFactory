@@ -1047,10 +1047,11 @@ async def list_topics_admin(
     persona_ids = [persona_id] if persona_id else kb.list_personas()
 
     all_topics = []
-    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    grouped: Dict[str, Any] = {}
 
     for pid in persona_ids:
-        discoveries = kb.list_discoveries(pid)
+        # Use the correct method: list_discovery_history
+        discoveries = kb.list_discovery_history(pid, limit=limit)
         persona = kb.load_persona(pid)
         persona_name = persona.identity.name if persona else pid
 
@@ -1061,12 +1062,38 @@ async def list_topics_admin(
             }
 
         for d in discoveries[:limit]:
+            # Extract data from the raw JSON structure
+            report = d.get("report", {})
+
+            # Get discovery ID from report or filename
+            discovery_id = report.get("id", d.get("_filename", ""))
+
+            # Get platform
+            platform = d.get("platform", "unknown")
+
+            # Extract trending topics from pattern_analysis (it's a list of strings)
+            topics_list = []
+            pattern_analysis = d.get("pattern_analysis", {})
+            if pattern_analysis:
+                trending = pattern_analysis.get("trending_topics", [])
+                # trending_topics is already a list of strings
+                topics_list = trending[:5] if trending else []
+
+            # Extract content ideas
+            ideas_list = []
+            raw_ideas = d.get("ideas", [])
+            if raw_ideas:
+                ideas_list = [idea.get("topic", "") for idea in raw_ideas[:3] if idea.get("topic")]
+
+            # Get timestamp
+            discovered_at = d.get("created_at")
+
             topic_data = {
-                "id": d.id,
-                "platform": d.platform.value if hasattr(d.platform, "value") else str(d.platform),
-                "topics": d.topics[:5] if d.topics else [],
-                "ideas": d.content_ideas[:3] if d.content_ideas else [],
-                "discovered_at": d.timestamp.isoformat() if d.timestamp else None,
+                "id": discovery_id,
+                "platform": platform,
+                "topics": topics_list,
+                "ideas": ideas_list,
+                "discovered_at": discovered_at,
             }
             grouped[pid]["topics"].append(topic_data)
             all_topics.append({**topic_data, "persona_id": pid, "persona_name": persona_name})

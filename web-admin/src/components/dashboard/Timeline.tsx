@@ -171,7 +171,7 @@ function TimelineItem({ event, index, baseUrl = '' }: TimelineItemProps) {
         </p>
         {event.content_id && (
           <a
-            href={`${baseUrl}/content/${event.content_id}`}
+            href={`${baseUrl}/contents/${event.content_id}`}
             className="inline-block mt-1 text-xs text-[hsl(var(--primary))] hover:underline"
           >
             查看内容 →

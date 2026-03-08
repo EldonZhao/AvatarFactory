@@ -4,11 +4,14 @@ Task Runners for AvatarFactory Scheduler.
 Contains implementations for different scheduled task types.
 """
 
+from __future__ import annotations
+
 import logging
 import os
-from typing import Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
-from avatarfactory.scheduler.engine import PublishQueueItem, ScheduledTask
+if TYPE_CHECKING:
+    from avatarfactory.scheduler.engine import PublishQueueItem, ScheduledTask
 
 logger = logging.getLogger("avatarfactory.scheduler.tasks")
 

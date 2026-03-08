@@ -6,7 +6,7 @@ Provides aggregated endpoints for the admin dashboard UI.
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from avatarfactory.service.cache import persona_cache, stats_cache
@@ -948,6 +948,75 @@ async def create_scheduler_task_admin(request: CreateSchedulerTaskRequest):
         "name": task.name,
         "status": "created",
     }
+
+
+@router.post("/scheduler/tasks/{task_id}/run", dependencies=[Depends(require_admin_auth)])
+async def run_scheduler_task_admin(task_id: str, background_tasks: BackgroundTasks):
+    """
+    Run a scheduled task immediately via Admin dashboard.
+    """
+    from datetime import datetime
+
+    scheduler = get_scheduler()
+    if not scheduler:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler not available",
+        )
+
+    task = scheduler.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task not found: {task_id}",
+        )
+
+    # Run the task in background
+    async def run_task():
+        await scheduler._run_task(task)
+
+    background_tasks.add_task(run_task)
+
+    return {
+        "status": "started",
+        "task_id": task_id,
+        "task_name": task.name,
+        "message": f"Task '{task.name}' is running in background",
+    }
+
+
+@router.delete("/scheduler/tasks/{task_id}", dependencies=[Depends(require_admin_auth)])
+async def delete_scheduler_task_admin(task_id: str):
+    """
+    Delete a single scheduled task by ID.
+    """
+    scheduler = get_scheduler()
+    if not scheduler:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler not available",
+        )
+
+    task = scheduler.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task not found: {task_id}",
+        )
+
+    # Remove the single task
+    removed = scheduler.remove_task(task_id)
+
+    if removed:
+        return {
+            "status": "deleted",
+            "task_id": task_id,
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete task: {task_id}",
+        )
 
 
 @router.get("/topics", dependencies=[Depends(require_admin_auth)])

@@ -204,21 +204,6 @@ Object.values(grouped).forEach((data: any) => {
                             </p>
                           )}
                         </div>
-                        <div class="flex gap-2 shrink-0">
-                          <button
-                            class="run-task-btn px-3 py-1.5 rounded text-xs font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
-                            data-task-id={task.id}
-                          >
-                            运行
-                          </button>
-                          <button
-                            class="delete-task-btn px-3 py-1.5 rounded text-xs font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors"
-                            data-task-id={task.id}
-                            data-persona-id={personaId}
-                          >
-                            删除
-                          </button>
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -243,76 +228,3 @@ Object.values(grouped).forEach((data: any) => {
     )}
   </div>
 </AdminLayout>
-
-<script>
-  const runButtons = document.querySelectorAll('.run-task-btn');
-  runButtons.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const taskId = btn.getAttribute('data-task-id');
-      if (!taskId) return;
-
-      btn.textContent = '运行中...';
-      btn.setAttribute('disabled', 'true');
-
-      try {
-        const response = await fetch(`/api/scheduler/tasks/${taskId}/run`, {
-          method: 'POST',
-        });
-        if (response.ok) {
-          btn.textContent = '已触发';
-          setTimeout(() => {
-            btn.textContent = '运行';
-            btn.removeAttribute('disabled');
-          }, 3000);
-        } else {
-          btn.textContent = '失败';
-          setTimeout(() => {
-            btn.textContent = '运行';
-            btn.removeAttribute('disabled');
-          }, 3000);
-        }
-      } catch (e) {
-        btn.textContent = '错误';
-        setTimeout(() => {
-          btn.textContent = '运行';
-          btn.removeAttribute('disabled');
-        }, 3000);
-      }
-    });
-  });
-
-  const deleteButtons = document.querySelectorAll('.delete-task-btn');
-  deleteButtons.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const taskId = btn.getAttribute('data-task-id');
-      const personaId = btn.getAttribute('data-persona-id');
-      if (!taskId || !personaId) return;
-
-      if (!confirm('确定要删除此任务吗？')) return;
-
-      btn.textContent = '删除中...';
-      btn.setAttribute('disabled', 'true');
-
-      try {
-        const response = await fetch(`/api/scheduler/tasks/${personaId}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          window.location.reload();
-        } else {
-          btn.textContent = '失败';
-          setTimeout(() => {
-            btn.textContent = '删除';
-            btn.removeAttribute('disabled');
-          }, 3000);
-        }
-      } catch (e) {
-        btn.textContent = '错误';
-        setTimeout(() => {
-          btn.textContent = '删除';
-          btn.removeAttribute('disabled');
-        }, 3000);
-      }
-    });
-  });
-</script>

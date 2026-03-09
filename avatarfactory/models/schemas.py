@@ -42,6 +42,14 @@ class RiskLevel(str, Enum):
     HIGH = "high"
 
 
+class ContentType(str, Enum):
+    """Content modality types - progressive multimodal support"""
+
+    TEXT = "text"  # Text-only content
+    IMAGE_TEXT = "image_text"  # Image + text content (e.g., illustrated posts)
+    VIDEO = "video"  # Video content (e.g., slideshow with TTS narration)
+
+
 class TaskType(str, Enum):
     """Agent task types"""
 
@@ -188,11 +196,12 @@ class PersonaVersion(BaseModel):
 class MediaAttachment(BaseModel):
     """Media attachment for content"""
 
-    type: str = Field(default="image", description="Media type: image, video")
+    type: str = Field(default="image", description="Media type: image, video, audio")
     url: Optional[str] = None  # Remote URL
     path: Optional[str] = None  # Local file path
     alt_text: Optional[str] = None  # Accessibility text
     caption: Optional[str] = None  # Caption/description
+    mime_type: Optional[str] = None  # MIME type (e.g., image/png, video/mp4)
     blob_ref: Optional[Dict[str, Any]] = None  # Platform-specific blob reference
 
 
@@ -216,6 +225,10 @@ class Content(BaseModel):
     body: str = Field(..., description="Content body")
     pillar: str = Field(..., description="Content pillar")
     platform: PlatformType = Field(..., description="Target platform")
+    content_type: ContentType = Field(
+        default=ContentType.TEXT,
+        description="Content modality type: text, image_text, or video",
+    )
 
     structure: Optional[ContentStructure] = None
     tags: List[str] = Field(default_factory=list)

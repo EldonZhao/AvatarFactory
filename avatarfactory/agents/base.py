@@ -94,11 +94,13 @@ class BaseAgent(ABC):
         temperature: float = 1.0,
         max_tokens: int = 4096,
         persona_id: Optional[str] = None,
+        images: Optional[List[str]] = None,
     ) -> str:
         """
         Call LLM with the given prompt.
 
         Supports per-persona agent configuration when persona_id is provided.
+        Supports multimodal input when images are provided.
 
         Args:
             prompt: User prompt
@@ -106,6 +108,8 @@ class BaseAgent(ABC):
             temperature: Sampling temperature (default, may be overridden by config)
             max_tokens: Maximum tokens to generate (default, may be overridden by config)
             persona_id: Optional persona ID for per-persona configuration
+            images: Optional list of image references (URLs, file paths, or
+                    base64 data URIs) for multimodal/vision input
 
         Returns:
             LLM response text
@@ -150,6 +154,7 @@ class BaseAgent(ABC):
                 system=system,
                 temperature=actual_temperature,
                 max_tokens=actual_max_tokens,
+                images=images,
             )
         except Exception as e:
             self.log("ERROR", f"LLM call failed: {e}")
@@ -244,6 +249,7 @@ class BaseAgent(ABC):
         title: Optional[str] = None,
         images: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
+        videos: Optional[List[str]] = None,
     ) -> Dict[str, "PublishResult"]:
         """
         Publish content to multiple platforms.
@@ -254,6 +260,7 @@ class BaseAgent(ABC):
             title: Optional title (for platforms that support it)
             images: Optional list of image paths
             tags: Optional list of tags/hashtags
+            videos: Optional list of video file paths
 
         Returns:
             Dict mapping platform name to PublishResult
@@ -274,10 +281,15 @@ class BaseAgent(ABC):
                 if not connector.is_connected():
                     await connector.connect()
 
+                # Combine images and videos for publishing
+                all_media = list(images or [])
+                if videos:
+                    all_media.extend(videos)
+
                 result = await connector.publish(
                     content=content,
                     title=title,
-                    images=images,
+                    images=all_media if all_media else None,
                     tags=tags,
                 )
 

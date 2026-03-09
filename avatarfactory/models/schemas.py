@@ -23,6 +23,13 @@ class PlatformType(str, Enum):
     ZHIHU = "zhihu"
     TWITTER = "twitter"
     DOUYIN = "douyin"
+    BLUESKY = "bluesky"
+    MASTODON = "mastodon"
+    INSTAGRAM = "instagram"
+    WEIBO = "weibo"
+    LINKEDIN = "linkedin"
+    THREADS = "threads"
+    TOUTIAO = "toutiao"
 
 
 class ContentPillarFrequency(str, Enum):

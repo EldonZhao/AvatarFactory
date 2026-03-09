@@ -5,9 +5,16 @@ Unit tests for platform adapters.
 import pytest
 
 from avatarfactory.adapters import get_adapter
+from avatarfactory.adapters.bluesky import BlueskyAdapter
+from avatarfactory.adapters.instagram import InstagramAdapter
+from avatarfactory.adapters.linkedin import LinkedInAdapter
+from avatarfactory.adapters.mastodon import MastodonAdapter
+from avatarfactory.adapters.threads import ThreadsAdapter
+from avatarfactory.adapters.toutiao import ToutiaoAdapter
+from avatarfactory.adapters.twitter import TwitterAdapter
+from avatarfactory.adapters.weibo import WeiboAdapter
 from avatarfactory.adapters.xiaohongshu import XiaohongshuAdapter
 from avatarfactory.adapters.zhihu import ZhihuAdapter
-from avatarfactory.adapters.twitter import TwitterAdapter
 from avatarfactory.models.schemas import Content, PlatformType
 
 
@@ -45,6 +52,53 @@ class TestAdapterFactory:
         adapter = get_adapter(PlatformType.TWITTER)
         assert isinstance(adapter, TwitterAdapter)
         assert adapter.platform == PlatformType.TWITTER
+
+    def test_get_bluesky_adapter(self):
+        """Test getting Bluesky adapter"""
+        adapter = get_adapter(PlatformType.BLUESKY)
+        assert isinstance(adapter, BlueskyAdapter)
+        assert adapter.platform == PlatformType.BLUESKY
+
+    def test_get_instagram_adapter(self):
+        """Test getting Instagram adapter"""
+        adapter = get_adapter(PlatformType.INSTAGRAM)
+        assert isinstance(adapter, InstagramAdapter)
+        assert adapter.platform == PlatformType.INSTAGRAM
+
+    def test_get_linkedin_adapter(self):
+        """Test getting LinkedIn adapter"""
+        adapter = get_adapter(PlatformType.LINKEDIN)
+        assert isinstance(adapter, LinkedInAdapter)
+        assert adapter.platform == PlatformType.LINKEDIN
+
+    def test_get_mastodon_adapter(self):
+        """Test getting Mastodon adapter"""
+        adapter = get_adapter(PlatformType.MASTODON)
+        assert isinstance(adapter, MastodonAdapter)
+        assert adapter.platform == PlatformType.MASTODON
+
+    def test_get_threads_adapter(self):
+        """Test getting Threads adapter"""
+        adapter = get_adapter(PlatformType.THREADS)
+        assert isinstance(adapter, ThreadsAdapter)
+        assert adapter.platform == PlatformType.THREADS
+
+    def test_get_toutiao_adapter(self):
+        """Test getting Toutiao adapter"""
+        adapter = get_adapter(PlatformType.TOUTIAO)
+        assert isinstance(adapter, ToutiaoAdapter)
+        assert adapter.platform == PlatformType.TOUTIAO
+
+    def test_get_weibo_adapter(self):
+        """Test getting Weibo adapter"""
+        adapter = get_adapter(PlatformType.WEIBO)
+        assert isinstance(adapter, WeiboAdapter)
+        assert adapter.platform == PlatformType.WEIBO
+
+    def test_unknown_platform_raises(self):
+        """Test that unknown platform raises ValueError"""
+        with pytest.raises(ValueError, match="No adapter available"):
+            get_adapter("unknown_platform")
 
 
 class TestXiaohongshuAdapter:
@@ -212,6 +266,380 @@ class TestTwitterAdapter:
 
         assert strategy["recommended_count"] == 1
         assert strategy["max_count"] == 2  # Twitter uses fewer hashtags
+
+
+class TestBlueskyAdapter:
+    """Test Bluesky adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = BlueskyAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "max_length_per_post" in guidelines
+        assert guidelines["max_length_per_post"] == 300
+        assert guidelines["format"] == "thread"
+
+    def test_validate_content_valid(self, sample_content):
+        """Test validating valid content"""
+        adapter = BlueskyAdapter()
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is True
+        assert len(validation["issues"]) == 0
+
+    def test_format_for_export_single(self, sample_content):
+        """Test formatting short content as single post"""
+        adapter = BlueskyAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "bluesky"
+        assert "posts" in formatted
+        assert isinstance(formatted["posts"], list)
+        assert formatted["metadata"]["post_count"] > 0
+
+    def test_format_for_export_thread(self, sample_content):
+        """Test formatting long content as thread"""
+        adapter = BlueskyAdapter()
+        sample_content.body = " ".join(["word"] * 400)  # Very long content
+
+        formatted = adapter.format_for_export(sample_content)
+
+        assert len(formatted["posts"]) > 1
+        # Check numbering on first post
+        assert formatted["posts"][0].startswith("1/")
+
+    def test_get_best_posting_times(self):
+        """Test getting best posting times"""
+        adapter = BlueskyAdapter()
+        times = adapter.get_best_posting_times()
+
+        assert len(times) > 0
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = BlueskyAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert "recommended_count" in strategy
+        assert strategy["recommended_count"] == 3
+
+
+class TestInstagramAdapter:
+    """Test Instagram adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = InstagramAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "caption_max_length" in guidelines
+        assert guidelines["caption_max_length"] == 2200
+
+    def test_validate_content_valid(self, sample_content):
+        """Test validating valid content"""
+        adapter = InstagramAdapter()
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is True
+
+    def test_validate_content_too_long(self, sample_content):
+        """Test validation fails for caption too long"""
+        adapter = InstagramAdapter()
+        sample_content.body = "A" * 2300  # Over 2200 char limit
+
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is False
+        assert any("too long" in issue.lower() for issue in validation["issues"])
+
+    def test_format_for_export(self, sample_content):
+        """Test formatting content for Instagram"""
+        adapter = InstagramAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "instagram"
+        assert "caption" in formatted
+        assert "metadata" in formatted
+
+    def test_hashtag_format(self, sample_content):
+        """Test hashtags are added to caption"""
+        adapter = InstagramAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        for tag in sample_content.tags:
+            assert f"#{tag}" in formatted["caption"]
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = InstagramAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert strategy["recommended_count"] == 20
+        assert strategy["max_count"] == 30
+
+
+class TestLinkedInAdapter:
+    """Test LinkedIn adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = LinkedInAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "post_max_length" in guidelines
+        assert guidelines["post_max_length"] == 3000
+
+    def test_validate_content_valid(self, sample_content):
+        """Test validating valid content"""
+        adapter = LinkedInAdapter()
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is True
+
+    def test_validate_content_too_long(self, sample_content):
+        """Test validation fails for post too long"""
+        adapter = LinkedInAdapter()
+        sample_content.body = "A" * 3100  # Over 3000 char limit
+
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is False
+        assert any("too long" in issue.lower() for issue in validation["issues"])
+
+    def test_format_for_export(self, sample_content):
+        """Test formatting content for LinkedIn"""
+        adapter = LinkedInAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "linkedin"
+        assert "text" in formatted
+        assert "metadata" in formatted
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = LinkedInAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert strategy["recommended_count"] == 3
+        assert strategy["max_count"] == 5
+
+
+class TestMastodonAdapter:
+    """Test Mastodon adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = MastodonAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "max_length_per_post" in guidelines
+        assert guidelines["max_length_per_post"] == 500
+
+    def test_validate_content_valid(self, sample_content):
+        """Test validating valid content"""
+        adapter = MastodonAdapter()
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is True
+
+    def test_format_for_export_single(self, sample_content):
+        """Test formatting short content as single post"""
+        adapter = MastodonAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "mastodon"
+        assert "posts" in formatted
+
+    def test_format_for_export_thread(self, sample_content):
+        """Test formatting long content as thread"""
+        adapter = MastodonAdapter()
+        sample_content.body = " ".join(["word"] * 600)  # Very long content
+
+        formatted = adapter.format_for_export(sample_content)
+
+        assert len(formatted["posts"]) > 1
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = MastodonAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert strategy["recommended_count"] == 5
+
+
+class TestWeiboAdapter:
+    """Test Weibo adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = WeiboAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "post_max_length" in guidelines
+        assert guidelines["post_max_length"] == 2000
+
+    def test_validate_content_valid(self, sample_content):
+        """Test validating valid content"""
+        adapter = WeiboAdapter()
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is True
+
+    def test_validate_content_too_long(self, sample_content):
+        """Test validation fails for post too long"""
+        adapter = WeiboAdapter()
+        sample_content.body = "A" * 2100  # Over 2000 char limit
+
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is False
+
+    def test_format_for_export_weibo_hashtags(self, sample_content):
+        """Test Weibo uses #tag# format"""
+        adapter = WeiboAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "weibo"
+        # Weibo uses #tag# format
+        for tag in sample_content.tags:
+            assert f"#{tag}#" in formatted["text"]
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = WeiboAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert strategy.get("format") == "#tag#"
+
+
+class TestToutiaoAdapter:
+    """Test Toutiao adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = ToutiaoAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "title_max_length" in guidelines
+        assert guidelines["title_max_length"] == 30
+
+    def test_validate_content_title_too_long(self, sample_content):
+        """Test validation fails for title too long"""
+        adapter = ToutiaoAdapter()
+        sample_content.title = "A" * 35  # Over 30 char limit
+
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is False
+        assert any("Title too long" in issue for issue in validation["issues"])
+
+    def test_format_for_export(self, sample_content):
+        """Test formatting content for Toutiao"""
+        adapter = ToutiaoAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "toutiao"
+        assert "title" in formatted
+        assert "content" in formatted
+        assert len(formatted["title"]) <= 30  # Title truncated to 30 chars
+
+    def test_format_detects_article_vs_microblog(self, sample_content):
+        """Test that format detects article vs microblog based on content length"""
+        adapter = ToutiaoAdapter()
+
+        # Short content -> microblog
+        sample_content.body = "Short content."
+        formatted = adapter.format_for_export(sample_content)
+        assert formatted["metadata"]["content_type"] == "microblog"
+
+        # Long content -> article
+        sample_content.body = "Long content. " * 50
+        formatted = adapter.format_for_export(sample_content)
+        assert formatted["metadata"]["content_type"] == "article"
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = ToutiaoAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert strategy["max_count"] == 5
+
+
+class TestThreadsAdapter:
+    """Test Threads adapter"""
+
+    def test_get_content_guidelines(self):
+        """Test getting content guidelines"""
+        adapter = ThreadsAdapter()
+        guidelines = adapter.get_content_guidelines()
+
+        assert "post_max_length" in guidelines
+        assert guidelines["post_max_length"] == 500
+
+    def test_validate_content_valid(self, sample_content):
+        """Test validating valid content"""
+        adapter = ThreadsAdapter()
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is True
+
+    def test_validate_content_too_long(self, sample_content):
+        """Test validation fails for post too long"""
+        adapter = ThreadsAdapter()
+        sample_content.body = "A" * 600  # Over 500 char limit
+
+        validation = adapter.validate_content(sample_content)
+
+        assert validation["valid"] is False
+
+    def test_format_for_export(self, sample_content):
+        """Test formatting content for Threads"""
+        adapter = ThreadsAdapter()
+        formatted = adapter.format_for_export(sample_content)
+
+        assert formatted["platform"] == "threads"
+        assert "text" in formatted
+        assert len(formatted["text"]) <= 500  # Never exceeds limit
+
+    def test_format_truncates_long_content(self, sample_content):
+        """Test that overly long content is truncated"""
+        adapter = ThreadsAdapter()
+        sample_content.body = "A" * 600
+
+        formatted = adapter.format_for_export(sample_content)
+
+        assert len(formatted["text"]) <= 500
+        assert formatted["text"].endswith("...")
+
+    def test_get_hashtag_strategy(self):
+        """Test getting hashtag strategy"""
+        adapter = ThreadsAdapter()
+        strategy = adapter.get_hashtag_strategy()
+
+        assert strategy["recommended_count"] == 1
+        assert strategy["max_count"] == 3
+
+
+class TestPlatformTypeEnum:
+    """Test PlatformType enum completeness"""
+
+    def test_all_new_platforms_exist(self):
+        """Test that all new platform types are defined"""
+        assert PlatformType.BLUESKY == "bluesky"
+        assert PlatformType.MASTODON == "mastodon"
+        assert PlatformType.INSTAGRAM == "instagram"
+        assert PlatformType.WEIBO == "weibo"
+        assert PlatformType.LINKEDIN == "linkedin"
+        assert PlatformType.THREADS == "threads"
+        assert PlatformType.TOUTIAO == "toutiao"
+
+    def test_original_platforms_still_exist(self):
+        """Test that original platform types still exist"""
+        assert PlatformType.XIAOHONGSHU == "xiaohongshu"
+        assert PlatformType.ZHIHU == "zhihu"
+        assert PlatformType.TWITTER == "twitter"
+        assert PlatformType.DOUYIN == "douyin"
 
 
 if __name__ == "__main__":

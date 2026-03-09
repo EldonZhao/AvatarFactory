@@ -1078,8 +1078,9 @@ async def get_timeline(
 
 @router.get("/stats")
 async def get_global_stats() -> Dict[str, Any]:
-    """Get global statistics."""
+    """Get global statistics (optimized)."""
     from avatarfactory.service.app import get_scheduler
+    from datetime import timedelta
 
     orchestrator = _get_orchestrator()
     scheduler = get_scheduler()
@@ -1091,22 +1092,28 @@ async def get_global_stats() -> Dict[str, Any]:
         if p:
             personas.append(p)
 
-    # Count all content
+    # Collect all content in a single pass per persona
     all_content = []
+    published_count = 0
+    draft_count = 0
+    content_cache: Dict[str, List] = {}  # Cache content per persona
+
     for pid in persona_ids:
         drafts = orchestrator.kb.list_content(persona_id=pid, status="draft")
         published = orchestrator.kb.list_content(persona_id=pid, status="published")
         published_ids = {c.id for c in published}
-        all_content.extend(c for c in drafts if c.id not in published_ids)
-        all_content.extend(published)
 
-    published = [c for c in all_content if any(
-        c.id == p.id
-        for persona_id in persona_ids
-        for p in orchestrator.kb.list_content(persona_id=persona_id, status="published")
-    )]
+        # Count unique drafts (not in published)
+        unique_drafts = [c for c in drafts if c.id not in published_ids]
+        draft_count += len(unique_drafts)
+        published_count += len(published)
 
-    # Calculate average score
+        # Combine for all_content
+        persona_content = unique_drafts + list(published)
+        all_content.extend(persona_content)
+        content_cache[pid] = persona_content
+
+    # Calculate average score from content
     total_score = 0
     score_count = 0
     for content in all_content:
@@ -1115,10 +1122,9 @@ async def get_global_stats() -> Dict[str, Any]:
             score_count += 1
 
     # Content by day (last 30 days)
-    content_by_day: Dict[str, int] = {}
     now = datetime.now()
+    content_by_day: Dict[str, int] = {}
     for i in range(29, -1, -1):
-        from datetime import timedelta
         date = now - timedelta(days=i)
         date_str = date.strftime("%Y-%m-%d")
         content_by_day[date_str] = 0
@@ -1129,26 +1135,47 @@ async def get_global_stats() -> Dict[str, Any]:
             if date_str in content_by_day:
                 content_by_day[date_str] += 1
 
-    # Get stats for each persona
+    # Build persona stats from cached data (avoid re-querying)
     personas_stats = []
     for pid in persona_ids:
-        stats = await get_persona_stats(pid)
-        personas_stats.append(stats)
+        persona_content = content_cache.get(pid, [])
+        published_content = [c for c in persona_content if c.status and c.status.value == "published"]
+
+        # Simple stats without loading reviews (expensive)
+        content_by_pillar: Dict[str, int] = {}
+        content_by_platform: Dict[str, int] = {}
+        p_total_score = 0
+        p_score_count = 0
+
+        for content in persona_content:
+            pillar = content.pillar or "unknown"
+            platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+            content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
+            content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
+            if content.review_score:
+                p_total_score += content.review_score
+                p_score_count += 1
+
+        personas_stats.append({
+            "persona_id": pid,
+            "total_content": len(persona_content),
+            "published_content": len(published_content),
+            "draft_content": len(persona_content) - len(published_content),
+            "avg_review_score": round(p_total_score / p_score_count) if p_score_count > 0 else 0,
+            "content_by_pillar": content_by_pillar,
+            "content_by_platform": content_by_platform,
+            "score_distribution": {
+                "persona_consistency": 0,
+                "platform_fit": 0,
+                "compliance": 0,
+                "engagement_potential": 0,
+            },
+        })
 
     # Count active tasks
     active_tasks = 0
     if scheduler:
         active_tasks = len([t for t in scheduler.list_tasks() if t.enabled])
-
-    # Count published content directly
-    published_count = 0
-    draft_count = 0
-    for pid in persona_ids:
-        p_published = orchestrator.kb.list_content(persona_id=pid, status="published")
-        p_drafts = orchestrator.kb.list_content(persona_id=pid, status="draft")
-        published_ids = {c.id for c in p_published}
-        published_count += len(p_published)
-        draft_count += len([c for c in p_drafts if c.id not in published_ids])
 
     return {
         "total_personas": len(personas),

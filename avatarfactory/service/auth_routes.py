@@ -122,7 +122,7 @@ async def login(request: LoginRequest, response: Response):
         max_age=COOKIE_MAX_AGE,
         httponly=True,
         secure=True,  # Set to True in production with HTTPS
-        samesite="lax",
+        samesite="none",  # "none" ensures cookie is always sent (requires Secure)
         path="/",
     )
 
@@ -143,7 +143,7 @@ async def logout(response: Response):
         path="/",
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
     )
     return {"success": True, "message": "Logged out successfully"}
 

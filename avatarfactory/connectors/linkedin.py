@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -43,6 +46,68 @@ class LinkedInConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "linkedin"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="linkedin",
+            display_name="LinkedIn",
+            description="LinkedIn professional network via OAuth 2.0",
+            supports_topic_discovery=False,
+            supports_persona_discovery=False,
+            supports_publishing=True,
+            supports_fetching=False,
+            config_fields=[
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=True,
+                    description="OAuth 2.0 access token from LinkedIn",
+                    env_var="LINKEDIN_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="client_id",
+                    label="Client ID",
+                    field_type="text",
+                    required=False,
+                    description=(
+                        "LinkedIn App Client ID (for OAuth flow)"
+                    ),
+                    env_var="LINKEDIN_CLIENT_ID",
+                ),
+                ConnectorConfigField(
+                    name="client_secret",
+                    label="Client Secret",
+                    field_type="password",
+                    required=False,
+                    description=(
+                        "LinkedIn App Client Secret (for OAuth flow)"
+                    ),
+                    env_var="LINKEDIN_CLIENT_SECRET",
+                ),
+                ConnectorConfigField(
+                    name="organization_id",
+                    label="Organization ID",
+                    field_type="text",
+                    required=False,
+                    description=(
+                        "LinkedIn Company Page ID"
+                        " (for posting as organization)"
+                    ),
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Requires OAuth 2.0 access"
+                " token. Call connector.publish(content) to share posts on"
+                " LinkedIn. Fetching trending content is very limited due"
+                " to LinkedIn API restrictions (partner-only). Best used"
+                " for professional content publishing only. Sub-agents"
+                " should use this connector primarily through the"
+                " publish() method."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to LinkedIn using OAuth access token."""

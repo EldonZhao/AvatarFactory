@@ -13,8 +13,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -33,6 +36,51 @@ class BlueskyConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "bluesky"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="bluesky",
+            display_name="Bluesky",
+            description="AT Protocol decentralized social network",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=True,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="username",
+                    label="Bluesky Handle",
+                    field_type="text",
+                    required=True,
+                    description="Your Bluesky handle (e.g. user.bsky.social)",
+                    placeholder="user.bsky.social",
+                    env_var="BLUESKY_USERNAME",
+                ),
+                ConnectorConfigField(
+                    name="password",
+                    label="App Password",
+                    field_type="password",
+                    required=True,
+                    description=(
+                        "App password from Bluesky settings"
+                        " (not your login password)"
+                    ),
+                    placeholder="xxxx-xxxx-xxxx-xxxx",
+                    env_var="BLUESKY_PASSWORD",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Call connector.connect() with"
+                " username and app password, then use"
+                " connector.fetch_trending(query, limit) for topic discovery,"
+                " connector.fetch_user_posts(user_id) for persona analysis, or"
+                " connector.publish(content, images, tags) to publish posts."
+                " Ideal for sub-agents as Bluesky has an open AT Protocol API"
+                " with no rate-limit friction."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Bluesky using app password authentication"""

@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -40,6 +43,46 @@ class ThreadsConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "threads"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="threads",
+            display_name="Threads",
+            description="Meta Threads via Instagram Graph API",
+            supports_topic_discovery=False,
+            supports_persona_discovery=False,
+            supports_publishing=True,
+            supports_fetching=False,
+            config_fields=[
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=True,
+                    description="Meta Graph API access token",
+                    env_var="THREADS_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="user_id",
+                    label="User ID",
+                    field_type="text",
+                    required=False,
+                    description="Threads user ID (from Graph API)",
+                    env_var="THREADS_USER_ID",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Requires Meta Graph API"
+                " access token. Call connector.publish(content) for text"
+                " posts, with optional image parameter. Content discovery"
+                " is very limited (no public search API). Best used for"
+                " content publishing only. Sub-agents can use this"
+                " connector through the publish() method for cross-platform"
+                " distribution."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Threads using access token."""

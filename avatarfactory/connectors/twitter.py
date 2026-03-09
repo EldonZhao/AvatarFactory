@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -32,6 +35,69 @@ class TwitterConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "twitter"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="twitter",
+            display_name="Twitter / X",
+            description="Twitter/X API v2 with OAuth authentication",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=True,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="api_key",
+                    label="API Key",
+                    field_type="text",
+                    required=True,
+                    description="Twitter API Key (Consumer Key)",
+                    env_var="TWITTER_API_KEY",
+                ),
+                ConnectorConfigField(
+                    name="api_secret",
+                    label="API Secret",
+                    field_type="password",
+                    required=True,
+                    description="Twitter API Secret (Consumer Secret)",
+                    env_var="TWITTER_API_SECRET",
+                ),
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=False,
+                    description=(
+                        "Bearer token for app-only access,"
+                        " or OAuth access token"
+                    ),
+                    env_var="TWITTER_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="access_token_secret",
+                    label="Access Token Secret",
+                    field_type="password",
+                    required=False,
+                    description=(
+                        "OAuth access token secret"
+                        " (required for publishing)"
+                    ),
+                    env_var="TWITTER_ACCESS_TOKEN_SECRET",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Supports two auth modes:"
+                " (1) Bearer token for read-only trending/search via"
+                " fetch_trending(), (2) OAuth 1.0a with all four keys for"
+                " publishing via publish(). For topic discovery, use"
+                " connector.fetch_trending(query) to search recent tweets."
+                " For persona discovery, use"
+                " connector.fetch_user_posts(user_id) to analyze a user's"
+                " timeline. Rate limits apply per Twitter API v2 tiers."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Twitter using OAuth 2.0 Bearer Token or API keys"""

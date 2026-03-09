@@ -23,8 +23,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -76,6 +79,53 @@ class XiaohongshuConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "xiaohongshu"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="xiaohongshu",
+            display_name="Xiaohongshu (小红书)",
+            description="Xiaohongshu (Little Red Book) content platform",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=True,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="cookie",
+                    label="Cookie",
+                    field_type="textarea",
+                    required=True,
+                    description=(
+                        "Browser cookie string (extract from browser"
+                        " DevTools, valid for 7-30 days)"
+                    ),
+                    placeholder="Paste cookie string from browser",
+                    env_var="XIAOHONGSHU_COOKIE",
+                ),
+                ConnectorConfigField(
+                    name="user_id",
+                    label="User ID",
+                    field_type="text",
+                    required=False,
+                    description=(
+                        "Xiaohongshu user ID for fetching own posts"
+                    ),
+                    env_var="XIAOHONGSHU_USER_ID",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Requires cookie-based"
+                " authentication (extract from browser). Call"
+                " connector.fetch_trending(query) for topic discovery of"
+                " popular notes. Call connector.fetch_user_posts(user_id)"
+                " for persona analysis of content creators. Publishing"
+                " requires title + at least 1 image. Note: Cookie expires"
+                " every 7-30 days and must be refreshed manually."
+                " Experimental due to anti-bot protections."
+            ),
+        )
 
     def _get_sign_function(self):
         """Get the sign function from xhs library."""

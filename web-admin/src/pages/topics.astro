@@ -102,72 +102,85 @@ const ideasCount = Object.values(grouped).reduce((acc: number, g: any) => acc + 
         </div>
 
         {Object.keys(grouped).length > 0 ? (
-          <div class="space-y-6">
-            {Object.entries(grouped).map(([personaId, data]: [string, any]) => (
-              <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
-                <div class="flex items-center justify-between mb-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                      {data.persona_name.charAt(0)}
-                    </div>
-                    <div>
-                      <h2 class="font-semibold">{data.persona_name}</h2>
-                      <p class="text-xs text-[hsl(var(--muted-foreground))]">{data.topics.length} 次发现</p>
-                    </div>
-                  </div>
-                  <a
-                    href={`${base}/personas/${personaId}`}
-                    class="text-sm text-[hsl(var(--primary))] hover:underline"
-                  >
-                    查看 Persona →
-                  </a>
-                </div>
-
-                <div class="space-y-4">
-                  {data.topics.map((discovery: any) => (
-                    <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
-                      <div class="flex items-start justify-between mb-2">
-                        <span class="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-600">
-                          {discovery.platform}
-                        </span>
-                        <span class="text-xs text-[hsl(var(--muted-foreground))]">
-                          {discovery.discovered_at ? new Date(discovery.discovered_at).toLocaleString('zh-CN') : '-'}
-                        </span>
-                      </div>
-
-                      {discovery.topics && discovery.topics.length > 0 && (
-                        <div class="mb-3">
-                          <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">热门话题</p>
-                          <div class="flex flex-wrap gap-1">
-                            {discovery.topics.map((topic: string) => (
-                              <span class="text-xs px-2 py-0.5 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
-                                {topic}
-                              </span>
-                            ))}
-                          </div>
+          <div class="space-y-4">
+            {Object.entries(grouped).map(([personaId, data]: [string, any]) => {
+              const totalIdeas = data.topics.reduce((sum: number, t: any) => sum + (t.ideas?.length || 0), 0);
+              return (
+                <details class="group rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden">
+                  <summary class="p-4 cursor-pointer list-none hover:bg-[hsl(var(--accent))] transition-colors">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                          {data.persona_name.charAt(0)}
                         </div>
-                      )}
-
-                      {discovery.ideas && discovery.ideas.length > 0 && (
                         <div>
-                          <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">内容创意</p>
-                          <ul class="space-y-1">
-                            {discovery.ideas.map((idea: string) => (
-                              <li class="flex items-start gap-2 text-sm">
-                                <svg class="w-4 h-4 text-[hsl(var(--primary))] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                </svg>
-                                <span>{idea}</span>
-                              </li>
-                            ))}
-                          </ul>
+                          <h2 class="font-semibold">{data.persona_name}</h2>
+                          <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                            {data.topics.length} 次发现 · {totalIdeas} 个创意
+                          </p>
                         </div>
-                      )}
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <a
+                          href={`${base}/personas/${personaId}`}
+                          class="text-sm text-[hsl(var(--primary))] hover:underline"
+                          onclick="event.stopPropagation();"
+                        >
+                          查看 Persona →
+                        </a>
+                        <svg class="w-5 h-5 text-[hsl(var(--muted-foreground))] transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                  </summary>
+
+                  <div class="p-4 pt-0 space-y-4">
+                    {data.topics.map((discovery: any) => (
+                      <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                        <div class="flex items-start justify-between mb-2">
+                          <span class="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                            {discovery.platform}
+                          </span>
+                          <span class="text-xs text-[hsl(var(--muted-foreground))]">
+                            {discovery.discovered_at ? new Date(discovery.discovered_at).toLocaleString('zh-CN') : '-'}
+                          </span>
+                        </div>
+
+                        {discovery.topics && discovery.topics.length > 0 && (
+                          <div class="mb-3">
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">热门话题</p>
+                            <div class="flex flex-wrap gap-1">
+                              {discovery.topics.map((topic: string) => (
+                                <span class="text-xs px-2 py-0.5 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {discovery.ideas && discovery.ideas.length > 0 && (
+                          <div>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">内容创意</p>
+                            <ul class="space-y-1">
+                              {discovery.ideas.map((idea: string) => (
+                                <li class="flex items-start gap-2 text-sm">
+                                  <svg class="w-4 h-4 text-[hsl(var(--primary))] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                  </svg>
+                                  <span>{idea}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         ) : (
           <div class="p-12 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-center">

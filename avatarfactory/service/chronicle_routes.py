@@ -1096,7 +1096,8 @@ async def get_global_stats() -> Dict[str, Any]:
     all_content = []
     published_count = 0
     draft_count = 0
-    content_cache: Dict[str, List] = {}  # Cache content per persona
+    content_cache: Dict[str, List] = {}  # Cache all content per persona
+    published_cache: Dict[str, List] = {}  # Cache published content per persona
 
     for pid in persona_ids:
         drafts = orchestrator.kb.list_content(persona_id=pid, status="draft")
@@ -1112,6 +1113,7 @@ async def get_global_stats() -> Dict[str, Any]:
         persona_content = unique_drafts + list(published)
         all_content.extend(persona_content)
         content_cache[pid] = persona_content
+        published_cache[pid] = list(published)  # Cache published for later use
 
     # Calculate average score from content
     total_score = 0
@@ -1135,11 +1137,11 @@ async def get_global_stats() -> Dict[str, Any]:
             if date_str in content_by_day:
                 content_by_day[date_str] += 1
 
-    # Build persona stats from cached data (avoid re-querying)
+    # Build persona stats from cached data (no re-querying needed)
     personas_stats = []
     for pid in persona_ids:
         persona_content = content_cache.get(pid, [])
-        published_content = [c for c in persona_content if c.status and c.status.value == "published"]
+        published_content = published_cache.get(pid, [])
 
         # Simple stats without loading reviews (expensive)
         content_by_pillar: Dict[str, int] = {}

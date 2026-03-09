@@ -53,6 +53,16 @@ def _resolve_image_content(image: str) -> Dict[str, Any]:
             ".webp": "image/webp",
         }
         mime_type = ext_to_mime.get(path.suffix.lower(), "image/png")
+
+        # Guard against excessively large files (20 MB limit)
+        max_size = 20 * 1024 * 1024
+        file_size = path.stat().st_size
+        if file_size > max_size:
+            raise ValueError(
+                f"Image file too large ({file_size / 1024 / 1024:.1f} MB). "
+                f"Maximum allowed size is {max_size / 1024 / 1024:.0f} MB."
+            )
+
         with open(path, "rb") as f:
             b64_data = base64.standard_b64encode(f.read()).decode("utf-8")
         return {

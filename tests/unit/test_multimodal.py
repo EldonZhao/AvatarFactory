@@ -279,6 +279,19 @@ class TestResolveImageContent:
         with pytest.raises(FileNotFoundError):
             _resolve_image_content("/nonexistent/path/image.png")
 
+    def test_resolve_large_file_raises(self):
+        """Test that a file exceeding size limit raises ValueError"""
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            # Write 21 MB of data (exceeds 20 MB limit)
+            f.write(b"\x89PNG\r\n\x1a\n" + b"\x00" * (21 * 1024 * 1024))
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="too large"):
+                _resolve_image_content(temp_path)
+        finally:
+            os.unlink(temp_path)
+
 
 # ============================================================================
 # LLM Provider Multimodal Tests

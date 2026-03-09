@@ -5,6 +5,7 @@ Renamed from ContentLabAgent to ContentAgent as part of architecture refactoring
 """
 
 import json
+import os
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -596,9 +597,10 @@ Generate {count} compelling variants in JSON array format."""
         Adds video generation configuration to metadata so that
         VideoGenerator can be used downstream to produce the actual video.
         """
+        default_voice = os.getenv("AVATARFACTORY_DEFAULT_VOICE", "zh-CN-XiaoxuanNeural")
         content.metadata["video_config"] = {
             "video_type": "slideshow",
-            "voice": "zh-CN-XiaoxuanNeural",
+            "voice": default_voice,
             "scene_count": len(content.metadata.get("scene_descriptions", [])),
             "narration_text": content.body,
             "narration_style": content.metadata.get("narration_style", ""),

@@ -281,7 +281,8 @@ class BaseAgent(ABC):
                 if not connector.is_connected():
                     await connector.connect()
 
-                # Combine images and videos for publishing
+                # Combine images and videos into a single media list for publishing.
+                # Connectors accept media files (images and videos) via the 'images' param.
                 all_media = list(images or [])
                 if videos:
                     all_media.extend(videos)

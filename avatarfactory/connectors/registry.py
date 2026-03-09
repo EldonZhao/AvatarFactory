@@ -7,7 +7,11 @@ Provides dynamic connector registration and factory functionality.
 import logging
 from typing import Dict, List, Optional, Type
 
-from avatarfactory.connectors.base import BasePlatformConnector, ConnectorConfig
+from avatarfactory.connectors.base import (
+    BasePlatformConnector,
+    ConnectorCapabilities,
+    ConnectorConfig,
+)
 
 logger = logging.getLogger("avatarfactory.connectors.registry")
 
@@ -148,6 +152,72 @@ class ConnectorRegistry:
         """Clear all registered connectors (for testing)."""
         cls._connectors.clear()
         cls._instances.clear()
+
+    @classmethod
+    def get_connector_capabilities(cls, platform: str) -> Optional[ConnectorCapabilities]:
+        """
+        Get capabilities for a specific platform connector.
+
+        Args:
+            platform: Platform name
+
+        Returns:
+            ConnectorCapabilities or None if platform not registered
+        """
+        connector_class = cls._connectors.get(platform.lower())
+        if not connector_class:
+            return None
+        return connector_class.get_capabilities()
+
+    @classmethod
+    def get_all_capabilities(cls) -> Dict[str, ConnectorCapabilities]:
+        """
+        Get capabilities for all registered connectors.
+
+        Returns:
+            Dict mapping platform name to ConnectorCapabilities
+        """
+        seen: Dict[str, ConnectorCapabilities] = {}
+        for platform_key, connector_class in cls._connectors.items():
+            caps = connector_class.get_capabilities()
+            # Avoid duplicates from aliases (e.g., "bsky" and "bluesky")
+            if caps.platform not in seen:
+                seen[caps.platform] = caps
+        return seen
+
+    @classmethod
+    def list_topic_discovery_connectors(cls) -> List[str]:
+        """
+        List connectors that support topic/trend discovery.
+
+        Returns:
+            List of platform names that support topic discovery
+        """
+        result = []
+        seen = set()
+        for platform_key, connector_class in cls._connectors.items():
+            caps = connector_class.get_capabilities()
+            if caps.supports_topic_discovery and caps.platform not in seen:
+                result.append(caps.platform)
+                seen.add(caps.platform)
+        return result
+
+    @classmethod
+    def list_persona_discovery_connectors(cls) -> List[str]:
+        """
+        List connectors that support persona/audience discovery.
+
+        Returns:
+            List of platform names that support persona discovery
+        """
+        result = []
+        seen = set()
+        for platform_key, connector_class in cls._connectors.items():
+            caps = connector_class.get_capabilities()
+            if caps.supports_persona_discovery and caps.platform not in seen:
+                result.append(caps.platform)
+                seen.add(caps.platform)
+        return result
 
     @classmethod
     def get_for_tenant(

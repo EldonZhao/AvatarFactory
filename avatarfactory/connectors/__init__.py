@@ -11,8 +11,11 @@ Connectors are different from Adapters:
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     ConnectionStatus,
+    IntegrationType,
     PublishResult,
     FetchResult,
 )
@@ -29,8 +32,11 @@ from avatarfactory.connectors import brave_search, bing_search, zhihu
 
 __all__ = [
     "BasePlatformConnector",
+    "ConnectorCapabilities",
     "ConnectorConfig",
+    "ConnectorConfigField",
     "ConnectionStatus",
+    "IntegrationType",
     "PublishResult",
     "FetchResult",
     "ConnectorRegistry",

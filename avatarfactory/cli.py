@@ -509,12 +509,6 @@ def publish_draft(
     # Determine platform
     target_platform = platform or (content.platform.value if hasattr(content.platform, 'value') else str(content.platform))
 
-    # For now, only bluesky is fully implemented
-    if target_platform not in ["bluesky", "twitter"]:
-        console.print(f"[yellow]Note: Platform '{target_platform}' connector not fully implemented.[/yellow]")
-        console.print(f"[yellow]Using bluesky for publishing.[/yellow]")
-        target_platform = "bluesky"
-
     # Parse images
     image_list = [img.strip() for img in images.split(",")] if images else []
 
@@ -577,6 +571,7 @@ def publish_draft(
         config.api_key = os.getenv("TWITTER_API_KEY")
         config.api_secret = os.getenv("TWITTER_API_SECRET")
         config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+        config.extra = {"access_token_secret": os.getenv("TWITTER_ACCESS_TOKEN_SECRET")}
     elif target_platform in ("xiaohongshu", "xhs"):
         xhs_cookie = os.getenv("XIAOHONGSHU_COOKIE")
         if not xhs_cookie:
@@ -588,6 +583,55 @@ def publish_draft(
             "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
             "b1": os.getenv("XIAOHONGSHU_B1"),
         }
+    elif target_platform == "mastodon":
+        mastodon_token = os.getenv("MASTODON_ACCESS_TOKEN")
+        mastodon_instance = os.getenv("MASTODON_INSTANCE_URL")
+        if not mastodon_token or not mastodon_instance:
+            console.print("[red]Error: MASTODON_ACCESS_TOKEN and MASTODON_INSTANCE_URL not set[/red]")
+            raise typer.Exit(1)
+        config.access_token = mastodon_token
+        config.extra = {"instance_url": mastodon_instance}
+    elif target_platform == "instagram":
+        instagram_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+        instagram_account_id = os.getenv("INSTAGRAM_ACCOUNT_ID")
+        if not instagram_token or not instagram_account_id:
+            console.print("[red]Error: INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID not set[/red]")
+            raise typer.Exit(1)
+        config.access_token = instagram_token
+        config.extra = {"account_id": instagram_account_id}
+    elif target_platform == "weibo":
+        weibo_token = os.getenv("WEIBO_ACCESS_TOKEN")
+        if not weibo_token:
+            console.print("[red]Error: WEIBO_ACCESS_TOKEN not set[/red]")
+            raise typer.Exit(1)
+        config.access_token = weibo_token
+    elif target_platform == "linkedin":
+        linkedin_token = os.getenv("LINKEDIN_ACCESS_TOKEN")
+        if not linkedin_token:
+            console.print("[red]Error: LINKEDIN_ACCESS_TOKEN not set[/red]")
+            raise typer.Exit(1)
+        config.access_token = linkedin_token
+        config.extra = {"person_id": os.getenv("LINKEDIN_PERSON_ID")}
+    elif target_platform == "threads":
+        threads_token = os.getenv("THREADS_ACCESS_TOKEN")
+        threads_user_id = os.getenv("THREADS_USER_ID")
+        if not threads_token or not threads_user_id:
+            console.print("[red]Error: THREADS_ACCESS_TOKEN and THREADS_USER_ID not set[/red]")
+            raise typer.Exit(1)
+        config.access_token = threads_token
+        config.extra = {"user_id": threads_user_id}
+    elif target_platform == "toutiao":
+        toutiao_token = os.getenv("TOUTIAO_ACCESS_TOKEN")
+        if not toutiao_token:
+            console.print("[red]Error: TOUTIAO_ACCESS_TOKEN not set[/red]")
+            raise typer.Exit(1)
+        config.access_token = toutiao_token
+    else:
+        console.print(f"[red]Error: Unknown platform '{target_platform}'[/red]")
+        supported = ["bluesky", "twitter", "xiaohongshu", "mastodon", "instagram",
+                     "weibo", "linkedin", "threads", "toutiao"]
+        console.print(f"[yellow]Supported platforms: {', '.join(supported)}[/yellow]")
+        raise typer.Exit(1)
 
     try:
         connector = get_connector(target_platform, config)
@@ -849,9 +893,10 @@ def fetch(
 
 @app.command()
 def publish(
-    platform: str = typer.Argument(..., help="Platform to publish to (bluesky, twitter)"),
+    platform: str = typer.Argument(..., help="Platform to publish to (bluesky, twitter, xiaohongshu, mastodon, instagram, weibo, linkedin, threads, toutiao)"),
     content: str = typer.Argument(..., help="Content to publish"),
     tags: Optional[str] = typer.Option(None, "--tags", "-t", help="Comma-separated hashtags"),
+    title: Optional[str] = typer.Option(None, "--title", help="Content title (required for some platforms)"),
 ):
     """
     Publish content to a platform.
@@ -859,6 +904,8 @@ def publish(
     Example:
         avatarfactory publish bluesky "Hello world!"
         avatarfactory publish twitter "Check this out" --tags "ai,productivity"
+        avatarfactory publish mastodon "Hello Fediverse!" --tags "introduction"
+        avatarfactory publish linkedin "Professional insight" --title "My Insight"
     """
     console.print(Panel.fit(f"Publishing to {platform}...", border_style="cyan"))
 
@@ -872,12 +919,35 @@ def publish(
         config.api_key = os.getenv("TWITTER_API_KEY")
         config.api_secret = os.getenv("TWITTER_API_SECRET")
         config.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+        config.extra = {"access_token_secret": os.getenv("TWITTER_ACCESS_TOKEN_SECRET")}
     elif platform.lower() in ("xiaohongshu", "xhs"):
         config.extra = {
             "cookie": os.getenv("XIAOHONGSHU_COOKIE"),
             "user_id": os.getenv("XIAOHONGSHU_USER_ID"),
             "b1": os.getenv("XIAOHONGSHU_B1"),
         }
+    elif platform.lower() == "mastodon":
+        config.access_token = os.getenv("MASTODON_ACCESS_TOKEN")
+        config.extra = {"instance_url": os.getenv("MASTODON_INSTANCE_URL")}
+    elif platform.lower() == "instagram":
+        config.access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+        config.extra = {"account_id": os.getenv("INSTAGRAM_ACCOUNT_ID")}
+    elif platform.lower() == "weibo":
+        config.access_token = os.getenv("WEIBO_ACCESS_TOKEN")
+    elif platform.lower() == "linkedin":
+        config.access_token = os.getenv("LINKEDIN_ACCESS_TOKEN")
+        config.extra = {"person_id": os.getenv("LINKEDIN_PERSON_ID")}
+    elif platform.lower() == "threads":
+        config.access_token = os.getenv("THREADS_ACCESS_TOKEN")
+        config.extra = {"user_id": os.getenv("THREADS_USER_ID")}
+    elif platform.lower() == "toutiao":
+        config.access_token = os.getenv("TOUTIAO_ACCESS_TOKEN")
+    else:
+        console.print(f"[red]Unknown platform: {platform}[/red]")
+        supported = ["bluesky", "twitter", "xiaohongshu", "mastodon", "instagram",
+                     "weibo", "linkedin", "threads", "toutiao"]
+        console.print(f"[yellow]Supported platforms: {', '.join(supported)}[/yellow]")
+        raise typer.Exit(1)
 
     tag_list = [t.strip() for t in tags.split(",")] if tags else None
 
@@ -886,7 +956,7 @@ def publish(
 
         async def do_publish():
             await connector.connect()
-            return await connector.publish(content=content, tags=tag_list)
+            return await connector.publish(content=content, title=title, tags=tag_list)
 
         with console.status(f"[bold cyan]Publishing...", spinner="dots"):
             result = asyncio.run(do_publish())

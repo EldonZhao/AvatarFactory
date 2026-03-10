@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -31,6 +34,38 @@ class BraveSearchConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "brave_search"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="brave_search",
+            display_name="Brave Search",
+            description="Brave Search API for web and news results",
+            supports_topic_discovery=True,
+            supports_persona_discovery=False,
+            supports_publishing=False,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="api_key",
+                    label="API Key",
+                    field_type="password",
+                    required=True,
+                    description="Brave Search API key",
+                    env_var="BRAVE_SEARCH_API_KEY",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. A read-only search"
+                " connector for web content. Call"
+                " connector.fetch_trending(query) for web and news search"
+                " results. Privacy-focused alternative to Bing Search for"
+                " topic discovery. Does not support publishing or"
+                " user-specific content fetching. Best used as a"
+                " supplementary source for broad trend analysis."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Initialize connection with API key."""

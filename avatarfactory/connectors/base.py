@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ConnectionStatus(str, Enum):
@@ -19,6 +19,73 @@ class ConnectionStatus(str, Enum):
     CONNECTING = "connecting"
     CONNECTED = "connected"
     ERROR = "error"
+
+
+class IntegrationType(str, Enum):
+    """How sub-agents integrate with this connector"""
+    API = "api"
+    AGENT_SKILL = "agent_skill"
+    MCP_TOOL = "mcp_tool"
+
+
+class ConnectorConfigField(BaseModel):
+    """Schema for a single connector configuration field (for frontend rendering)."""
+    name: str = Field(..., description="Field name used as the key in credentials dict")
+    label: str = Field(..., description="Human-readable label for UI display")
+    field_type: str = Field(
+        default="text",
+        description="Input type: text, password, textarea, url, email, number",
+    )
+    required: bool = Field(default=False, description="Whether this field is required")
+    description: str = Field(default="", description="Help text for the field")
+    placeholder: str = Field(default="", description="Placeholder text for the input")
+    env_var: Optional[str] = Field(
+        default=None,
+        description="Environment variable that can be used as fallback",
+    )
+
+
+class ConnectorCapabilities(BaseModel):
+    """Describes the capabilities and metadata of a connector."""
+    platform: str = Field(..., description="Platform identifier")
+    display_name: str = Field(..., description="Human-readable platform name")
+    description: str = Field(default="", description="Short description of the connector")
+
+    # Discovery capability flags
+    supports_topic_discovery: bool = Field(
+        default=False,
+        description="Whether this connector can be used for topic/trend mining",
+    )
+    supports_persona_discovery: bool = Field(
+        default=False,
+        description="Whether this connector can be used for persona/audience mining",
+    )
+
+    # Functional capability flags
+    supports_publishing: bool = Field(
+        default=False,
+        description="Whether this connector can publish content",
+    )
+    supports_fetching: bool = Field(
+        default=False,
+        description="Whether this connector can fetch/search content",
+    )
+
+    # Frontend config schema
+    config_fields: List[ConnectorConfigField] = Field(
+        default_factory=list,
+        description="Configuration fields needed by this connector (for frontend forms)",
+    )
+
+    # Integration info for sub-agents
+    integration_type: IntegrationType = Field(
+        default=IntegrationType.API,
+        description="Primary integration method for sub-agents",
+    )
+    usage_guide: str = Field(
+        default="",
+        description="Detailed usage instructions for sub-agents",
+    )
 
 
 class ConnectorConfig(BaseModel):
@@ -104,6 +171,24 @@ class BasePlatformConnector(ABC):
     def platform_name(self) -> str:
         """Return platform name"""
         pass
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        """
+        Return the capabilities and metadata for this connector.
+
+        Subclasses should override this to provide platform-specific capabilities
+        including config fields for frontend rendering, discovery flags, and
+        integration guides for sub-agents.
+
+        Returns:
+            ConnectorCapabilities describing this connector
+        """
+        return ConnectorCapabilities(
+            platform="unknown",
+            display_name="Unknown",
+            description="Base connector with no specific capabilities.",
+        )
 
     @abstractmethod
     async def connect(self) -> bool:

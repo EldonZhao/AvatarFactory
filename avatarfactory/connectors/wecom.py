@@ -14,8 +14,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -46,6 +49,45 @@ class WeComConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "wecom"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="wecom",
+            display_name="WeChat Work (企业微信)",
+            description="WeChat Work webhook for team notifications",
+            supports_topic_discovery=False,
+            supports_persona_discovery=False,
+            supports_publishing=True,
+            supports_fetching=False,
+            config_fields=[
+                ConnectorConfigField(
+                    name="webhook_url",
+                    label="Webhook URL",
+                    field_type="url",
+                    required=True,
+                    description=(
+                        "Full webhook URL from WeChat Work bot settings"
+                    ),
+                    placeholder=(
+                        "https://qyapi.weixin.qq.com/cgi-bin"
+                        "/webhook/send?key=..."
+                    ),
+                    env_var="AVATARFACTORY_WEBHOOK_URL",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. This is a send-only"
+                " connector for team notifications via WeChat Work webhook"
+                " bots. Call connector.publish(content) to send"
+                " text/markdown messages, or use"
+                " send_content_notification() for formatted content cards."
+                " Does not support content fetching or discovery. Ideal for"
+                " notifying team members about generated content or review"
+                " results."
+            ),
+        )
 
     def _get_webhook_url(self) -> str:
         """

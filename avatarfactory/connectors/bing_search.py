@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -32,6 +35,56 @@ class BingSearchConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "bing_search"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="bing_search",
+            display_name="Bing Search",
+            description="Microsoft Bing Web and News Search API",
+            supports_topic_discovery=True,
+            supports_persona_discovery=False,
+            supports_publishing=False,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="api_key",
+                    label="API Key",
+                    field_type="password",
+                    required=True,
+                    description=(
+                        "Azure Cognitive Services API key"
+                        " for Bing Search"
+                    ),
+                    env_var="BING_SEARCH_API_KEY",
+                ),
+                ConnectorConfigField(
+                    name="endpoint",
+                    label="Endpoint URL",
+                    field_type="url",
+                    required=False,
+                    description=(
+                        "Custom Bing Search endpoint"
+                        " (defaults to standard endpoint)"
+                    ),
+                    placeholder=(
+                        "https://api.bing.microsoft.com/v7.0"
+                    ),
+                    env_var="BING_SEARCH_ENDPOINT",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. A read-only search"
+                " connector for web and news content. Call"
+                " connector.fetch_trending(query) to search web and news"
+                " articles for topic discovery. Useful for identifying"
+                " trending topics and gathering external content signals."
+                " Does not support publishing or user-specific content"
+                " fetching. Ideal for supplementing social platform"
+                " discovery with broader web trends."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Initialize connection with API key."""

@@ -166,57 +166,20 @@ async def get_dashboard():
             ))
 
     # Get connector status
-    connector_configs = {
-        "bluesky": {
-            "env_keys": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],
-            "description": "AT Protocol social network",
-        },
-        "twitter": {
-            "env_keys": ["TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN"],
-            "description": "Twitter/X API v2",
-        },
-        "xiaohongshu": {
-            "env_keys": ["XIAOHONGSHU_COOKIE"],
-            "description": "Little Red Book (小红书)",
-        },
-        "wecom": {
-            "env_keys": ["AVATARFACTORY_WEBHOOK_URL"],
-            "description": "WeChat Work notifications",
-        },
-        "linkedin": {
-            "env_keys": ["LINKEDIN_ACCESS_TOKEN"],
-            "description": "LinkedIn OAuth 2.0",
-        },
-        "weibo": {
-            "env_keys": ["WEIBO_ACCESS_TOKEN"],
-            "description": "Weibo (微博) OAuth 2.0",
-        },
-        "zhihu": {
-            "env_keys": ["ZHIHU_COOKIE"],
-            "description": "Zhihu (知乎) Q&A platform",
-        },
-        "brave_search": {
-            "env_keys": ["BRAVE_SEARCH_API_KEY"],
-            "description": "Brave Search API",
-        },
-        "bing_search": {
-            "env_keys": ["BING_SEARCH_API_KEY"],
-            "description": "Bing Search API (Azure)",
-        },
-    }
+    all_capabilities = ConnectorRegistry.get_all_capabilities()
 
     connectors = []
     connectors_configured = 0
-    for platform, config in connector_configs.items():
-        registered = ConnectorRegistry.is_registered(platform)
-        configured = all(os.getenv(k) is not None for k in config["env_keys"])
+    for platform, caps in all_capabilities.items():
+        env_keys = [f.env_var for f in caps.config_fields if f.env_var]
+        configured = all(os.getenv(k) is not None for k in env_keys) if env_keys else False
         if configured:
             connectors_configured += 1
         connectors.append(ConnectorStatusResponse(
-            platform=platform,
-            registered=registered,
+            platform=caps.platform,
+            registered=True,
             configured=configured,
-            description=config["description"],
+            description=caps.description,
         ))
 
     # Scheduler status
@@ -238,7 +201,7 @@ async def get_dashboard():
             tasks_count=tasks_count,
             active_tasks_count=active_tasks_count,
             connectors_configured=connectors_configured,
-            connectors_total=len(connector_configs),
+            connectors_total=len(all_capabilities),
         ),
         recent_personas=recent_personas,
         connectors=connectors,
@@ -1107,80 +1070,41 @@ async def list_topics_admin(
 
 @router.get("/connectors", dependencies=[Depends(require_admin_auth)])
 async def list_connectors_admin():
-    """Get detailed connector status for admin."""
+    """Get detailed connector status and capabilities for admin."""
     import os
     from avatarfactory.connectors.registry import ConnectorRegistry
 
-    connector_configs = {
-        "bluesky": {
-            "env_keys": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],
-            "description": "AT Protocol social network",
-        },
-        "twitter": {
-            "env_keys": ["TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN", "TWITTER_ACCESS_SECRET"],
-            "description": "Twitter/X API v2",
-        },
-        "xiaohongshu": {
-            "env_keys": ["XIAOHONGSHU_COOKIE", "XIAOHONGSHU_USER_ID"],
-            "description": "Little Red Book (小红书)",
-        },
-        "wecom": {
-            "env_keys": ["AVATARFACTORY_WEBHOOK_URL"],
-            "description": "WeChat Work notifications",
-        },
-        "linkedin": {
-            "env_keys": ["LINKEDIN_ACCESS_TOKEN"],
-            "description": "LinkedIn OAuth 2.0",
-        },
-        "threads": {
-            "env_keys": ["THREADS_ACCESS_TOKEN"],
-            "description": "Threads (Meta) Graph API",
-        },
-        "instagram": {
-            "env_keys": ["INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_BUSINESS_ACCOUNT_ID"],
-            "description": "Instagram Business Graph API",
-        },
-        "weibo": {
-            "env_keys": ["WEIBO_ACCESS_TOKEN"],
-            "description": "Weibo (微博) OAuth 2.0",
-        },
-        "mastodon": {
-            "env_keys": ["MASTODON_ACCESS_TOKEN", "MASTODON_INSTANCE_URL"],
-            "description": "Mastodon/Fediverse",
-        },
-        "zhihu": {
-            "env_keys": ["ZHIHU_COOKIE"],
-            "description": "Zhihu (知乎) Q&A platform",
-        },
-        "brave_search": {
-            "env_keys": ["BRAVE_SEARCH_API_KEY"],
-            "description": "Brave Search API",
-        },
-        "bing_search": {
-            "env_keys": ["BING_SEARCH_API_KEY"],
-            "description": "Bing Search API (Azure)",
-        },
-    }
+    all_capabilities = ConnectorRegistry.get_all_capabilities()
 
     connectors = []
-    for platform, config in connector_configs.items():
-        registered = ConnectorRegistry.is_registered(platform)
-        configured_keys = [(k, os.getenv(k) is not None) for k in config["env_keys"]]
-        all_configured = all(v for _, v in configured_keys)
+    for platform, caps in all_capabilities.items():
+        env_keys = [f.env_var for f in caps.config_fields if f.env_var]
+        configured_keys = [(k, os.getenv(k) is not None) for k in env_keys]
+        all_configured = all(v for _, v in configured_keys) if configured_keys else False
 
         connectors.append({
-            "platform": platform,
-            "description": config["description"],
-            "registered": registered,
+            "platform": caps.platform,
+            "display_name": caps.display_name,
+            "description": caps.description,
+            "registered": True,
             "configured": all_configured,
             "env_keys": [{
                 "key": k,
                 "configured": v,
             } for k, v in configured_keys],
+            "supports_topic_discovery": caps.supports_topic_discovery,
+            "supports_persona_discovery": caps.supports_persona_discovery,
+            "supports_publishing": caps.supports_publishing,
+            "supports_fetching": caps.supports_fetching,
+            "config_fields": [f.model_dump() for f in caps.config_fields],
+            "integration_type": caps.integration_type.value,
+            "usage_guide": caps.usage_guide,
         })
 
     return {
         "connectors": connectors,
         "configured_count": sum(1 for c in connectors if c["configured"]),
         "total_count": len(connectors),
+        "topic_discovery_connectors": ConnectorRegistry.list_topic_discovery_connectors(),
+        "persona_discovery_connectors": ConnectorRegistry.list_persona_discovery_connectors(),
     }

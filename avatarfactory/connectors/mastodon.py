@@ -12,8 +12,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -42,6 +45,51 @@ class MastodonConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "mastodon"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="mastodon",
+            display_name="Mastodon",
+            description="Mastodon/Fediverse via ActivityPub API",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=True,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=True,
+                    description="Mastodon OAuth access token",
+                    env_var="MASTODON_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="instance_url",
+                    label="Instance URL",
+                    field_type="url",
+                    required=False,
+                    description=(
+                        "Mastodon instance URL"
+                        " (default: mastodon.social)"
+                    ),
+                    placeholder="https://mastodon.social",
+                    env_var="MASTODON_INSTANCE_URL",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Call"
+                " connector.fetch_trending() for trending posts/hashtags"
+                " on the instance. Call"
+                " connector.fetch_user_posts(user_id) for persona"
+                " analysis. Call connector.publish(content, images, tags)"
+                " to post toots with optional media and visibility"
+                " control. Supports search across federated instances for"
+                " broad topic discovery."
+            ),
+        )
 
     @property
     def api_base(self) -> str:

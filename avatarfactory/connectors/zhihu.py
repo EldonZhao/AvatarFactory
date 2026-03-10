@@ -12,8 +12,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -43,6 +46,54 @@ class ZhihuConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "zhihu"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="zhihu",
+            display_name="Zhihu (知乎)",
+            description="Zhihu Q&A and knowledge platform",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=False,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="cookie",
+                    label="Cookie",
+                    field_type="textarea",
+                    required=True,
+                    description=(
+                        "Browser cookie string"
+                        " (extract from browser DevTools)"
+                    ),
+                    placeholder="Paste cookie string from browser",
+                    env_var="ZHIHU_COOKIE",
+                ),
+                ConnectorConfigField(
+                    name="user_id",
+                    label="User URL Token",
+                    field_type="text",
+                    required=False,
+                    description=(
+                        "Zhihu user URL token for fetching user content"
+                    ),
+                    env_var="ZHIHU_USER_ID",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Requires cookie-based"
+                " auth. Call connector.fetch_trending() for Zhihu hot"
+                " questions and trending topics. Call"
+                " connector.fetch_user_posts(user_id) to analyze expert"
+                " content for persona research. connector.search(query)"
+                " provides topic-specific Q&A analysis. Publishing is not"
+                " supported due to complex authentication requirements."
+                " Best used for topic and persona discovery in"
+                " professional/knowledge domains."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Zhihu using cookie authentication."""

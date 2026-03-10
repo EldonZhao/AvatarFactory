@@ -1673,69 +1673,48 @@ def register_routes(app: FastAPI):
     @app.get("/connectors/status", tags=["System"])
     async def get_connectors_status():
         """
-        Get configuration status of all platform connectors.
+        Get configuration status and capabilities of all platform connectors.
 
-        Returns whether each connector is registered and configured.
+        Returns connector capabilities including:
+        - Frontend config schema (fields needed for configuration)
+        - Topic/persona discovery support flags
+        - Publishing/fetching capabilities
+        - Integration type and usage guide for sub-agents
         """
         from avatarfactory.connectors.registry import ConnectorRegistry
 
-        connector_configs = {
-            "bluesky": {
-                "env_keys": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],
-                "description": "AT Protocol social network",
-            },
-            "twitter": {
-                "env_keys": ["TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN"],
-                "description": "Twitter/X API v2",
-            },
-            "xiaohongshu": {
-                "env_keys": ["XIAOHONGSHU_COOKIE"],
-                "description": "Little Red Book (小红书)",
-            },
-            "wecom": {
-                "env_keys": ["AVATARFACTORY_WEBHOOK_URL"],
-                "description": "WeChat Work notifications",
-            },
-            "linkedin": {
-                "env_keys": ["LINKEDIN_ACCESS_TOKEN"],
-                "description": "LinkedIn OAuth 2.0",
-            },
-            "threads": {
-                "env_keys": ["THREADS_ACCESS_TOKEN"],
-                "description": "Threads (Meta) Graph API",
-            },
-            "instagram": {
-                "env_keys": ["INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_BUSINESS_ACCOUNT_ID"],
-                "description": "Instagram Business Graph API",
-            },
-            "weibo": {
-                "env_keys": ["WEIBO_ACCESS_TOKEN"],
-                "description": "Weibo (微博) OAuth 2.0",
-            },
-            "mastodon": {
-                "env_keys": ["MASTODON_ACCESS_TOKEN"],
-                "description": "Mastodon/Fediverse",
-            },
-        }
+        all_capabilities = ConnectorRegistry.get_all_capabilities()
 
         statuses = []
-        for platform, config in connector_configs.items():
-            registered = ConnectorRegistry.is_registered(platform)
-            configured = all(os.getenv(k) is not None for k in config["env_keys"])
-            missing_keys = [k for k in config["env_keys"] if not os.getenv(k)]
+        for platform, caps in all_capabilities.items():
+            env_keys = [
+                f.env_var for f in caps.config_fields if f.env_var
+            ]
+            configured = all(os.getenv(k) is not None for k in env_keys) if env_keys else False
+            missing_keys = [k for k in env_keys if not os.getenv(k)]
 
             statuses.append({
-                "platform": platform,
-                "description": config["description"],
-                "registered": registered,
+                "platform": caps.platform,
+                "display_name": caps.display_name,
+                "description": caps.description,
+                "registered": True,
                 "configured": configured,
                 "missing_keys": missing_keys,
+                "supports_topic_discovery": caps.supports_topic_discovery,
+                "supports_persona_discovery": caps.supports_persona_discovery,
+                "supports_publishing": caps.supports_publishing,
+                "supports_fetching": caps.supports_fetching,
+                "config_fields": [f.model_dump() for f in caps.config_fields],
+                "integration_type": caps.integration_type.value,
+                "usage_guide": caps.usage_guide,
             })
 
         return {
             "connectors": statuses,
             "configured_count": sum(1 for s in statuses if s["configured"]),
             "total_count": len(statuses),
+            "topic_discovery_connectors": ConnectorRegistry.list_topic_discovery_connectors(),
+            "persona_discovery_connectors": ConnectorRegistry.list_persona_discovery_connectors(),
         }
 
     # -------------------------------------------------------------------------

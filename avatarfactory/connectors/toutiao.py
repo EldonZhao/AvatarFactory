@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -43,6 +46,59 @@ class ToutiaoConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "toutiao"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="toutiao",
+            display_name="Toutiao (今日头条)",
+            description="Toutiao/Jinri Toutiao content platform",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=True,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=True,
+                    description="Toutiao OAuth 2.0 access token",
+                    env_var="TOUTIAO_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="client_key",
+                    label="Client Key",
+                    field_type="text",
+                    required=False,
+                    description=(
+                        "Toutiao app client key (for token refresh)"
+                    ),
+                    env_var="TOUTIAO_CLIENT_KEY",
+                ),
+                ConnectorConfigField(
+                    name="client_secret",
+                    label="Client Secret",
+                    field_type="password",
+                    required=False,
+                    description=(
+                        "Toutiao app client secret (for token refresh)"
+                    ),
+                    env_var="TOUTIAO_CLIENT_SECRET",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Call"
+                " connector.fetch_trending() for Toutiao hot list and"
+                " trending articles. Call"
+                " connector.fetch_user_posts(user_id) for user content"
+                " analysis. Call connector.publish(content, title, images)"
+                " to publish articles (图文) or microblogs (微头条)."
+                " Toutiao's recommendation algorithm provides strong topic"
+                " trend signals."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Toutiao using OAuth access token."""

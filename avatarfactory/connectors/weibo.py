@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -41,6 +44,47 @@ class WeiboConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "weibo"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="weibo",
+            display_name="Weibo (微博)",
+            description="Sina Weibo via OAuth 2.0 API",
+            supports_topic_discovery=True,
+            supports_persona_discovery=True,
+            supports_publishing=True,
+            supports_fetching=True,
+            config_fields=[
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=True,
+                    description="Weibo OAuth 2.0 access token",
+                    env_var="WEIBO_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="app_key",
+                    label="App Key",
+                    field_type="text",
+                    required=False,
+                    description="Weibo App Key (for token refresh)",
+                    env_var="WEIBO_APP_KEY",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Call"
+                " connector.fetch_trending(query) to discover hot topics"
+                " from Weibo's trending feed and search. Call"
+                " connector.fetch_user_posts(user_id) to analyze user"
+                " content for persona discovery. Call"
+                " connector.publish(content, images) to post with up to 9"
+                " images. Supports public timeline and search for"
+                " comprehensive topic analysis."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Weibo using OAuth access token."""

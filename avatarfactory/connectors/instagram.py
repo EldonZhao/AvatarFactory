@@ -13,8 +13,11 @@ from typing import Any, Dict, List, Optional
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectionStatus,
+    ConnectorCapabilities,
     ConnectorConfig,
+    ConnectorConfigField,
     FetchResult,
+    IntegrationType,
     PublishResult,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
@@ -46,6 +49,48 @@ class InstagramConnector(BasePlatformConnector):
     @property
     def platform_name(self) -> str:
         return "instagram"
+
+    @classmethod
+    def get_capabilities(cls) -> ConnectorCapabilities:
+        return ConnectorCapabilities(
+            platform="instagram",
+            display_name="Instagram",
+            description="Instagram Business via Meta Graph API",
+            supports_topic_discovery=False,
+            supports_persona_discovery=False,
+            supports_publishing=True,
+            supports_fetching=False,
+            config_fields=[
+                ConnectorConfigField(
+                    name="access_token",
+                    label="Access Token",
+                    field_type="password",
+                    required=True,
+                    description="Meta Graph API access token",
+                    env_var="INSTAGRAM_ACCESS_TOKEN",
+                ),
+                ConnectorConfigField(
+                    name="instagram_business_account_id",
+                    label="Business Account ID",
+                    field_type="text",
+                    required=True,
+                    description=(
+                        "Instagram Business or Creator account ID"
+                    ),
+                    env_var="INSTAGRAM_BUSINESS_ACCOUNT_ID",
+                ),
+            ],
+            integration_type=IntegrationType.API,
+            usage_guide=(
+                "Use via ConnectorRegistry API. Requires a Business or"
+                " Creator Instagram account with Meta Graph API token."
+                " Call connector.publish(content, images) for single-image"
+                " or carousel posts (images must be publicly accessible"
+                " URLs). No public search API for discovery. Sub-agents"
+                " should use this connector through the publish() method"
+                " for visual content distribution."
+            ),
+        )
 
     async def connect(self) -> bool:
         """Connect to Instagram using Graph API access token."""

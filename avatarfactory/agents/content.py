@@ -5,6 +5,7 @@ Renamed from ContentLabAgent to ContentAgent as part of architecture refactoring
 """
 
 import json
+import os
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -14,6 +15,7 @@ from avatarfactory.models.schemas import (
     AgentMessage,
     Content,
     ContentStructure,
+    ContentType,
     MediaAttachment,
     Persona,
     PlatformType,
@@ -234,6 +236,8 @@ class ContentAgent(BaseAgent):
             - platform: str (optional, defaults to persona's primary platform)
             - variant_count: int (optional, defaults to 1)
             - use_trending: bool (optional, defaults to True, integrate trending data)
+            - content_type: str (optional, "text" | "image_text" | "video", defaults to "text")
+            - reference_images: list[str] (optional, image URLs/paths for multimodal analysis)
         """
         persona_id = payload.get("persona_id")
         pillar = payload.get("pillar")
@@ -242,6 +246,8 @@ class ContentAgent(BaseAgent):
         platform = payload.get("platform")
         variant_count = payload.get("variant_count", 1)
         use_trending = payload.get("use_trending", True)
+        content_type_str = payload.get("content_type", "text")
+        reference_images = payload.get("reference_images", [])
 
         if not all([persona_id, pillar, topic]):
             raise ValueError("persona_id, pillar, and topic are required")
@@ -257,9 +263,16 @@ class ContentAgent(BaseAgent):
         else:
             platform = PlatformType(platform)
 
+        # Resolve content_type
+        try:
+            content_type = ContentType(content_type_str)
+        except ValueError:
+            content_type = ContentType.TEXT
+
         self.log(
             "INFO",
-            f"Generating content for persona {persona_id}, topic: {topic}, platform: {platform}",
+            f"Generating content for persona {persona_id}, topic: {topic}, "
+            f"platform: {platform}, content_type: {content_type.value}",
         )
 
         # Get trending context if enabled (reads from KB, saved by DiscoveryAgent)
@@ -273,16 +286,22 @@ class ContentAgent(BaseAgent):
         # Generate content
         if variant_count == 1:
             content = await self._generate_single_content(
-                persona, pillar, topic, template, platform, trending_context
+                persona, pillar, topic, template, platform, trending_context,
+                content_type=content_type, reference_images=reference_images,
             )
         else:
             variants = await self._generate_variants(
-                persona, pillar, topic, template, platform, variant_count, trending_context
+                persona, pillar, topic, template, platform, variant_count, trending_context,
+                content_type=content_type,
             )
             # Save all variants to KB
             for variant in variants[1:]:
                 self.kb.save_content(variant, status="draft")
             content = variants[0]
+
+        # For video content type, generate video metadata
+        if content_type == ContentType.VIDEO:
+            content = self._prepare_video_metadata(content)
 
         # Auto-review content
         review_score = await self._review_content(content)
@@ -311,10 +330,42 @@ class ContentAgent(BaseAgent):
         template: str,
         platform: PlatformType,
         trending_context: str = "",
+        content_type: ContentType = ContentType.TEXT,
+        reference_images: Optional[List[str]] = None,
     ) -> Content:
         """Generate a single content piece"""
 
         template_info = CONTENT_TEMPLATES.get(template, CONTENT_TEMPLATES["comparison"])
+
+        # Build multimodal-specific instructions
+        multimodal_instructions = ""
+        if content_type == ContentType.IMAGE_TEXT:
+            multimodal_instructions = """
+CONTENT FORMAT: IMAGE + TEXT (图文内容)
+This content should be designed as an illustrated post. Focus on:
+- Creating text that complements visual elements
+- Including detailed image_prompts for each recommended image
+- Structuring text for interleaving with images
+- Considering visual flow and image placement
+"""
+        elif content_type == ContentType.VIDEO:
+            multimodal_instructions = """
+CONTENT FORMAT: VIDEO (视频内容)
+This content should be designed as a video script. Focus on:
+- Writing a narration script suitable for TTS (text-to-speech) voiceover
+- Structuring content into scenes with clear visual descriptions
+- Including scene_descriptions for each visual segment
+- Keeping sentences concise and natural for spoken delivery
+- Planning for slideshow-style video (images + narration)
+"""
+
+        # Build reference images context
+        reference_context = ""
+        if reference_images:
+            reference_context = f"""
+REFERENCE IMAGES: {len(reference_images)} image(s) provided for visual context analysis.
+Analyze these images and incorporate relevant visual insights into the content.
+"""
 
         # Build system prompt with optional trending context
         system_prompt = f"""You are a professional content creator for {platform.value}. Your task is to create high-quality, engaging content that matches the given persona and platform style.
@@ -330,7 +381,7 @@ PERSONA:
 
 PLATFORM: {platform.value}
 CONTENT PILLAR: {pillar}
-{trending_context}
+{multimodal_instructions}{reference_context}{trending_context}
 TEMPLATE STRUCTURE:
 {json.dumps(template_info['structure'], indent=2, ensure_ascii=False)}
 
@@ -356,7 +407,7 @@ Output MUST be valid JSON:
     "description of what kind of image/photo would work well here",
     "description of image 2"
   ],
-  "recommended_image_count": 2
+  "recommended_image_count": 2{self._get_video_json_fields(content_type)}
 }}
 
 Generate 2-4 image prompts that would complement the content for visual platforms."""
@@ -371,7 +422,13 @@ Make it:
 
 Generate the content in JSON format."""
 
-        response = await self.call_llm(user_prompt, system=system_prompt, temperature=0.8)
+        # Pass reference images for multimodal analysis if provided
+        response = await self.call_llm(
+            user_prompt,
+            system=system_prompt,
+            temperature=0.8,
+            images=reference_images if reference_images else None,
+        )
 
         # Parse response
         try:
@@ -396,6 +453,7 @@ Generate the content in JSON format."""
             body=content_data["body"],
             pillar=pillar,
             platform=platform,
+            content_type=content_type,
             structure=ContentStructure(
                 sections=template_info["structure"],
                 style_constraints={"template": template, "persona_voice": persona.voice_style.tone},
@@ -404,9 +462,15 @@ Generate the content in JSON format."""
             metadata={
                 "topic": topic,
                 "template": template,
+                "content_type": content_type.value,
                 "structure_notes": content_data.get("structure_notes", ""),
                 "image_suggestions": content_data.get("image_suggestions", []),
                 "recommended_image_count": content_data.get("recommended_image_count", 2),
+                **(
+                    {"scene_descriptions": content_data.get("scene_descriptions", [])}
+                    if content_type == ContentType.VIDEO
+                    else {}
+                ),
             },
             image_prompts=content_data.get("image_prompts", []),
         )
@@ -426,6 +490,7 @@ Generate the content in JSON format."""
         platform: PlatformType,
         count: int,
         trending_context: str = "",
+        content_type: ContentType = ContentType.TEXT,
     ) -> List[Content]:
         """Generate multiple variants of the same topic"""
 
@@ -493,10 +558,12 @@ Generate {count} compelling variants in JSON array format."""
                 body=variant_data["body"],
                 pillar=pillar,
                 platform=platform,
+                content_type=content_type,
                 tags=variant_data.get("tags", []),
                 metadata={
                     "topic": topic,
                     "template": template,
+                    "content_type": content_type.value,
                     "variant_index": i + 1,
                     "angle": variant_data.get("angle", ""),
                     "hook_type": variant_data.get("hook_type", ""),
@@ -506,6 +573,42 @@ Generate {count} compelling variants in JSON array format."""
 
         self.log("INFO", f"Generated {len(contents)} variants")
         return contents
+
+    # =========================================================================
+    # Multimodal Helpers
+    # =========================================================================
+
+    def _get_video_json_fields(self, content_type: ContentType) -> str:
+        """Return additional JSON fields for video content type in the LLM prompt."""
+        if content_type == ContentType.VIDEO:
+            return """,
+  "scene_descriptions": [
+    "Scene 1: visual description for this segment",
+    "Scene 2: visual description for this segment"
+  ],
+  "narration_style": "calm and informative"
+"""
+        return ""
+
+    def _prepare_video_metadata(self, content: Content) -> Content:
+        """
+        Prepare video-specific metadata on a Content object.
+
+        Adds video generation configuration to metadata so that
+        VideoGenerator can be used downstream to produce the actual video.
+        """
+        default_voice = os.getenv("AVATARFACTORY_DEFAULT_VOICE", "zh-CN-XiaoxuanNeural")
+        content.metadata["video_config"] = {
+            "video_type": "slideshow",
+            "voice": default_voice,
+            "scene_count": len(content.metadata.get("scene_descriptions", [])),
+            "narration_text": content.body,
+            "narration_style": content.metadata.get("narration_style", ""),
+        }
+        # Save updated metadata
+        self.kb.save_content(content, status="draft")
+        self.log("INFO", f"Prepared video metadata for content {content.id}")
+        return content
 
     # =========================================================================
     # Platform Adaptation

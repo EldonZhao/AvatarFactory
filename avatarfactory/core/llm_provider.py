@@ -5,13 +5,72 @@ Supported providers:
 - Anthropic Claude (claude-3-5-sonnet, claude-3-5-haiku, etc.)
 - Azure OpenAI (GPT-4, GPT-3.5, etc.)
 - OpenAI (GPT-4, GPT-3.5, etc.)
+
+All providers support multimodal input (text + images) via the `images` parameter.
 """
 
+import base64
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from anthropic import Anthropic
+
+
+def _resolve_image_content(image: str) -> Dict[str, Any]:
+    """
+    Resolve an image reference to a content dict suitable for LLM APIs.
+
+    Supports:
+    - URLs (http:// or https://) → returned as-is
+    - Local file paths → read and base64-encoded
+    - Base64 strings (data:image/...) → returned as-is
+
+    Args:
+        image: URL, file path, or base64 data URI
+
+    Returns:
+        Dict with 'type' and 'data'/'url' keys for API consumption
+    """
+    if image.startswith(("http://", "https://")):
+        return {"type": "url", "url": image}
+    elif image.startswith("data:"):
+        # Already a data URI (e.g., data:image/png;base64,...)
+        return {"type": "base64", "data_uri": image}
+    else:
+        # Assume local file path
+        path = Path(image)
+        if not path.exists():
+            raise FileNotFoundError(f"Image file not found: {image}")
+
+        # Detect MIME type from extension
+        ext_to_mime = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+        }
+        mime_type = ext_to_mime.get(path.suffix.lower(), "image/png")
+
+        # Guard against excessively large files (20 MB limit)
+        max_size = 20 * 1024 * 1024
+        file_size = path.stat().st_size
+        if file_size > max_size:
+            raise ValueError(
+                f"Image file too large ({file_size / 1024 / 1024:.1f} MB). "
+                f"Maximum allowed size is {max_size / 1024 / 1024:.0f} MB."
+            )
+
+        with open(path, "rb") as f:
+            b64_data = base64.standard_b64encode(f.read()).decode("utf-8")
+        return {
+            "type": "base64",
+            "data_uri": f"data:{mime_type};base64,{b64_data}",
+            "mime_type": mime_type,
+            "base64_data": b64_data,
+        }
 
 
 class BaseLLMProvider(ABC):
@@ -28,6 +87,7 @@ class BaseLLMProvider(ABC):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
+        images: Optional[List[str]] = None,
     ) -> str:
         """
         Generate text from the LLM.
@@ -37,6 +97,8 @@ class BaseLLMProvider(ABC):
             system: System prompt (optional)
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            images: Optional list of image references (URLs, file paths, or
+                    base64 data URIs) for multimodal/vision input
 
         Returns:
             Generated text
@@ -62,14 +124,43 @@ class AnthropicProvider(BaseLLMProvider):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
+        images: Optional[List[str]] = None,
     ) -> str:
         try:
+            # Build user content: text-only or multimodal (text + images)
+            if images:
+                content_blocks: List[Dict[str, Any]] = []
+                for img in images:
+                    resolved = _resolve_image_content(img)
+                    if resolved["type"] == "url":
+                        content_blocks.append({
+                            "type": "image",
+                            "source": {
+                                "type": "url",
+                                "url": resolved["url"],
+                            },
+                        })
+                    else:
+                        # base64 data
+                        content_blocks.append({
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": resolved.get("mime_type", "image/png"),
+                                "data": resolved["base64_data"],
+                            },
+                        })
+                content_blocks.append({"type": "text", "text": prompt})
+                user_content: Union[str, List[Dict[str, Any]]] = content_blocks
+            else:
+                user_content = prompt
+
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system=system if system else [],
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": user_content}],
             )
             return response.content[0].text
         except Exception as e:
@@ -114,12 +205,30 @@ class AzureOpenAIProvider(BaseLLMProvider):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
+        images: Optional[List[str]] = None,
     ) -> str:
         try:
-            messages = []
+            messages: List[Dict[str, Any]] = []
             if system:
                 messages.append({"role": "system", "content": system})
-            messages.append({"role": "user", "content": prompt})
+
+            # Build user message: text-only or multimodal (vision)
+            if images:
+                user_content: List[Dict[str, Any]] = []
+                for img in images:
+                    resolved = _resolve_image_content(img)
+                    if resolved["type"] == "url":
+                        image_url = resolved["url"]
+                    else:
+                        image_url = resolved["data_uri"]
+                    user_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": image_url},
+                    })
+                user_content.append({"type": "text", "text": prompt})
+                messages.append({"role": "user", "content": user_content})
+            else:
+                messages.append({"role": "user", "content": prompt})
 
             # Build kwargs based on model type
             kwargs: Dict[str, Any] = {
@@ -191,12 +300,30 @@ class OpenAIProvider(BaseLLMProvider):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
+        images: Optional[List[str]] = None,
     ) -> str:
         try:
-            messages = []
+            messages: List[Dict[str, Any]] = []
             if system:
                 messages.append({"role": "system", "content": system})
-            messages.append({"role": "user", "content": prompt})
+
+            # Build user message: text-only or multimodal (vision)
+            if images:
+                user_content: List[Dict[str, Any]] = []
+                for img in images:
+                    resolved = _resolve_image_content(img)
+                    if resolved["type"] == "url":
+                        image_url = resolved["url"]
+                    else:
+                        image_url = resolved["data_uri"]
+                    user_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": image_url},
+                    })
+                user_content.append({"type": "text", "text": prompt})
+                messages.append({"role": "user", "content": user_content})
+            else:
+                messages.append({"role": "user", "content": prompt})
 
             response = await self.client.chat.completions.create(
                 model=self.model,

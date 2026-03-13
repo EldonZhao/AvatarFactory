@@ -1,0 +1,717 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+
+const { id } = Astro.params;
+const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+const cookie = Astro.request.headers.get('cookie') || '';
+
+let persona: any = null;
+let suggestions: any[] = [];
+let history: any[] = [];
+let error = null;
+
+// Fetch persona details
+try {
+  const response = await fetch(`${API_BASE}/api/admin/personas/${id}`, {
+    headers: { 'Cookie': cookie }
+  });
+  if (response.ok) {
+    persona = await response.json();
+  } else if (response.status === 404) {
+    error = 'Persona 不存在';
+  } else {
+    error = `API error: ${response.status}`;
+  }
+} catch (e) {
+  error = `Failed to fetch persona: ${e}`;
+}
+
+// Fetch evolution suggestions
+if (persona) {
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/personas/${id}/evolution/suggestions`, {
+      headers: { 'Cookie': cookie }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      suggestions = data.suggestions || data || [];
+    }
+  } catch (e) {
+    console.error('Failed to fetch suggestions:', e);
+  }
+
+  // Fetch evolution history
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/personas/${id}/evolution/history`, {
+      headers: { 'Cookie': cookie }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      history = data.versions || data || [];
+    }
+  } catch (e) {
+    console.error('Failed to fetch history:', e);
+  }
+}
+
+// Calculate stats
+const pendingCount = suggestions.filter((s: any) => s.status === 'pending').length;
+const approvedCount = suggestions.filter((s: any) => s.status === 'approved').length;
+const rejectedCount = suggestions.filter((s: any) => s.status === 'rejected').length;
+const autoAppliedCount = suggestions.filter((s: any) => s.status === 'auto_applied').length;
+---
+
+<AdminLayout title={`${persona?.identity?.name || 'Persona'} - Evolution`}>
+  <div class="space-y-6 animate-fade-in">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+      <a href={`${base}/personas`} class="hover:text-[hsl(var(--foreground))]">Personas</a>
+      <span>/</span>
+      <a href={`${base}/personas/${id}`} class="hover:text-[hsl(var(--foreground))]">{persona?.identity?.name || id}</a>
+      <span>/</span>
+      <span class="text-[hsl(var(--foreground))]">Evolution</span>
+    </nav>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : persona ? (
+      <>
+        <!-- Header -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shrink-0">
+                {persona.identity?.name?.charAt(0) || '?'}
+              </div>
+              <div>
+                <div class="flex items-center gap-3 mb-1">
+                  <h1 class="text-2xl font-bold">{persona.identity?.name}</h1>
+                  <span class="px-2 py-0.5 text-xs rounded bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))]">
+                    {persona.version}
+                  </span>
+                  {persona.evolution_config?.enabled ? (
+                    <span class="px-2 py-0.5 text-xs rounded bg-green-500/10 text-green-600 border border-green-500/20">
+                      Evolution 已启用
+                    </span>
+                  ) : (
+                    <span class="px-2 py-0.5 text-xs rounded bg-gray-500/10 text-gray-500 border border-gray-500/20">
+                      Evolution 未启用
+                    </span>
+                  )}
+                </div>
+                <p class="text-[hsl(var(--muted-foreground))]">Persona 演进管理</p>
+              </div>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              <button
+                id="analyze-btn"
+                class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                分析反馈
+              </button>
+              <button
+                id="feedback-btn"
+                class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                提交反馈
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">待审核建议</p>
+            <p class="text-2xl font-bold mt-1 text-yellow-600">{pendingCount}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">已批准</p>
+            <p class="text-2xl font-bold mt-1 text-green-600">{approvedCount}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">已拒绝</p>
+            <p class="text-2xl font-bold mt-1 text-red-600">{rejectedCount}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">自动应用</p>
+            <p class="text-2xl font-bold mt-1 text-blue-600">{autoAppliedCount}</p>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="flex items-center gap-4 p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <span class="text-sm font-medium">筛选:</span>
+          <div class="flex gap-2">
+            <button
+              class="filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+              data-filter="all"
+            >
+              全部 ({suggestions.length})
+            </button>
+            <button
+              class="filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              data-filter="pending"
+            >
+              待审核 ({pendingCount})
+            </button>
+            <button
+              class="filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              data-filter="approved"
+            >
+              已批准 ({approvedCount})
+            </button>
+            <button
+              class="filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              data-filter="rejected"
+            >
+              已拒绝 ({rejectedCount})
+            </button>
+            <button
+              class="filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              data-filter="auto_applied"
+            >
+              自动应用 ({autoAppliedCount})
+            </button>
+          </div>
+        </div>
+
+        <!-- Suggestions Section -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <h2 class="text-lg font-semibold mb-4">演进建议</h2>
+          <div id="suggestions-container">
+            <!-- React component will be mounted here -->
+          </div>
+        </div>
+
+        <!-- Version History Section -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">版本历史</h2>
+            <button
+              id="toggle-history"
+              class="text-sm text-[hsl(var(--primary))] hover:underline"
+            >
+              展开
+            </button>
+          </div>
+          <div id="history-container" class="hidden">
+            <!-- React component will be mounted here -->
+          </div>
+          <div id="history-preview">
+            {history.length > 0 ? (
+              <div class="space-y-2">
+                {history.slice(0, 3).map((version: any, index: number) => (
+                  <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                    <div class="flex items-center gap-3">
+                      <span class={`w-2 h-2 rounded-full ${index === 0 ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                      <span class="font-medium">{typeof version === 'string' ? version : version.version}</span>
+                      {index === 0 && (
+                        <span class="text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-600">当前</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {history.length > 3 && (
+                  <p class="text-sm text-[hsl(var(--muted-foreground))] text-center py-2">
+                    还有 {history.length - 3} 个版本
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p class="text-sm text-[hsl(var(--muted-foreground))] text-center py-4">
+                暂无版本历史
+              </p>
+            )}
+          </div>
+        </div>
+      </>
+    ) : (
+      <div class="p-8 text-center text-[hsl(var(--muted-foreground))]">
+        加载中...
+      </div>
+    )}
+  </div>
+
+  <!-- Feedback Modal -->
+  <div id="feedback-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="modal-backdrop"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-lg rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-xl">
+        <div class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
+          <h2 class="text-lg font-semibold">提交反馈</h2>
+          <button id="modal-close" class="p-1 rounded-lg hover:bg-[hsl(var(--accent))] transition-colors">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="p-4 space-y-4">
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">
+            输入您对 Persona 的反馈或改进建议，系统将基于反馈生成演进建议。
+          </p>
+          <textarea
+            id="feedback-input"
+            placeholder="例如：希望内容更加专业、减少表情符号使用、增加技术深度..."
+            class="w-full h-32 p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+          ></textarea>
+          <div id="feedback-result" class="hidden p-3 rounded-lg text-sm"></div>
+        </div>
+        <div class="flex justify-end gap-2 p-4 border-t border-[hsl(var(--border))]">
+          <button
+            id="modal-cancel"
+            class="px-4 py-2 text-sm rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity"
+          >
+            取消
+          </button>
+          <button
+            id="modal-submit"
+            class="px-4 py-2 text-sm rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            生成建议
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden config -->
+  <div id="app-config"
+    data-base-url={base}
+    data-persona-id={id}
+    data-suggestions={JSON.stringify(suggestions)}
+    data-history={JSON.stringify(history)}
+    style="display:none;">
+  </div>
+</AdminLayout>
+
+<script>
+  const config = document.getElementById('app-config');
+  const baseUrl = config?.dataset.baseUrl || '';
+  const personaId = config?.dataset.personaId || '';
+  let suggestions = JSON.parse(config?.dataset.suggestions || '[]');
+  const history = JSON.parse(config?.dataset.history || '[]');
+  let currentFilter = 'all';
+
+  // Render suggestions
+  function renderSuggestions() {
+    const container = document.getElementById('suggestions-container');
+    if (!container) return;
+
+    const filtered = currentFilter === 'all'
+      ? suggestions
+      : suggestions.filter((s: any) => s.status === currentFilter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-12 text-[hsl(var(--muted-foreground))]">
+          暂无演进建议
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.map((suggestion: any) => {
+      const targetColors: Record<string, string> = {
+        persona: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+        content_agent: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+        review_agent: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',
+        discovery_agent: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+      };
+      const severityColors: Record<string, string> = {
+        minor: 'bg-green-500/10 text-green-600 border-green-500/20',
+        moderate: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+        major: 'bg-red-500/10 text-red-600 border-red-500/20',
+      };
+      const statusColors: Record<string, string> = {
+        pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+        approved: 'bg-green-500/10 text-green-600 border-green-500/20',
+        rejected: 'bg-red-500/10 text-red-600 border-red-500/20',
+        auto_applied: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+      };
+      const statusLabels: Record<string, string> = {
+        pending: '待审核',
+        approved: '已批准',
+        rejected: '已拒绝',
+        auto_applied: '自动应用',
+      };
+
+      const formatValue = (value: any): string => {
+        if (value === undefined || value === null) return '(空)';
+        if (typeof value === 'object') return JSON.stringify(value, null, 2);
+        return String(value);
+      };
+
+      const hasDetails = suggestion.current_value !== undefined ||
+                        suggestion.proposed_value !== undefined ||
+                        suggestion.rationale ||
+                        suggestion.expected_impact ||
+                        (suggestion.evidence && suggestion.evidence.length > 0);
+
+      return `
+        <div class="suggestion-card rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] overflow-hidden mb-3" data-id="${suggestion.id}">
+          <div class="suggestion-header p-4 cursor-pointer hover:bg-[hsl(var(--accent))]/50 transition-colors">
+            <div class="flex items-start gap-3">
+              <svg class="expand-icon w-4 h-4 text-[hsl(var(--muted-foreground))] shrink-0 mt-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                  <span class="px-2 py-0.5 text-xs rounded border ${targetColors[suggestion.target] || ''}">${(suggestion.target || '').replace('_', ' ')}</span>
+                  <span class="px-2 py-0.5 text-xs rounded border ${severityColors[suggestion.severity] || ''}">${suggestion.severity || ''}</span>
+                  <span class="px-2 py-0.5 text-xs rounded bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))]">${suggestion.area || ''}</span>
+                  <span class="px-2 py-0.5 text-xs rounded border ${statusColors[suggestion.status] || ''}">${statusLabels[suggestion.status] || suggestion.status}</span>
+                </div>
+                <p class="text-sm font-medium text-[hsl(var(--foreground))]">${suggestion.summary || ''}</p>
+                <div class="flex items-center gap-2 mt-2">
+                  <span class="text-xs text-[hsl(var(--muted-foreground))]">置信度</span>
+                  <div class="flex-1 h-1.5 rounded-full bg-[hsl(var(--accent))] overflow-hidden max-w-[100px]">
+                    <div class="h-full bg-[hsl(var(--primary))] rounded-full" style="width: ${(suggestion.confidence || 0) * 100}%"></div>
+                  </div>
+                  <span class="text-xs text-[hsl(var(--muted-foreground))]">${Math.round((suggestion.confidence || 0) * 100)}%</span>
+                </div>
+              </div>
+              ${suggestion.status === 'pending' ? `
+                <div class="action-buttons flex gap-2 shrink-0">
+                  <button class="approve-btn px-3 py-1.5 text-sm rounded-lg bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors" data-id="${suggestion.id}">批准</button>
+                  <button class="reject-btn px-3 py-1.5 text-sm rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors" data-id="${suggestion.id}">拒绝</button>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+          ${hasDetails ? `
+            <div class="suggestion-details hidden px-4 pb-4 pt-0 border-t border-[hsl(var(--border))] space-y-4">
+              ${(suggestion.current_value !== undefined || suggestion.proposed_value !== undefined) ? `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">当前值</p>
+                    <pre class="p-3 rounded-lg bg-red-500/5 text-sm overflow-x-auto whitespace-pre-wrap break-words border border-red-500/10">${formatValue(suggestion.current_value)}</pre>
+                  </div>
+                  <div>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">建议值</p>
+                    <pre class="p-3 rounded-lg bg-green-500/5 text-sm overflow-x-auto whitespace-pre-wrap break-words border border-green-500/10">${formatValue(suggestion.proposed_value)}</pre>
+                  </div>
+                </div>
+              ` : ''}
+              ${suggestion.rationale ? `
+                <div>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">理由</p>
+                  <p class="text-sm text-[hsl(var(--foreground))]">${suggestion.rationale}</p>
+                </div>
+              ` : ''}
+              ${suggestion.expected_impact ? `
+                <div>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">预期影响</p>
+                  <p class="text-sm text-[hsl(var(--foreground))]">${suggestion.expected_impact}</p>
+                </div>
+              ` : ''}
+              ${suggestion.evidence && suggestion.evidence.length > 0 ? `
+                <div>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mb-1">依据</p>
+                  <ul class="space-y-1">
+                    ${suggestion.evidence.map((item: string) => `
+                      <li class="flex items-start gap-2 text-sm">
+                        <span class="text-[hsl(var(--primary))]">•</span>
+                        <span>${item}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Add event listeners
+    document.querySelectorAll('.suggestion-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.action-buttons')) return;
+
+        const card = header.closest('.suggestion-card');
+        const details = card?.querySelector('.suggestion-details');
+        const icon = card?.querySelector('.expand-icon');
+
+        if (details) {
+          details.classList.toggle('hidden');
+          icon?.classList.toggle('rotate-90');
+        }
+      });
+    });
+
+    document.querySelectorAll('.approve-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = (btn as HTMLElement).dataset.id;
+        await reviewSuggestion(id!, true);
+      });
+    });
+
+    document.querySelectorAll('.reject-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = (btn as HTMLElement).dataset.id;
+        await reviewSuggestion(id!, false);
+      });
+    });
+  }
+
+  async function reviewSuggestion(suggestionId: string, approved: boolean) {
+    try {
+      const response = await fetch(
+        `/api/admin/personas/${personaId}/evolution/suggestions/${suggestionId}/review`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approved }),
+        }
+      );
+      if (response.ok) {
+        // Update local state
+        suggestions = suggestions.map((s: any) =>
+          s.id === suggestionId
+            ? { ...s, status: approved ? 'approved' : 'rejected' }
+            : s
+        );
+        renderSuggestions();
+      } else {
+        alert('操作失败');
+      }
+    } catch (e) {
+      alert('操作失败: ' + e);
+    }
+  }
+
+  // Filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFilter = (btn as HTMLElement).dataset.filter || 'all';
+
+      // Update button styles
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        if ((b as HTMLElement).dataset.filter === currentFilter) {
+          b.className = 'filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]';
+        } else {
+          b.className = 'filter-btn px-3 py-1.5 text-sm rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90';
+        }
+      });
+
+      renderSuggestions();
+    });
+  });
+
+  // Analyze button
+  document.getElementById('analyze-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('analyze-btn') as HTMLButtonElement;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>分析中...';
+
+    try {
+      const response = await fetch(`/api/admin/personas/${personaId}/evolution/analyze`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        alert(`分析完成，生成了 ${data.suggestions_count || 0} 条建议`);
+        window.location.reload();
+      } else {
+        const data = await response.json();
+        alert(data.detail || '分析失败');
+      }
+    } catch (e) {
+      alert('分析失败: ' + e);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  });
+
+  // Feedback modal
+  const modal = document.getElementById('feedback-modal');
+  const feedbackBtn = document.getElementById('feedback-btn');
+  const modalClose = document.getElementById('modal-close');
+  const modalBackdrop = document.getElementById('modal-backdrop');
+  const modalCancel = document.getElementById('modal-cancel');
+  const modalSubmit = document.getElementById('modal-submit');
+  const feedbackInput = document.getElementById('feedback-input') as HTMLTextAreaElement;
+  const feedbackResult = document.getElementById('feedback-result');
+
+  function openModal() {
+    modal?.classList.remove('hidden');
+  }
+
+  function closeModal() {
+    modal?.classList.add('hidden');
+    if (feedbackInput) feedbackInput.value = '';
+    feedbackResult?.classList.add('hidden');
+  }
+
+  feedbackBtn?.addEventListener('click', openModal);
+  modalClose?.addEventListener('click', closeModal);
+  modalBackdrop?.addEventListener('click', closeModal);
+  modalCancel?.addEventListener('click', closeModal);
+
+  modalSubmit?.addEventListener('click', async () => {
+    const feedback = feedbackInput?.value.trim();
+    if (!feedback) return;
+
+    const btn = modalSubmit as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+
+    try {
+      const response = await fetch(`/api/admin/personas/${personaId}/evolution/suggest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback }),
+      });
+
+      const data = await response.json();
+
+      if (feedbackResult) {
+        feedbackResult.classList.remove('hidden');
+        if (response.ok) {
+          feedbackResult.className = 'p-3 rounded-lg text-sm bg-green-500/10 text-green-600 border border-green-500/20';
+          feedbackResult.textContent = `成功生成 ${data.suggestions_count || 0} 条演进建议`;
+          if (feedbackInput) feedbackInput.value = '';
+          // Reload after a short delay
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          feedbackResult.className = 'p-3 rounded-lg text-sm bg-red-500/10 text-red-600 border border-red-500/20';
+          feedbackResult.textContent = data.detail || '生成建议失败';
+        }
+      }
+    } catch (e) {
+      if (feedbackResult) {
+        feedbackResult.classList.remove('hidden');
+        feedbackResult.className = 'p-3 rounded-lg text-sm bg-red-500/10 text-red-600 border border-red-500/20';
+        feedbackResult.textContent = '请求失败: ' + e;
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '生成建议';
+    }
+  });
+
+  // Toggle history
+  const toggleHistory = document.getElementById('toggle-history');
+  const historyContainer = document.getElementById('history-container');
+  const historyPreview = document.getElementById('history-preview');
+
+  toggleHistory?.addEventListener('click', () => {
+    const isExpanded = !historyContainer?.classList.contains('hidden');
+    if (isExpanded) {
+      historyContainer?.classList.add('hidden');
+      historyPreview?.classList.remove('hidden');
+      toggleHistory.textContent = '展开';
+    } else {
+      historyContainer?.classList.remove('hidden');
+      historyPreview?.classList.add('hidden');
+      toggleHistory.textContent = '收起';
+      renderHistory();
+    }
+  });
+
+  function renderHistory() {
+    if (!historyContainer) return;
+
+    if (history.length === 0) {
+      historyContainer.innerHTML = `
+        <div class="text-center py-8 text-[hsl(var(--muted-foreground))]">
+          暂无版本历史
+        </div>
+      `;
+      return;
+    }
+
+    historyContainer.innerHTML = `
+      <div class="relative">
+        <div class="absolute left-[7px] top-3 bottom-3 w-0.5 bg-[hsl(var(--border))]"></div>
+        <div class="space-y-3">
+          ${history.map((entry: any, index: number) => {
+            const version = typeof entry === 'string' ? entry : entry.version;
+            const timestamp = typeof entry === 'object' ? entry.timestamp : null;
+            const changes = typeof entry === 'object' ? entry.changes : null;
+
+            return `
+              <div class="relative flex items-start gap-4 pl-6">
+                <div class="absolute left-0 w-3.5 h-3.5 rounded-full border-2 ${
+                  index === 0
+                    ? 'bg-green-500 border-green-500'
+                    : 'bg-[hsl(var(--card))] border-[hsl(var(--muted-foreground))]'
+                }"></div>
+                <div class="flex-1 p-3 rounded-lg bg-[hsl(var(--accent))]">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium">${version}</span>
+                      ${index === 0 ? '<span class="px-2 py-0.5 text-xs rounded bg-green-500/10 text-green-600 border border-green-500/20">当前</span>' : ''}
+                    </div>
+                    <div class="flex items-center gap-2">
+                      ${timestamp ? `<span class="text-xs text-[hsl(var(--muted-foreground))]">${new Date(timestamp).toLocaleString('zh-CN')}</span>` : ''}
+                      ${index !== 0 ? `<button class="rollback-btn text-xs text-[hsl(var(--primary))] hover:underline" data-version="${version}">回滚</button>` : ''}
+                    </div>
+                  </div>
+                  ${changes && changes.length > 0 ? `
+                    <ul class="mt-2 space-y-1">
+                      ${changes.map((change: string) => `
+                        <li class="flex items-start gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+                          <span class="text-[hsl(var(--primary))]">•</span>
+                          <span>${change}</span>
+                        </li>
+                      `).join('')}
+                    </ul>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    // Add rollback handlers
+    document.querySelectorAll('.rollback-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const version = (btn as HTMLElement).dataset.version;
+        if (!confirm(`确定要回滚到版本 ${version} 吗？此操作不可撤销。`)) return;
+
+        try {
+          const response = await fetch(`/api/admin/personas/${personaId}/evolution/rollback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_version: version }),
+          });
+
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            const data = await response.json();
+            alert(data.detail || '回滚失败');
+          }
+        } catch (e) {
+          alert('回滚失败: ' + e);
+        }
+      });
+    });
+  }
+
+  // Initial render
+  renderSuggestions();
+</script>

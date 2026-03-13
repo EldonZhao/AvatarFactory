@@ -12,6 +12,7 @@ const cookie = Astro.request.headers.get('cookie') || '';
 
 let persona: any = null;
 let error = null;
+let pendingSuggestionsCount = 0;
 
 try {
   const response = await fetch(`${API_BASE}/api/admin/personas/${id}`, {
@@ -28,6 +29,22 @@ try {
   }
 } catch (e) {
   error = `Failed to fetch: ${e}`;
+}
+
+// Fetch pending evolution suggestions count
+if (persona) {
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/personas/${id}/evolution/suggestions?status=pending`, {
+      headers: { 'Cookie': cookie }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const suggestions = data.suggestions || data || [];
+      pendingSuggestionsCount = suggestions.length;
+    }
+  } catch (e) {
+    // Ignore errors for suggestions count
+  }
 }
 ---
 
@@ -70,6 +87,20 @@ try {
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
+              <a
+                href={`${base}/personas/${id}/evolution`}
+                class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Evolution
+                {pendingSuggestionsCount > 0 && (
+                  <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-500 text-white">
+                    {pendingSuggestionsCount}
+                  </span>
+                )}
+              </a>
               <button class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium">
                 编辑
               </button>
@@ -223,6 +254,46 @@ try {
                 暂无计划任务
               </p>
             )}
+          </div>
+
+          <!-- Evolution Overview -->
+          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-semibold">Evolution</h2>
+              <a href={`${base}/personas/${id}/evolution`} class="text-sm text-[hsl(var(--primary))] hover:underline">
+                管理演进
+              </a>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                <span class="text-sm">状态</span>
+                {persona.evolution_config?.enabled ? (
+                  <span class="text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-600 border border-green-500/20">
+                    已启用
+                  </span>
+                ) : (
+                  <span class="text-xs px-2 py-0.5 rounded bg-gray-500/10 text-gray-500 border border-gray-500/20">
+                    未启用
+                  </span>
+                )}
+              </div>
+              {pendingSuggestionsCount > 0 && (
+                <div class="flex items-center justify-between p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                  <span class="text-sm">待审核建议</span>
+                  <span class="text-lg font-bold text-yellow-600">{pendingSuggestionsCount}</span>
+                </div>
+              )}
+              <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                <span class="text-sm">当前版本</span>
+                <span class="font-medium">{persona.version}</span>
+              </div>
+              {persona.evolution_config?.auto_apply_threshold && (
+                <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                  <span class="text-sm">自动应用阈值</span>
+                  <span class="font-medium">{persona.evolution_config.auto_apply_threshold}%</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

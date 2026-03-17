@@ -1,10 +1,10 @@
 ---
 export const prerender = false;
 
-import PageLayout from '../layouts/PageLayout.astro';
-import { StatsOverview } from '../components/dashboard/StatsOverview';
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { StatsOverview } from '../components/stats/StatsOverview';
 import { ContentTrendChart, ScoreDistributionChart, ContentByPillarChart, ContentByPlatformChart } from '../components/stats/Charts';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { ScoreRing } from '../components/ui/Score';
 import { getGlobalStats, getAllPersonas, getPersonaStats } from '../lib/data';
 
@@ -53,7 +53,7 @@ if (personaCount > 0) {
 }
 ---
 
-<PageLayout title="统计分析">
+<AdminLayout title="统计分析">
   <div class="space-y-8 animate-fade-in">
     <!-- Header -->
     <div>
@@ -84,7 +84,7 @@ if (personaCount > 0) {
       <h2 class="text-xl font-semibold mb-4">Avatar 统计</h2>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {personasWithStats.filter(({ stats }) => stats.avg_review_score > 0).map(({ persona, stats }) => (
-          <a href={`${base}/avatars/${persona.id}`}>
+          <a href={`${base}/personas/${persona.id}`}>
             <Card hover>
               <CardContent className="p-4">
                 <div class="flex items-center gap-4">
@@ -107,4 +107,4 @@ if (personaCount > 0) {
       </div>
     </section>
   </div>
-</PageLayout>
+</AdminLayout>

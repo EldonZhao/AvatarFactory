@@ -224,3 +224,122 @@ export interface ConnectorsResponse {
 export async function getConnectors(cookie?: string): Promise<ConnectorsResponse> {
   return apiFetch<ConnectorsResponse>('/api/admin/connectors', { cookie });
 }
+
+// Statistics Types and Functions
+export interface PersonaStats {
+  persona_id: string;
+  total_content: number;
+  published_content: number;
+  draft_content: number;
+  avg_review_score: number;
+  content_by_pillar: Record<string, number>;
+  content_by_platform: Record<string, number>;
+  score_distribution: {
+    persona_consistency: number;
+    platform_fit: number;
+    compliance: number;
+    engagement_potential: number;
+  };
+}
+
+export interface GlobalStats {
+  total_personas: number;
+  total_content: number;
+  total_published: number;
+  total_drafts: number;
+  avg_review_score: number;
+  active_tasks: number;
+  content_by_day: { date: string; count: number }[];
+  personas_stats: PersonaStats[];
+}
+
+// Chronicle API base URL (no auth required)
+const CHRONICLE_API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+
+async function chronicleFetch<T>(endpoint: string): Promise<T> {
+  const url = `${CHRONICLE_API_BASE}/api/chronicle${endpoint}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Chronicle API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getGlobalStats(): Promise<GlobalStats> {
+  const stats = await chronicleFetch<GlobalStats>('/stats');
+  return stats || {
+    total_personas: 0,
+    total_content: 0,
+    total_published: 0,
+    total_drafts: 0,
+    avg_review_score: 0,
+    active_tasks: 0,
+    content_by_day: [],
+    personas_stats: [],
+  };
+}
+
+export async function getPersonaStats(id: string): Promise<PersonaStats> {
+  const stats = await chronicleFetch<PersonaStats>(`/personas/${id}/stats`);
+  return stats || {
+    persona_id: id,
+    total_content: 0,
+    published_content: 0,
+    draft_content: 0,
+    avg_review_score: 0,
+    content_by_pillar: {},
+    content_by_platform: {},
+    score_distribution: {
+      persona_consistency: 0,
+      platform_fit: 0,
+      compliance: 0,
+      engagement_potential: 0,
+    },
+  };
+}
+
+export interface Persona {
+  id: string;
+  version: string;
+  created_at: string | null;
+  updated_at: string | null;
+  identity: {
+    name: string;
+    tagline: string;
+    expertise: string[];
+  };
+  target_audience: {
+    primary: string;
+    pain_points: string[];
+    goals: string[];
+  };
+  voice_style: {
+    tone: string;
+    language_patterns: string[];
+    emoji_usage: string;
+  };
+  content_pillars: Array<{
+    name: string;
+    description: string;
+    frequency: string;
+    examples: string[];
+  }>;
+  boundaries: {
+    avoid: string[];
+    compliance: string[];
+  };
+  platforms: string[];
+}
+
+export async function getAllPersonas(): Promise<Persona[]> {
+  const response = await chronicleFetch<{ count: number; personas: Persona[] }>('/personas');
+  return response?.personas || [];
+}

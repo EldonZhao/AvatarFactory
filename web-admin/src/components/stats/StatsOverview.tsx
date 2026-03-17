@@ -10,15 +10,11 @@ interface StatCardProps {
   value: number | string;
   subtitle?: string;
   icon: React.ReactNode;
-  trend?: {
-    value: number;
-    isPositive: boolean;
-  };
   index?: number;
   color?: string;
 }
 
-export function StatCard({ title, value, subtitle, icon, trend, index = 0, color = 'blue' }: StatCardProps) {
+function StatCard({ title, value, subtitle, icon, index = 0, color = 'blue' }: StatCardProps) {
   const colors: Record<string, string> = {
     blue: 'from-blue-500 to-blue-600',
     green: 'from-green-500 to-green-600',
@@ -42,20 +38,6 @@ export function StatCard({ title, value, subtitle, icon, trend, index = 0, color
               <p className="text-3xl font-bold text-[hsl(var(--foreground))]">{value}</p>
               {subtitle && (
                 <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">{subtitle}</p>
-              )}
-              {trend && (
-                <div className={cn('flex items-center gap-1 mt-2 text-xs', trend.isPositive ? 'text-green-500' : 'text-red-500')}>
-                  {trend.isPositive ? (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                  ) : (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                  )}
-                  <span>{trend.value}%</span>
-                </div>
               )}
             </div>
             <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-white shadow-lg', colors[color])}>

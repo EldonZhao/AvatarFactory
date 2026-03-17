@@ -1,25 +1,7 @@
-# AvatarFactory Dockerfile - Full Version with Monitor + Journal + Admin SSR
+# AvatarFactory Dockerfile - Full Version with Journal + Admin SSR
 # For Azure deployment
 
-# Stage 1: Build the Monitor SSR website
-FROM node:20-alpine AS monitor-builder
-
-WORKDIR /web
-
-# Copy package files
-COPY web/package*.json ./
-
-# Install dependencies
-RUN npm ci --silent
-
-# Copy source
-COPY web/ ./
-
-# Fix permissions and build SSR with /monitor base path
-ENV ASTRO_BASE=/monitor
-RUN chmod -R +x node_modules/.bin && npm run build
-
-# Stage 2: Build the Journal SSR website
+# Stage 1: Build the Journal SSR website
 FROM node:20-alpine AS journal-builder
 
 WORKDIR /web-journal
@@ -37,7 +19,7 @@ COPY web-journal/ ./
 ENV ASTRO_BASE=/journal
 RUN chmod -R +x node_modules/.bin && npm run build
 
-# Stage 3: Build the Admin SSR website
+# Stage 2: Build the Admin SSR website
 FROM node:20-alpine AS admin-builder
 
 WORKDIR /web-admin
@@ -55,7 +37,7 @@ COPY web-admin/ ./
 ENV ASTRO_BASE=/admin
 RUN chmod -R +x node_modules/.bin && npm run build
 
-# Stage 4: Main application
+# Stage 3: Main application
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -117,10 +99,6 @@ COPY pyproject.toml setup.py README.md ./
 # Install package
 RUN pip install --no-cache-dir -e .
 
-# Copy Monitor SSR build from builder (dist + node_modules for runtime deps)
-COPY --from=monitor-builder /web/dist /app/monitor
-COPY --from=monitor-builder /web/node_modules /app/monitor/node_modules
-
 # Copy Journal SSR build from builder (dist + node_modules for runtime deps)
 COPY --from=journal-builder /web-journal/dist /app/journal
 COPY --from=journal-builder /web-journal/node_modules /app/journal/node_modules
@@ -142,7 +120,6 @@ RUN chmod +x /app/scripts/start_services.sh
 ENV PYTHONUNBUFFERED=1
 ENV AVATARFACTORY_KB_PATH=/app/knowledges
 ENV API_BASE_URL=http://127.0.0.1:8000
-ENV MONITOR_PORT=4321
 ENV JOURNAL_PORT=4322
 ENV ADMIN_PORT=4323
 ENV LANG=zh_CN.UTF-8

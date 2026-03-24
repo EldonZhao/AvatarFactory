@@ -952,7 +952,7 @@ async def run_scheduler_task_admin(task_id: str, background_tasks: BackgroundTas
 
     # Run the task in background
     async def run_task():
-        await scheduler._run_task(task)
+        await scheduler._run_task_async(task_id)
 
     background_tasks.add_task(run_task)
 

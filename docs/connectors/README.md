@@ -14,11 +14,30 @@ AvatarFactory supports multiple social media platforms through its connector sys
 | [Instagram](instagram.md) | `instagram` / `ig` | ✅ New | High | Meta Graph API, business accounts only |
 | [Weibo](weibo.md) | `weibo` | ✅ New | Medium | OAuth 2.0, Chinese market |
 | [Mastodon](mastodon.md) | `mastodon` | ✅ New | Low | Simple REST API, any instance |
+| [Toutiao](toutiao.md) | `toutiao` | ✅ New | Medium | OAuth 2.0, Chinese news platform |
 | [WeCom](wecom.md) | `wecom` | ✅ Stable | Low | Webhook notifications |
+
+### Search Connectors (Read-Only)
+
+| Platform | Connector | Status | Notes |
+|----------|-----------|--------|-------|
+| [Brave Search](brave_search.md) | `brave_search` | ✅ Stable | Privacy-focused web search |
+| [Bing Search](bing_search.md) | `bing_search` | ✅ Stable | Azure Cognitive Services |
+| [Zhihu](zhihu.md) | `zhihu` | ✅ New | Chinese Q&A platform, cookie-based |
 
 ## Quick Start
 
-### 1. Environment Variables (Simple Mode)
+### 1. Web Admin UI (Recommended)
+
+Navigate to the **Connectors** page in the Admin dashboard:
+
+1. Go to `http://localhost:4321/connectors`
+2. Click on any connector card
+3. Fill in the required credentials
+4. Click **Save** to store the configuration
+5. Click **Test Connection** to verify
+
+### 2. Environment Variables (Simple Mode)
 
 For single-tenant deployments, configure connectors via environment variables:
 
@@ -34,7 +53,7 @@ export TWITTER_ACCESS_TOKEN="your-access-token"
 export TWITTER_ACCESS_TOKEN_SECRET="your-access-token-secret"
 ```
 
-### 2. Multi-Tenant Mode
+### 3. Multi-Tenant Mode
 
 For multi-tenant deployments, configure connectors per-tenant via the API:
 
@@ -55,7 +74,7 @@ curl -X POST "http://localhost:8000/tenant/connectors/bluesky/test" \
   -H "X-API-Key: your-tenant-api-key"
 ```
 
-### 3. Using Connectors in Code
+### 4. Using Connectors in Code
 
 ```python
 from avatarfactory.connectors import get_connector, ConnectorConfig

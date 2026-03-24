@@ -10,6 +10,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, rely on system environment variables
+
 from pydantic import BaseModel, Field
 
 from avatarfactory.service.cache import (
@@ -1716,6 +1723,287 @@ def register_routes(app: FastAPI):
             "topic_discovery_connectors": ConnectorRegistry.list_topic_discovery_connectors(),
             "persona_discovery_connectors": ConnectorRegistry.list_persona_discovery_connectors(),
         }
+
+    @app.get("/api/connectors/", tags=["Connectors"])
+    async def list_connectors():
+        """
+        List all connectors with their status and configuration fields.
+        Uses environment variables and local config file for single-tenant mode.
+        """
+        from avatarfactory.connectors.registry import ConnectorRegistry
+
+        all_capabilities = ConnectorRegistry.get_all_capabilities()
+        kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+        config_file = os.path.join(kb_path, "connectors_config.yaml")
+
+        # Load saved config if exists
+        saved_configs = {}
+        if os.path.exists(config_file):
+            import yaml
+            with open(config_file, "r", encoding="utf-8") as f:
+                saved_configs = yaml.safe_load(f) or {}
+
+        connectors = []
+        for platform, caps in all_capabilities.items():
+            # Check if configured via env vars
+            env_keys = [f.env_var for f in caps.config_fields if f.env_var]
+            env_configured = all(os.getenv(k) for k in env_keys) if env_keys else False
+
+            # Check if configured via saved config
+            saved_config = saved_configs.get(platform, {})
+            local_configured = bool(saved_config)
+
+            # Get current values (masked for passwords)
+            current_values = {}
+            for field in caps.config_fields:
+                # First check saved config, then env var
+                if field.name in saved_config:
+                    val = saved_config[field.name]
+                    if field.field_type == "password" and val:
+                        current_values[field.name] = "••••••••"
+                    else:
+                        current_values[field.name] = val
+                elif field.env_var and os.getenv(field.env_var):
+                    val = os.getenv(field.env_var)
+                    if field.field_type == "password":
+                        current_values[field.name] = "••••••••"
+                    else:
+                        current_values[field.name] = val
+                else:
+                    current_values[field.name] = ""
+
+            connectors.append({
+                "platform": caps.platform,
+                "display_name": caps.display_name,
+                "description": caps.description,
+                "configured": env_configured or local_configured,
+                "config_source": "env" if env_configured else ("local" if local_configured else None),
+                "supports_topic_discovery": caps.supports_topic_discovery,
+                "supports_persona_discovery": caps.supports_persona_discovery,
+                "supports_publishing": caps.supports_publishing,
+                "supports_fetching": caps.supports_fetching,
+                "config_fields": [f.model_dump() for f in caps.config_fields],
+                "current_values": current_values,
+            })
+
+        return {"connectors": connectors}
+
+    @app.get("/api/connectors/{platform}", tags=["Connectors"])
+    async def get_connector_config(platform: str):
+        """Get configuration for a specific connector."""
+        from avatarfactory.connectors.registry import ConnectorRegistry
+
+        if not ConnectorRegistry.is_registered(platform):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Connector '{platform}' not found",
+            )
+
+        caps = ConnectorRegistry.get_connector_capabilities(platform)
+        kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+        config_file = os.path.join(kb_path, "connectors_config.yaml")
+
+        # Load saved config
+        saved_config = {}
+        if os.path.exists(config_file):
+            import yaml
+            with open(config_file, "r", encoding="utf-8") as f:
+                all_configs = yaml.safe_load(f) or {}
+                saved_config = all_configs.get(platform, {})
+
+        # Get current values
+        current_values = {}
+        configured = False
+        for field in caps.config_fields:
+            if field.name in saved_config:
+                val = saved_config[field.name]
+                # Don't mask for GET - frontend needs to show masked version itself
+                current_values[field.name] = val
+                if field.required and val:
+                    configured = True
+            elif field.env_var and os.getenv(field.env_var):
+                current_values[field.name] = os.getenv(field.env_var)
+                if field.required:
+                    configured = True
+            else:
+                current_values[field.name] = ""
+
+        return {
+            "platform": caps.platform,
+            "display_name": caps.display_name,
+            "description": caps.description,
+            "configured": configured,
+            "config_fields": [f.model_dump() for f in caps.config_fields],
+            "current_values": current_values,
+        }
+
+    @app.put("/api/connectors/{platform}", tags=["Connectors"])
+    async def save_connector_config(platform: str, credentials: Dict[str, str]):
+        """
+        Save connector configuration.
+
+        For single-tenant mode, saves to knowledges/connectors_config.yaml.
+        Password fields are stored as-is (consider encryption for production).
+        """
+        from avatarfactory.connectors.registry import ConnectorRegistry
+
+        if not ConnectorRegistry.is_registered(platform):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Connector '{platform}' not found",
+            )
+
+        caps = ConnectorRegistry.get_connector_capabilities(platform)
+        kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+        config_file = os.path.join(kb_path, "connectors_config.yaml")
+
+        # Validate required fields
+        for field in caps.config_fields:
+            if field.required and not credentials.get(field.name):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Missing required field: {field.label}",
+                )
+
+        # Load existing config
+        import yaml
+        all_configs = {}
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                all_configs = yaml.safe_load(f) or {}
+
+        # Handle password fields - if value is masked, keep original
+        existing_config = all_configs.get(platform, {})
+        for field in caps.config_fields:
+            if field.field_type == "password":
+                new_val = credentials.get(field.name, "")
+                if new_val == "••••••••" or not new_val:
+                    # Keep existing value
+                    if field.name in existing_config:
+                        credentials[field.name] = existing_config[field.name]
+
+        # Filter to only known fields
+        known_fields = {f.name for f in caps.config_fields}
+        filtered_creds = {k: v for k, v in credentials.items() if k in known_fields and v}
+
+        # Save
+        all_configs[platform] = filtered_creds
+        os.makedirs(os.path.dirname(config_file), exist_ok=True)
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(all_configs, f, default_flow_style=False, allow_unicode=True)
+
+        return {
+            "status": "saved",
+            "platform": platform,
+            "fields_saved": list(filtered_creds.keys()),
+        }
+
+    @app.delete("/api/connectors/{platform}", tags=["Connectors"])
+    async def delete_connector_config(platform: str):
+        """Delete saved connector configuration."""
+        from avatarfactory.connectors.registry import ConnectorRegistry
+
+        if not ConnectorRegistry.is_registered(platform):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Connector '{platform}' not found",
+            )
+
+        kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+        config_file = os.path.join(kb_path, "connectors_config.yaml")
+
+        if not os.path.exists(config_file):
+            return {"status": "not_configured", "platform": platform}
+
+        import yaml
+        with open(config_file, "r", encoding="utf-8") as f:
+            all_configs = yaml.safe_load(f) or {}
+
+        if platform not in all_configs:
+            return {"status": "not_configured", "platform": platform}
+
+        del all_configs[platform]
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(all_configs, f, default_flow_style=False, allow_unicode=True)
+
+        return {"status": "deleted", "platform": platform}
+
+    @app.post("/api/connectors/{platform}/test", tags=["Connectors"])
+    async def test_connector(platform: str):
+        """
+        Test connector connection with saved credentials.
+
+        Attempts to connect and verify credentials.
+        """
+        from avatarfactory.connectors.registry import ConnectorRegistry
+        from avatarfactory.connectors.base import ConnectorConfig
+
+        if not ConnectorRegistry.is_registered(platform):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Connector '{platform}' not found",
+            )
+
+        # Load credentials
+        kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
+        config_file = os.path.join(kb_path, "connectors_config.yaml")
+
+        credentials = {}
+
+        # First check saved config
+        if os.path.exists(config_file):
+            import yaml
+            with open(config_file, "r", encoding="utf-8") as f:
+                all_configs = yaml.safe_load(f) or {}
+                credentials = all_configs.get(platform, {})
+
+        # Then check env vars (as fallback)
+        caps = ConnectorRegistry.get_connector_capabilities(platform)
+        for field in caps.config_fields:
+            if not credentials.get(field.name) and field.env_var:
+                env_val = os.getenv(field.env_var)
+                if env_val:
+                    credentials[field.name] = env_val
+
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No credentials configured for this connector",
+            )
+
+        # Create connector config
+        config = ConnectorConfig(
+            username=credentials.get("username"),
+            password=credentials.get("password"),
+            api_key=credentials.get("api_key"),
+            api_secret=credentials.get("api_secret"),
+            access_token=credentials.get("access_token"),
+            access_token_secret=credentials.get("access_token_secret"),
+            extra=credentials,
+        )
+
+        try:
+            connector = ConnectorRegistry.create_connector(platform, config)
+            connected = await connector.connect()
+            if connected:
+                await connector.disconnect()
+                return {
+                    "status": "success",
+                    "platform": platform,
+                    "message": "Connection successful",
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "platform": platform,
+                    "message": "Connection failed - check credentials",
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "platform": platform,
+                "message": str(e),
+            }
 
     # -------------------------------------------------------------------------
     # Evolution

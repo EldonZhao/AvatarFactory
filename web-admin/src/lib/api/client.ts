@@ -261,3 +261,75 @@ export interface ConnectorStatus {
 export interface ConnectorsResponse {
   connectors: ConnectorStatus[];
 }
+
+// Enhanced connector types for configuration page
+export interface ConnectorConfigField {
+  name: string;
+  label: string;
+  field_type: 'text' | 'password' | 'textarea' | 'url' | 'email' | 'number';
+  required: boolean;
+  description: string;
+  placeholder: string;
+  env_var?: string;
+}
+
+export interface ConnectorDetail {
+  platform: string;
+  display_name: string;
+  description: string;
+  configured: boolean;
+  config_source?: 'env' | 'local' | null;
+  supports_topic_discovery: boolean;
+  supports_persona_discovery: boolean;
+  supports_publishing: boolean;
+  supports_fetching: boolean;
+  config_fields: ConnectorConfigField[];
+  current_values: Record<string, string>;
+}
+
+export interface ConnectorListResponse {
+  connectors: ConnectorDetail[];
+}
+
+export interface ConnectorTestResult {
+  status: 'success' | 'failed' | 'error';
+  platform: string;
+  message: string;
+}
+
+// Connector API functions
+export async function getConnectorsList(): Promise<ConnectorListResponse> {
+  return apiFetch<ConnectorListResponse>('/api/connectors/');
+}
+
+export async function getConnectorConfig(platform: string) {
+  return apiFetch<{
+    platform: string;
+    display_name: string;
+    description: string;
+    config_fields: ConnectorConfigField[];
+    current_values: Record<string, string>;
+  }>(`/api/connectors/${platform}`);
+}
+
+export async function saveConnectorConfig(platform: string, credentials: Record<string, string>) {
+  return apiFetch<{ status: string; platform: string; fields_saved: string[] }>(
+    `/api/connectors/${platform}`,
+    {
+      method: 'PUT',
+      body: credentials,
+    }
+  );
+}
+
+export async function deleteConnectorConfig(platform: string) {
+  return apiFetch<{ status: string; platform: string }>(`/api/connectors/${platform}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function testConnector(platform: string): Promise<ConnectorTestResult> {
+  return apiFetch<ConnectorTestResult>(`/api/connectors/${platform}/test`, {
+    method: 'POST',
+  });
+}

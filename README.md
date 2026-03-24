@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/logo.png" alt="AvatarFactory" width="600">
+</p>
+
 # AvatarFactory
 
 **AvatarFactory** is a *Persona Factory* for social platforms: it helps you **design, simulate, evaluate, and evolve** social personas (avatars) across different platforms, so you can build long-term attention and trust—preparing for sustainable lead generation and future monetization.

@@ -50,6 +50,7 @@ def render_task_timeline(
 
     # Type icons
     type_icons = {
+        "topic": "🔍",
         "discovery": "🔍",
         "content": "📝",
         "publish": "📤",
@@ -62,7 +63,8 @@ def render_task_timeline(
 
     # Display name mapping for task types
     type_display_names = {
-        "discovery": "Discovery",
+        "topic": "Topic",
+        "discovery": "Topic",
         "content": "Content",
         "publish": "Publish",
         "report": "Report",

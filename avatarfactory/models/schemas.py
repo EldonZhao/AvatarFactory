@@ -670,7 +670,7 @@ class EvolutionTarget(str, Enum):
     PERSONA = "persona"
     CONTENT_AGENT = "content_agent"
     REVIEW_AGENT = "review_agent"
-    DISCOVERY_AGENT = "discovery_agent"
+    TOPIC_AGENT = "topic_agent"
 
 
 class EvolutionArea(str, Enum):

@@ -255,7 +255,7 @@ class DashboardDataProvider:
             ("orchestrator", "Orchestrator"),
             ("persona_agent", "Persona Agent"),
             ("content_agent", "Content Agent"),
-            ("discovery_agent", "Discovery Agent"),
+            ("topic_agent", "Topic Agent"),
             ("review_agent", "Review Agent"),
         ]
         for agent_id, agent_name in agents:
@@ -304,9 +304,9 @@ class DashboardDataProvider:
                 size=25,
                 color=node_color,
             ))
-            # Discovery agent connects to connectors
+            # Topic agent connects to connectors
             edges.append(TopologyEdge(
-                source="discovery_agent",
+                source="topic_agent",
                 target=f"connector_{status.platform}",
                 label="fetches from",
             ))

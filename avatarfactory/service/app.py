@@ -1575,7 +1575,7 @@ def register_routes(app: FastAPI):
             ("orchestrator", "Orchestrator"),
             ("persona_agent", "Persona Agent"),
             ("content_agent", "Content Agent"),
-            ("discovery_agent", "Discovery Agent"),
+            ("topic_agent", "Topic Agent"),
             ("review_agent", "Review Agent"),
         ]
         for agent_id, agent_name in agents:
@@ -1647,7 +1647,7 @@ def register_routes(app: FastAPI):
                 "configured": configured,
             })
             edges.append({
-                "source": "discovery_agent",
+                "source": "topic_agent",
                 "target": f"connector_{platform}",
                 "label": "fetches from",
             })

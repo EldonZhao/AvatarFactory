@@ -398,7 +398,7 @@ Based on user feedback, generate specific, actionable suggestions for improving 
 Output MUST be valid JSON array:
 [
     {
-        "target": "persona|content_agent|review_agent|discovery_agent",
+        "target": "persona|content_agent|review_agent|topic_agent",
         "area": "identity|voice_style|content_pillars|boundaries|target_audience|agent_config",
         "suggestion": "Human-readable suggestion",
         "current_value": {"field": "current value"},
@@ -472,7 +472,7 @@ Based on the feedback analysis, generate specific, actionable suggestions.
 Output MUST be valid JSON array:
 [
     {
-        "target": "persona|content_agent|review_agent|discovery_agent",
+        "target": "persona|content_agent|review_agent|topic_agent",
         "area": "identity|voice_style|content_pillars|boundaries|target_audience|agent_config",
         "suggestion": "Human-readable suggestion",
         "current_value": {"field": "current value"},
@@ -712,7 +712,7 @@ Generate optimization suggestions."""
         agent_type_map = {
             EvolutionTarget.CONTENT_AGENT: "content",
             EvolutionTarget.REVIEW_AGENT: "review",
-            EvolutionTarget.DISCOVERY_AGENT: "discovery",
+            EvolutionTarget.TOPIC_AGENT: "topic",
         }
         agent_type = agent_type_map.get(suggestion.target, "content")
 

@@ -141,7 +141,7 @@ class ContentAgent(BaseAgent):
         """
         Get trending context from knowledges.
 
-        DiscoveryAgent runs on its own schedule and saves results to knowledges.
+        TopicAgent runs on its own schedule and saves results to knowledges.
         ContentAgent reads from knowledges - they are decoupled.
 
         Args:
@@ -152,7 +152,7 @@ class ContentAgent(BaseAgent):
             Dict with trending data or None if unavailable
         """
         try:
-            # Read from knowledges (saved by DiscoveryAgent)
+            # Read from knowledges (saved by TopicAgent)
             data = self.kb.get_latest_discovery(persona_id, platform)
             if data:
                 self.log("DEBUG", f"Loaded trending data for {persona_id}/{platform}")
@@ -275,7 +275,7 @@ class ContentAgent(BaseAgent):
             f"platform: {platform}, content_type: {content_type.value}",
         )
 
-        # Get trending context if enabled (reads from KB, saved by DiscoveryAgent)
+        # Get trending context if enabled (reads from KB, saved by TopicAgent)
         trending_context = ""
         if use_trending:
             trends = self._get_trending_context(persona_id, platform.value)

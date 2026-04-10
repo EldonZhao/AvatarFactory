@@ -552,7 +552,7 @@ class Scheduler:
         from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
 
         # Build console notification for all task types
-        if task.task_type == "discovery":
+        if task.task_type in ("topic", "discovery"):
             title = f"Discovery Complete: {task.name}"
             body = f"Found {result.get('trending_count', 0)} trending posts, generated {result.get('ideas_count', 0)} ideas."
             if result.get('suggestions'):
@@ -598,26 +598,26 @@ class Scheduler:
                     return
 
                 # Check notification type preferences
-                if task.task_type == "discovery" and not persona.notification.notify_on_discovery:
-                    logger.debug(f"Skipping discovery notification for persona {task.persona_id}")
+                if task.task_type in ("topic", "discovery") and not persona.notification.notify_on_discovery:
+                    logger.debug(f"Skipping topic notification for persona {task.persona_id}")
                     return
                 if task.task_type == "content" and not persona.notification.notify_on_content:
                     logger.debug(f"Skipping content notification for persona {task.persona_id}")
                     return
 
         # Only send webhook notifications for discovery and content tasks
-        if task.task_type == "discovery":
+        if task.task_type in ("topic", "discovery"):
             # Discovery: Use markdown format for detailed report
-            await self._send_discovery_webhook_notification(task, result, webhook_url)
+            await self._send_topic_webhook_notification(task, result, webhook_url)
         elif task.task_type == "content":
             # Content: Use news card format with link
             await self._send_content_webhook_notification(task, result, webhook_url)
 
-    async def _send_discovery_webhook_notification(
+    async def _send_topic_webhook_notification(
         self, task: ScheduledTask, result: Dict[str, Any], webhook_url: str
     ) -> None:
         """
-        Send discovery task notification using markdown format.
+        Send topic task notification using markdown format.
 
         Format includes:
         - Trending topics discovered
@@ -688,13 +688,13 @@ class Scheduler:
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("errcode") == 0:
-                        logger.info(f"Sent discovery notification for task {task.id}")
+                        logger.info(f"Sent topic notification for task {task.id}")
                     else:
-                        logger.warning(f"Discovery notification failed: {data.get('errmsg')}")
+                        logger.warning(f"Topic notification failed: {data.get('errmsg')}")
                 else:
-                    logger.warning(f"Discovery notification HTTP error: {response.status_code}")
+                    logger.warning(f"Topic notification HTTP error: {response.status_code}")
         except Exception as e:
-            logger.warning(f"Failed to send discovery notification: {e}")
+            logger.warning(f"Failed to send topic notification: {e}")
 
     async def _send_content_webhook_notification(
         self, task: ScheduledTask, result: Dict[str, Any], webhook_url: str
@@ -823,7 +823,7 @@ class Scheduler:
         await console_notifier.send(message)
 
         # Only send webhook notifications for discovery and content tasks
-        if task.task_type not in ("discovery", "content"):
+        if task.task_type not in ("topic", "discovery", "content"):
             return
 
         webhook_url = os.getenv("AVATARFACTORY_WEBHOOK_URL")

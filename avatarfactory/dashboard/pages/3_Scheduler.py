@@ -200,7 +200,8 @@ with col_right:
 
     # Display name mapping for task types
     type_display_names = {
-        "discovery": "Discovery",
+        "topic": "Topic",
+        "discovery": "Topic",
         "content": "Content",
         "publish": "Publish",
         "evolution_analysis": "Evolution",

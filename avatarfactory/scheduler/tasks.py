@@ -45,17 +45,17 @@ class TaskRegistry:
 # =============================================================================
 
 
-@TaskRegistry.register("discovery")
-async def run_discovery_task(task: ScheduledTask) -> Dict[str, Any]:
+@TaskRegistry.register("topic")
+async def run_topic_task(task: ScheduledTask) -> Dict[str, Any]:
     """
-    Run discovery task - fetch and analyze trending content.
+    Run topic task - fetch and analyze trending content.
 
     Expected task params:
     - persona_id: str
     - platform: str (default: bluesky)
     - query: str (optional)
     """
-    from avatarfactory.agents.discovery import DiscoveryAgent
+    from avatarfactory.agents.topic import TopicAgent
     from avatarfactory.core.knowledges import KnowledgeBase
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
@@ -65,13 +65,13 @@ async def run_discovery_task(task: ScheduledTask) -> Dict[str, Any]:
     limit = task.extra_params.get("limit", 20)
 
     if not persona_id:
-        return {"success": False, "error": "persona_id required for discovery"}
+        return {"success": False, "error": "persona_id required for topic task"}
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
     provider = LLMProviderFactory.from_env()
 
-    agent = DiscoveryAgent(knowledge_base=kb, llm_provider=provider)
+    agent = TopicAgent(knowledge_base=kb, llm_provider=provider)
 
     result = await agent.discover_and_analyze(
         persona_id=persona_id,

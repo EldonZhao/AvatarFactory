@@ -66,13 +66,21 @@ st.divider()
 
 # Task type definitions for data flow
 TASK_DATA_FLOWS = {
-    "discovery": {
-        "name": "Discovery",
+    "topic": {
+        "name": "Topic",
         "icon": "🔍",
         "description": "Fetch trending content from platforms",
         "source": "Platform",  # From platform
         "target": "KB",  # To knowledges
-        "flow": "Platform → Discovery Agent → Knowledges",
+        "flow": "Platform → Topic Agent → Knowledges",
+    },
+    "discovery": {
+        "name": "Topic (legacy)",
+        "icon": "🔍",
+        "description": "Fetch trending content from platforms",
+        "source": "Platform",
+        "target": "KB",
+        "flow": "Platform → Topic Agent → Knowledges",
     },
     "content": {
         "name": "Content Generation",

@@ -8,7 +8,7 @@ automated discovery/content generation workflows.
 from typing import Any, Dict, List, Optional
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
-from avatarfactory.agents.discovery import DiscoveryAgent
+from avatarfactory.agents.topic import TopicAgent
 from avatarfactory.models.schemas import AgentMessage, TaskType
 
 
@@ -25,17 +25,17 @@ class ProactiveOrchestrator(OrchestratorAgent):
     def __init__(self, *args: Any, scheduler: Optional[Any] = None, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self._scheduler = scheduler
-        self._discovery_agent: Optional[DiscoveryAgent] = None
+        self._topic_agent: Optional[TopicAgent] = None
 
     @property
-    def discovery_agent(self) -> DiscoveryAgent:
-        """Lazily initialize and return DiscoveryAgent."""
-        if self._discovery_agent is None:
-            self._discovery_agent = DiscoveryAgent(
+    def topic_agent(self) -> TopicAgent:
+        """Lazily initialize and return TopicAgent."""
+        if self._topic_agent is None:
+            self._topic_agent = TopicAgent(
                 knowledge_base=self.kb,
                 llm_provider=self.llm_provider,
             )
-        return self._discovery_agent
+        return self._topic_agent
 
     @property
     def scheduler(self) -> Optional[Any]:
@@ -98,9 +98,9 @@ class ProactiveOrchestrator(OrchestratorAgent):
         # Discovery task (only if discovery platforms specified)
         if discovery_platforms:
             discovery_task = {
-                "id": f"discovery_{persona_id}",
-                "name": f"Discovery - {persona_name}",
-                "task_type": "discovery",
+                "id": f"topic_{persona_id}",
+                "name": f"Topic - {persona_name}",
+                "task_type": "topic",
                 "schedule": discovery_schedule,
                 "persona_id": persona_id,
                 "extra_params": {"platforms": discovery_platforms},
@@ -161,9 +161,10 @@ class ProactiveOrchestrator(OrchestratorAgent):
             return 0
 
         task_ids = [
-            f"discovery_{persona_id}",
+            f"topic_{persona_id}",
             f"content_{persona_id}",
             # Also try old task IDs for backward compatibility
+            f"discovery_{persona_id}",
             f"trending_{persona_id}",
             f"content_suggest_{persona_id}",
             f"optimize_{persona_id}",
@@ -204,7 +205,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
         results = {}
         for platform in platforms:
             try:
-                result = await self.discovery_agent.discover_and_analyze(
+                result = await self.topic_agent.discover_and_analyze(
                     persona_id=persona_id,
                     platform=platform,
                     limit=30,
@@ -265,7 +266,7 @@ class ProactiveOrchestrator(OrchestratorAgent):
 
         # If no cached results, run a fresh discovery
         try:
-            result = await self.discovery_agent.discover_and_analyze(
+            result = await self.topic_agent.discover_and_analyze(
                 persona_id=persona_id,
                 platform="bluesky",
                 limit=20,

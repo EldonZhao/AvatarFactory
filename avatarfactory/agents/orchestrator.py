@@ -385,10 +385,10 @@ Output MUST be valid JSON:
 
         self.log("INFO", f"Discovering trends for persona {persona_id} on {platform}")
 
-        # Import DiscoveryAgent
-        from avatarfactory.agents.discovery import DiscoveryAgent
+        # Import TopicAgent
+        from avatarfactory.agents.topic import TopicAgent
 
-        discovery_agent = DiscoveryAgent(
+        discovery_agent = TopicAgent(
             knowledge_base=self.kb,
             llm_provider=self.llm_provider,
         )

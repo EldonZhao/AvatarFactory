@@ -60,7 +60,7 @@ CLI (chat/commands) / FastAPI Service
 ProactiveOrchestrator (intent routing + scheduled tasks)
     ├→ PersonaAgent (persona CRUD, versioning)
     ├→ ContentAgent (multi-variant generation + hot-topic integration)
-    ├→ DiscoveryAgent (platform trend analysis)
+    ├→ TopicAgent (hot topic mining)
     ├→ ReviewAgent (4-dimension scoring)
     ├→ SimulationAgent (engagement prediction)
     └→ Knowledges (file-based persistence)
@@ -77,7 +77,7 @@ Platform Connectors (via ConnectorRegistry)
 - **`avatarfactory/agents/`** - Agent implementations inheriting from `BaseAgent`
   - `persona.py` - PersonaAgent (persona CRUD, versioning)
   - `content.py` - ContentAgent (content generation with hot-topic support)
-  - `discovery.py` - DiscoveryAgent (platform trend analysis)
+  - `topic.py` - TopicAgent (hot topic mining)
   - `orchestrator.py` - OrchestratorAgent (intent routing)
   - `proactive_orchestrator.py` - ProactiveOrchestrator (scheduled tasks)
 - **`avatarfactory/connectors/`** - Platform connectors

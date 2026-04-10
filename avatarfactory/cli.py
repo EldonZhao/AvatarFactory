@@ -25,7 +25,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
-from avatarfactory.agents.discovery import DiscoveryAgent
+from avatarfactory.agents.topic import TopicAgent
 from avatarfactory.core.knowledges import KnowledgeBase
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
@@ -973,11 +973,11 @@ def publish(
 
 
 # =============================================================================
-# Discovery Commands
+# Topic Commands
 # =============================================================================
 
-def get_discovery_agent() -> DiscoveryAgent:
-    """Initialize discovery agent with LLM provider from environment."""
+def get_topic_agent() -> TopicAgent:
+    """Initialize topic agent with LLM provider from environment."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
     kb = KnowledgeBase(kb_path)
 
@@ -987,7 +987,7 @@ def get_discovery_agent() -> DiscoveryAgent:
         console.print(f"[red]Error initializing LLM provider: {e}[/red]")
         raise typer.Exit(1)
 
-    return DiscoveryAgent(knowledge_base=kb, llm_provider=provider)
+    return TopicAgent(knowledge_base=kb, llm_provider=provider)
 
 
 @app.command()
@@ -1008,14 +1008,14 @@ def discover(
         avatarfactory discover twitter -q "AI productivity" -n 30
     """
     console.print(Panel.fit(
-        f"[bold cyan]Discovery Agent[/bold cyan]\n"
+        f"[bold cyan]Topic Agent[/bold cyan]\n"
         f"Platform: {platform}\n"
         f"Persona: {persona_id or 'None (general discovery)'}\n"
         f"Query: {query or 'Auto (from persona)'}",
         border_style="cyan",
     ))
 
-    agent = get_discovery_agent()
+    agent = get_topic_agent()
 
     async def run_discovery():
         if persona_id:
@@ -1089,7 +1089,7 @@ def discover(
         for suggestion in data["persona_suggestions"]:
             console.print(f"  → {suggestion}")
 
-    console.print(f"\n[dim]{result.get('message', 'Discovery complete.')}[/dim]")
+    console.print(f"\n[dim]{result.get('message', 'Topic analysis complete.')}[/dim]")
 
 
 @app.command()
@@ -1114,7 +1114,7 @@ def inspire(
         border_style="cyan",
     ))
 
-    agent = get_discovery_agent()
+    agent = get_topic_agent()
 
     async def run_inspiration():
         return await agent.discover_and_analyze(
@@ -1504,12 +1504,12 @@ def schedule(
             console.print("[red]--type required (discovery, content, publish, report)[/red]")
             raise typer.Exit(1)
 
-        if task_type in ("discovery", "content", "report") and not persona_id:
+        if task_type in ("topic", "discovery", "content", "report") and not persona_id:
             console.print(f"[red]--persona required for {task_type} tasks[/red]")
             raise typer.Exit(1)
 
         schedule_cron = cron or {
-            "discovery": "0 9 * * *",
+            "topic": "0 9 * * *",
             "content": "0 10 * * *",
             "publish": "0 12 * * *",
             "report": "0 18 * * 5",

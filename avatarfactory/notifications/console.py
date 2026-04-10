@@ -68,6 +68,7 @@ class ConsoleNotifier(NotificationProvider):
                 "content_published": "📤",
                 "error": "❌",
                 "warning": "⚠️",
+                "topic": "🔍",
                 "discovery": "🔍",
                 "report": "📊",
             }.get(message.category or "", "📬")

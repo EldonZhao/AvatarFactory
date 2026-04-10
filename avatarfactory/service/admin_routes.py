@@ -890,6 +890,7 @@ async def create_scheduler_task_admin(request: CreateSchedulerTaskRequest):
 
     # Generate task name if not provided
     task_type_names = {
+        "topic": "发现话题",
         "discovery": "发现话题",
         "content": "生成内容",
         "publish": "发布内容",

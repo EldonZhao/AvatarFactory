@@ -35,8 +35,8 @@ class AgentConfigManager:
             "creativity_level": "conservative",
             "detail_level": "detailed",
         },
-        "discovery": {
-            "agent_type": "discovery",
+        "topic": {
+            "agent_type": "topic",
             "temperature": 0.5,
             "max_tokens": 4096,
             "creativity_level": "balanced",
@@ -64,7 +64,7 @@ class AgentConfigManager:
 
         Args:
             persona_id: Persona ID
-            agent_type: Agent type (content, review, discovery)
+            agent_type: Agent type (content, review, topic)
 
         Returns:
             AgentConfig for the agent
@@ -82,7 +82,7 @@ class AgentConfigManager:
         Get default configuration for an agent type.
 
         Args:
-            agent_type: Agent type (content, review, discovery)
+            agent_type: Agent type (content, review, topic)
 
         Returns:
             Default AgentConfig for the agent type
@@ -105,7 +105,7 @@ class AgentConfigManager:
 
         Args:
             persona_id: Persona ID
-            agent_type: Agent type (content, review, discovery)
+            agent_type: Agent type (content, review, topic)
             config: AgentConfig to save
         """
         self.kb.save_agent_config(persona_id, agent_type, config)

@@ -1,5 +1,5 @@
 """
-Discovery Agent for AvatarFactory.
+Topic Agent for AvatarFactory.
 
 Responsible for:
 1. Fetching trending content from social platforms
@@ -27,9 +27,9 @@ from avatarfactory.models.schemas import (
 )
 
 
-class DiscoveryAgent(BaseAgent):
+class TopicAgent(BaseAgent):
     """
-    Discovery Agent - learns from social platforms to optimize persona and content.
+    Topic Agent - discovers and analyzes hot topics from social platforms to guide content creation.
 
     Capabilities:
     - Search trending content based on persona keywords
@@ -39,7 +39,7 @@ class DiscoveryAgent(BaseAgent):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(agent_id="discovery", **kwargs)
+        super().__init__(agent_id="topic", **kwargs)
         self._connector_configs: Dict[str, ConnectorConfig] = {}
 
     def configure_platform(self, platform: str, config: ConnectorConfig) -> None:

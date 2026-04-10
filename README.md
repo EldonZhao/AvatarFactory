@@ -40,7 +40,7 @@ AvatarFactory turns this into an **experiment-driven workflow**.
 ### Agent System
 - **PersonaAgent** - Persona CRUD, versioning, optimization
 - **ContentAgent** - Multi-variant generation with hot-topic integration
-- **DiscoveryAgent** - Learn from social platforms, analyze trends
+- **TopicAgent** - Discover hot topics and analyze trends from social platforms
 - **ReviewAgent** - 4-dimension scoring (persona consistency, platform fit, compliance, engagement)
 - **SimulationAgent** - Engagement prediction and comment scripts
 - **ProactiveOrchestrator** - Scheduled tasks, automatic trend scanning
@@ -247,7 +247,7 @@ avatarfactory/
 ├── agents/              # AI agents
 │   ├── persona.py       # PersonaAgent (persona CRUD)
 │   ├── content.py       # ContentAgent (content generation)
-│   ├── discovery.py     # DiscoveryAgent (trend analysis)
+│   ├── topic.py         # TopicAgent (hot topic mining)
 │   ├── orchestrator.py  # OrchestratorAgent (intent routing)
 │   └── proactive_orchestrator.py  # ProactiveOrchestrator
 ├── connectors/          # Platform connectors
@@ -291,7 +291,7 @@ knowledges/              # User data storage (default)
 - Hot-topic driven content generation
 - Multi-dimensional review system
 - Platform connectors (Bluesky, Twitter, Xiaohongshu, WeChat Work)
-- Discovery Agent for trend analysis
+- Topic Agent for hot topic mining
 - Scheduled task automation
 - FastAPI REST API service
 - Docker deployment support

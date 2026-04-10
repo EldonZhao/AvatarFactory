@@ -115,25 +115,12 @@ with st.sidebar:
                 st.warning("Please enter a description")
 
     st.markdown("---")
-    st.markdown("### Filters")
-    platform_filter = st.multiselect(
-        "Filter by platform",
-        ["xiaohongshu", "bluesky", "twitter", "zhihu", "douyin"],
-        default=[]
-    )
 
     if st.button("🔄 Refresh"):
         st.rerun()
 
 # Get personas
 personas = provider.get_personas()
-
-# Apply filters
-if platform_filter:
-    personas = [
-        p for p in personas
-        if any(plat in p.platforms for plat in platform_filter)
-    ]
 
 # Session state for selected persona
 if "selected_persona" not in st.session_state:
@@ -174,7 +161,6 @@ else:
                         persona_id=persona.id,
                         name=persona.name,
                         tagline=persona.tagline,
-                        platforms=persona.platforms,
                         version=persona.version,
                         draft_count=persona.draft_count,
                         published_count=persona.published_count,

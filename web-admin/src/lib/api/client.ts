@@ -132,7 +132,6 @@ export interface PersonaSummary {
   id: string;
   name: string;
   description: string;
-  platforms: string[];
   content_count?: number;
 }
 
@@ -144,7 +143,6 @@ export interface PersonaDetail {
   id: string;
   name: string;
   description: string;
-  platforms: string[];
   voice: string;
   expertise: string[];
   style_guidelines: string[];
@@ -163,7 +161,6 @@ export interface NotificationConfig {
 export interface CreatePersonaRequest {
   name: string;
   description: string;
-  platforms?: string[];
   voice?: string;
   expertise?: string[];
   style_guidelines?: string[];

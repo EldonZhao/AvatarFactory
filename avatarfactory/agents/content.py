@@ -259,7 +259,7 @@ class ContentAgent(BaseAgent):
 
         # Determine platform
         if not platform:
-            platform = persona.platforms[0] if persona.platforms else PlatformType.XIAOHONGSHU
+            platform = PlatformType.XIAOHONGSHU
         else:
             platform = PlatformType(platform)
 

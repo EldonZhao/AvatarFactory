@@ -11,7 +11,6 @@ from avatarfactory.models.schemas import (
     Persona,
     TargetAudience,
     VoiceStyle,
-    PlatformType,
 )
 from datetime import datetime
 import tempfile
@@ -67,7 +66,6 @@ def test_persona_creation_and_loading(temp_kb):
             avoid=["spam"],
             compliance=["cite sources"],
         ),
-        platforms=[PlatformType.XIAOHONGSHU],
     )
 
     # Save
@@ -95,7 +93,6 @@ def test_list_personas(temp_kb):
             voice_style=VoiceStyle(tone="test", language_patterns=[], emoji_usage="test"),
             content_pillars=[],
             boundaries=Boundaries(avoid=[], compliance=[]),
-            platforms=[PlatformType.XIAOHONGSHU],
         )
         temp_kb.save_persona(persona)
 

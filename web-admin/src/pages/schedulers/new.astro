@@ -88,7 +88,6 @@ const personas = personasData?.personas || [];
               >
                 <option value="discovery">Discovery - 发现热门话题</option>
                 <option value="content">Content - 生成内容草稿</option>
-                <option value="publish">Publish - 发布内容</option>
               </select>
             </div>
 
@@ -107,19 +106,16 @@ const personas = personasData?.personas || [];
 
           <!-- Platform -->
           <div class="space-y-4">
-            <h2 class="text-lg font-semibold">目标平台（可选）</h2>
-            <div class="flex flex-wrap gap-3">
-              {['xiaohongshu', 'bluesky', 'twitter', 'linkedin'].map((platform) => (
+            <h2 class="text-lg font-semibold">目标平台</h2>
+            <div class="flex flex-wrap gap-3" id="platform-options">
+              {['bluesky', 'xiaohongshu', 'twitter', 'linkedin', 'threads'].map((platform) => (
                 <label class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--accent))] cursor-pointer hover:bg-[hsl(var(--accent))]/80 transition-colors">
                   <input type="radio" name="platform" value={platform} class="rounded" />
                   <span class="text-sm">{platform}</span>
                 </label>
               ))}
-              <label class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--accent))] cursor-pointer hover:bg-[hsl(var(--accent))]/80 transition-colors">
-                <input type="radio" name="platform" value="" checked class="rounded" />
-                <span class="text-sm">使用 Persona 默认</span>
-              </label>
             </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))]">默认: Discovery 使用 bluesky，Content 使用 xiaohongshu</p>
           </div>
 
           <!-- Actions -->
@@ -151,16 +147,41 @@ const personas = personasData?.personas || [];
   const baseUrl = document.getElementById('app-config')?.dataset.baseUrl || '';
   const form = document.getElementById('create-task-form');
   const submitBtn = document.getElementById('submit-btn');
+  const taskTypeSelect = document.querySelector('select[name="task_type"]') as HTMLSelectElement;
+  const platformRadios = document.querySelectorAll('input[name="platform"]') as NodeListOf<HTMLInputElement>;
+
+  // Set default platform based on task type
+  function setDefaultPlatform(taskType: string) {
+    const defaultPlatform = taskType === 'discovery' ? 'bluesky' : 'xiaohongshu';
+    platformRadios.forEach(radio => {
+      radio.checked = radio.value === defaultPlatform;
+    });
+  }
+
+  // Set initial default
+  setDefaultPlatform(taskTypeSelect?.value || 'discovery');
+
+  // Update default when task type changes
+  taskTypeSelect?.addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement;
+    setDefaultPlatform(target.value);
+  });
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const formData = new FormData(form as HTMLFormElement);
+    const taskType = formData.get('task_type') as string;
+    const selectedPlatform = formData.get('platform') as string;
+
+    // Use selected platform or default based on task type
+    const platform = selectedPlatform || (taskType === 'discovery' ? 'bluesky' : 'xiaohongshu');
+
     const data = {
       persona_id: formData.get('persona_id'),
-      task_type: formData.get('task_type'),
+      task_type: taskType,
       schedule: formData.get('schedule'),
-      platform: formData.get('platform') || undefined,
+      platform: platform,
       enabled: true,
     };
 

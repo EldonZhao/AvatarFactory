@@ -66,7 +66,6 @@ class PersonaSummary(BaseModel):
     id: str
     name: str
     tagline: str
-    platforms: List[str]
     content_count: int
     draft_count: int
     version: str
@@ -159,7 +158,6 @@ async def get_dashboard():
                 id=persona.id,
                 name=persona.identity.name,
                 tagline=persona.identity.tagline,
-                platforms=[pt.value for pt in persona.platforms],
                 content_count=p_draft + p_published,
                 draft_count=p_draft,
                 version=persona.version,
@@ -221,7 +219,6 @@ class CreatePersonaRequest(BaseModel):
     name: str = Field(..., description="Persona name")
     tagline: Optional[str] = Field(None, description="Short tagline")
     description: str = Field(..., description="Persona description")
-    platforms: List[str] = Field(default_factory=list, description="Target platforms")
     expertise: List[str] = Field(default_factory=list, description="Areas of expertise")
 
 
@@ -247,14 +244,6 @@ async def create_persona_admin(request: CreatePersonaRequest):
 
     # Generate persona ID
     persona_id = f"persona_{uuid.uuid4().hex[:8]}"
-
-    # Parse platforms
-    valid_platforms = []
-    for p in request.platforms:
-        try:
-            valid_platforms.append(PlatformType(p))
-        except ValueError:
-            pass  # Skip invalid platforms
 
     # Create persona with defaults
     tagline = request.tagline or ""
@@ -283,7 +272,6 @@ async def create_persona_admin(request: CreatePersonaRequest):
             avoid=[],
             compliance=[],
         ),
-        platforms=valid_platforms if valid_platforms else [PlatformType.XIAOHONGSHU],
         version="v1.0",
         created_at=datetime.now(),
         updated_at=datetime.now(),
@@ -346,7 +334,6 @@ async def list_personas_admin():
             "id": pid,
             "name": summary.get("name", ""),
             "tagline": summary.get("tagline", ""),
-            "platforms": summary.get("platforms", []),
             "expertise": summary.get("expertise", []),
             "version": summary.get("version", "v1.0"),
             "content_count": stats.get("total_content", 0),
@@ -819,7 +806,8 @@ async def list_scheduler_tasks_admin():
     next_runs = scheduler.get_next_runs() if scheduler.is_running() else []
     next_run_map = {nr["task_id"]: nr["next_run"] for nr in next_runs}
 
-    # Group by persona
+    # Build flat list and group by persona
+    all_tasks = []
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for t in tasks:
         task_data = {
@@ -828,6 +816,7 @@ async def list_scheduler_tasks_admin():
             "task_type": t.task_type,
             "schedule": t.schedule,
             "platform": t.platform,
+            "persona_id": t.persona_id,
             "enabled": t.enabled,
             "last_run": t.last_run.isoformat() if t.last_run else None,
             "last_status": t.last_status,
@@ -835,6 +824,7 @@ async def list_scheduler_tasks_admin():
             "run_count": t.run_count,
             "next_run_time": next_run_map.get(t.id),
         }
+        all_tasks.append(task_data)
 
         persona_id = t.persona_id or "system"
         if persona_id not in grouped:
@@ -858,6 +848,7 @@ async def list_scheduler_tasks_admin():
 
     return {
         "count": len(tasks),
+        "tasks": all_tasks,
         "grouped": result,
     }
 
@@ -1107,4 +1098,96 @@ async def list_connectors_admin():
         "total_count": len(connectors),
         "topic_discovery_connectors": ConnectorRegistry.list_topic_discovery_connectors(),
         "persona_discovery_connectors": ConnectorRegistry.list_persona_discovery_connectors(),
+    }
+
+
+# =============================================================================
+# Recommendations Endpoints
+# =============================================================================
+
+
+@router.get("/recommendations/personas", dependencies=[Depends(require_admin_auth)])
+async def list_recommended_personas(
+    limit: int = 20,
+    domain: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    """
+    List recommended personas discovered by system tasks.
+
+    Args:
+        limit: Maximum number of recommendations to return
+        domain: Filter by domain (e.g., "tech", "lifestyle")
+        status: Filter by status (active, adopted, archived)
+    """
+    orchestrator = get_orchestrator()
+    kb = orchestrator.kb
+
+    try:
+        recommendations = kb.get_recommended_personas(
+            limit=limit,
+            domain=domain,
+            status=status,
+        )
+
+        return {
+            "count": len(recommendations),
+            "recommendations": [
+                {
+                    "id": rec.id,
+                    "name": rec.name,
+                    "tagline": rec.tagline,
+                    "domain": rec.domain,
+                    "expertise": rec.expertise,
+                    "content_pillars": rec.content_pillars,
+                    "target_audience": rec.target_audience,
+                    "relevance_score": rec.relevance_score,
+                    "potential_score": rec.potential_score,
+                    "rationale": rec.rationale,
+                    "source_platforms": rec.source_platforms,
+                    "source_trends": rec.source_trends[:3] if rec.source_trends else [],
+                    "status": rec.status.value if hasattr(rec.status, 'value') else rec.status,
+                    "created_at": rec.created_at.isoformat() if rec.created_at else None,
+                }
+                for rec in recommendations
+            ],
+        }
+    except Exception as e:
+        return {"count": 0, "recommendations": [], "error": str(e)}
+
+
+@router.get("/recommendations/system-tasks", dependencies=[Depends(require_admin_auth)])
+async def get_system_tasks_status():
+    """
+    Get status of system tasks (trend scan and persona recommendation).
+
+    Returns task info, last run time, and next scheduled run.
+    """
+    scheduler = get_scheduler()
+
+    if not scheduler:
+        return {"tasks": [], "scheduler_running": False}
+
+    tasks = scheduler.list_tasks()
+    system_tasks = [t for t in tasks if t.persona_id is None]
+
+    # Get next run times
+    next_runs = scheduler.get_next_runs() if scheduler.is_running() else []
+    next_run_map = {nr["task_id"]: nr["next_run"] for nr in next_runs}
+
+    result = []
+    for t in system_tasks:
+        result.append({
+            "id": t.id,
+            "task_type": t.task_type,
+            "schedule": t.schedule,
+            "enabled": t.enabled,
+            "last_run": t.last_run.isoformat() if t.last_run else None,
+            "run_count": t.run_count,
+            "next_run": next_run_map.get(t.id),
+        })
+
+    return {
+        "tasks": result,
+        "scheduler_running": scheduler.is_running(),
     }

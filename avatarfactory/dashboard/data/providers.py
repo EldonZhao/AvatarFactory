@@ -42,7 +42,6 @@ class PersonaSummary:
     id: str
     name: str
     tagline: str
-    platforms: List[str]
     version: str
     created_at: Optional[datetime]
     draft_count: int = 0
@@ -96,7 +95,6 @@ class DashboardDataProvider:
                     id=persona.id,
                     name=persona.identity.name,
                     tagline=persona.identity.tagline,
-                    platforms=[p.value for p in persona.platforms],
                     version=persona.version,
                     created_at=persona.created_at,
                     draft_count=draft_count,

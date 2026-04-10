@@ -18,7 +18,6 @@ from avatarfactory.models.schemas import (
     NotificationConfig,
     Persona,
     PersonaVersion,
-    PlatformType,
     TargetAudience,
     TaskType,
     VoiceStyle,
@@ -54,10 +53,8 @@ class PersonaAgent(BaseAgent):
 
         Expected payload:
             - user_description: str (user's rough description of desired persona)
-            - platform: str (target platform, optional)
         """
         user_description = payload.get("user_description", "")
-        target_platform = payload.get("platform", "xiaohongshu")
 
         self.log("INFO", f"Creating persona from description: {user_description[:100]}...")
 
@@ -104,8 +101,6 @@ IMPORTANT:
 
         user_prompt = f"""Create a persona for: {user_description}
 
-Target platform: {target_platform}
-
 Provide a complete persona configuration in JSON format."""
 
         response = await self.call_llm(user_prompt, system=system_prompt, temperature=0.7)
@@ -139,7 +134,6 @@ Provide a complete persona configuration in JSON format."""
                 ContentPillar(**pillar) for pillar in persona_data["content_pillars"]
             ],
             boundaries=Boundaries(**persona_data["boundaries"]),
-            platforms=[PlatformType(target_platform)],
             # Enable notifications by default for new personas
             notification=NotificationConfig(enabled=True),
         )

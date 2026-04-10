@@ -228,7 +228,6 @@ Output MUST be valid JSON:
             task_type=TaskType.CREATE_PERSONA,
             payload={
                 "user_description": parameters.get("user_description", original_input),
-                "platform": parameters.get("platform", "xiaohongshu"),
             },
             context={},
         )

@@ -91,7 +91,6 @@ async def list_personas() -> Dict[str, Any]:
                     "avoid": persona.boundaries.avoid if persona.boundaries else [],
                     "compliance": persona.boundaries.compliance if persona.boundaries else [],
                 },
-                "platforms": [pt.value for pt in persona.platforms],
                 "notification": persona.notification.model_dump() if persona.notification else None,
             })
 
@@ -154,7 +153,6 @@ async def get_persona(persona_id: str) -> Optional[Dict[str, Any]]:
             "avoid": persona.boundaries.avoid if persona.boundaries else [],
             "compliance": persona.boundaries.compliance if persona.boundaries else [],
         },
-        "platforms": [pt.value for pt in persona.platforms],
         "notification": persona.notification.model_dump() if persona.notification else None,
     }
 

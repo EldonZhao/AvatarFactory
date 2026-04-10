@@ -281,7 +281,6 @@ async def list_personas() -> List[Dict[str, Any]]:
                     "name": persona.identity.name,
                     "tagline": persona.identity.tagline,
                     "expertise": persona.identity.expertise,
-                    "platforms": [pt.value for pt in persona.platforms],
                     "content_count": content_count,
                     "created_at": persona.created_at.isoformat() if persona.created_at else None,
                 })
@@ -311,7 +310,6 @@ async def get_persona(persona_id: str) -> Optional[Dict[str, Any]]:
         "name": persona.identity.name,
         "tagline": persona.identity.tagline,
         "expertise": persona.identity.expertise,
-        "platforms": [pt.value for pt in persona.platforms],
         "content_count": content_count,
         "created_at": persona.created_at.isoformat() if persona.created_at else None,
     }

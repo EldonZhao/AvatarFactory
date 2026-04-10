@@ -4,7 +4,7 @@ Persona card component for dashboard.
 Renders a visual card displaying persona information.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import streamlit as st
 
@@ -13,7 +13,6 @@ def render_persona_card(
     persona_id: str,
     name: str,
     tagline: str,
-    platforms: List[str],
     version: str,
     draft_count: int = 0,
     published_count: int = 0,
@@ -29,7 +28,6 @@ def render_persona_card(
         persona_id: Unique persona identifier
         name: Persona name
         tagline: One-line description
-        platforms: List of target platforms
         version: Persona version
         draft_count: Number of draft content items
         published_count: Number of published content items
@@ -43,15 +41,6 @@ def render_persona_card(
     """
     action = None
 
-    # Platform emoji mapping
-    platform_emojis = {
-        "xiaohongshu": "📕",
-        "bluesky": "🦋",
-        "twitter": "𝕏",
-        "zhihu": "知",
-        "douyin": "🎵",
-    }
-
     # Notification type emoji mapping
     notification_emojis = {
         "wecom": "💬",
@@ -60,11 +49,6 @@ def render_persona_card(
         "telegram": "📨",
         "feishu": "🪶",
     }
-
-    platform_badges = " ".join(
-        platform_emojis.get(p.lower(), "📱") + " " + p
-        for p in platforms
-    )
 
     # Build notification badge
     if notification_enabled and notification_type:
@@ -93,7 +77,6 @@ def render_persona_card(
                     font-size: 12px;
                     margin-right: 8px;
                 ">{version}</span>
-                <span style="font-size: 13px;">{platform_badges}</span>
                 {notification_badge}
             </div>
             <div style="display: flex; gap: 16px; font-size: 13px; color: #666;">

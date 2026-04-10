@@ -34,20 +34,19 @@ try {
 const grouped = tasksData?.grouped || {};
 const taskCount = tasksData?.count || 0;
 
-// Sort persona IDs: non-system first, 'system' last
-const sortedPersonaIds = Object.keys(grouped).sort((a, b) => {
-  if (a === 'system') return 1;
-  if (b === 'system') return -1;
-  return 0;
-});
+// Filter out system tasks - they are shown on Connectors page now
+const personaIds = Object.keys(grouped).filter(k => k !== 'system');
 
-// Calculate total run count from all tasks
+// Calculate total run count from persona tasks only (exclude system)
 let totalRunCount = 0;
-Object.values(grouped).forEach((data: any) => {
-  data.tasks?.forEach((task: any) => {
+personaIds.forEach((personaId) => {
+  grouped[personaId]?.tasks?.forEach((task: any) => {
     totalRunCount += task.run_count || 0;
   });
 });
+
+// Calculate task count excluding system tasks
+const personaTaskCount = personaIds.reduce((sum, id) => sum + (grouped[id]?.tasks?.length || 0), 0);
 ---
 
 <AdminLayout title="Schedulers">
@@ -84,7 +83,7 @@ Object.values(grouped).forEach((data: any) => {
               <div class="flex items-start justify-between">
                 <div>
                   <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">总任务数</p>
-                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{taskCount}</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{personaTaskCount}</p>
                 </div>
                 <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
                   <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -100,7 +99,7 @@ Object.values(grouped).forEach((data: any) => {
               <div class="flex items-start justify-between">
                 <div>
                   <p class="text-sm text-[hsl(var(--muted-foreground))] mb-1">Personas</p>
-                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{Object.keys(grouped).filter(k => k !== 'system').length}</p>
+                  <p class="text-3xl font-bold text-[hsl(var(--foreground))]">{personaIds.length}</p>
                 </div>
                 <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
                   <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,9 +128,9 @@ Object.values(grouped).forEach((data: any) => {
         </div>
 
         <!-- Tasks by Persona -->
-        {Object.keys(grouped).length > 0 ? (
+        {personaIds.length > 0 ? (
           <div class="space-y-6">
-            {sortedPersonaIds.map((personaId) => {
+            {personaIds.map((personaId) => {
               const data = grouped[personaId];
               return (
               <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
@@ -145,14 +144,12 @@ Object.values(grouped).forEach((data: any) => {
                       <p class="text-xs text-[hsl(var(--muted-foreground))]">{data.tasks.length} 个任务</p>
                     </div>
                   </div>
-                  {personaId !== 'system' && (
-                    <a
-                      href={`${base}/personas/${personaId}`}
-                      class="text-sm text-[hsl(var(--primary))] hover:underline"
-                    >
-                      查看 Persona →
-                    </a>
-                  )}
+                  <a
+                    href={`${base}/personas/${personaId}`}
+                    class="text-sm text-[hsl(var(--primary))] hover:underline"
+                  >
+                    查看 Persona →
+                  </a>
                 </div>
 
                 <div class="space-y-3">

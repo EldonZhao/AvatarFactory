@@ -128,11 +128,7 @@ else:
             info_col1, info_col2, info_col3 = st.columns(3)
 
             with info_col1:
-                platforms_str = ", ".join(
-                    f"{CONNECTOR_ICONS.get(p, '📱')} {p}"
-                    for p in persona.platforms
-                )
-                st.markdown(f"**Platforms:** {platforms_str or 'None configured'}")
+                st.markdown(f"**Tagline:** {persona.tagline[:50] if persona.tagline else 'None'}...")
 
             with info_col2:
                 st.markdown(f"**Content:** {persona.draft_count} drafts, {persona.published_count} published")
@@ -248,8 +244,8 @@ else:
                     if task.get("task_type") == "content" and task.get("platform"):
                         content_platforms.add(task.get("platform"))
 
-                # Fallback to persona.platforms if no content tasks
-                target_platforms = content_platforms or set(persona.platforms)
+                # Use platforms from content tasks
+                target_platforms = content_platforms
 
                 for p in target_platforms:
                     icon = CONNECTOR_ICONS.get(p, "📱")

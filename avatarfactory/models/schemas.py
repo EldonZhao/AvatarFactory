@@ -158,10 +158,6 @@ class Persona(BaseModel):
     content_pillars: List[ContentPillar]
     boundaries: Boundaries
 
-    platforms: List[PlatformType] = Field(
-        default_factory=list, description="Target platforms"
-    )
-
     # Notification settings
     notification: Optional[NotificationConfig] = Field(
         None, description="Notification connector configuration"

@@ -118,7 +118,7 @@ def main() -> None:
         st.markdown("### 👥 Recent Personas")
         if personas:
             for p in personas[:3]:
-                platform_str = ", ".join(p.platforms) if p.platforms else "No platforms"
+                tagline_str = p.tagline if p.tagline else "No tagline"
                 content_count = p.draft_count + p.published_count
 
                 st.markdown(f"""
@@ -132,7 +132,7 @@ def main() -> None:
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <strong style="font-size: 16px;">{p.name}</strong>
-                            <p style="color: #666; margin: 4px 0 0 0; font-size: 14px;">{p.tagline[:60]}...</p>
+                            <p style="color: #666; margin: 4px 0 0 0; font-size: 14px;">{p.tagline[:60] if p.tagline else ''}...</p>
                         </div>
                         <div style="text-align: right;">
                             <span style="
@@ -141,7 +141,7 @@ def main() -> None:
                                 padding: 4px 12px;
                                 border-radius: 16px;
                                 font-size: 12px;
-                            ">{platform_str}</span>
+                            ">{tagline_str}</span>
                             <p style="color: #999; margin: 8px 0 0 0; font-size: 12px;">{content_count} content items</p>
                         </div>
                     </div>

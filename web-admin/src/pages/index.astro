@@ -2,7 +2,6 @@
 import AdminLayout from '../layouts/AdminLayout.astro';
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { PersonaCard } from '../components/dashboard/PersonaCard';
-import { ConnectorList } from '../components/dashboard/ConnectorList';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { getDashboardData } from '../lib/data';
 
@@ -22,6 +21,10 @@ try {
 // Remove trailing slash from BASE_URL for consistent path joining
 const rawBase = import.meta.env.BASE_URL || '';
 const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+// Separate callbacks (wecom) from connectors
+const callbacks = dashboard?.connectors?.filter((c: any) => c.platform === 'wecom') || [];
+const connectors = dashboard?.connectors?.filter((c: any) => c.platform !== 'wecom') || [];
 ---
 
 <AdminLayout title="Dashboard">
@@ -81,12 +84,82 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
               </CardContent>
             </Card>
 
-            <!-- Connector Status -->
-            <ConnectorList connectors={dashboard.connectors} client:load />
+            <!-- Quick Actions -->
+            <div class="p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+              <h2 class="text-lg font-semibold mb-4">快速操作</h2>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <a
+                  href={`${base}/personas/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium text-center"
+                >
+                  创建 Persona
+                </a>
+                <a
+                  href={`${base}/connectors`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium text-center"
+                >
+                  查看 Connectors
+                </a>
+                <a
+                  href={`${base}/schedulers/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium text-center"
+                >
+                  新建任务
+                </a>
+                <a
+                  href={`${base}/topics`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium text-center"
+                >
+                  查看话题
+                </a>
+                <a
+                  href={`${base}/contents/new`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium text-center"
+                >
+                  生成内容
+                </a>
+                <a
+                  href={`${base}/stats`}
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium text-center"
+                >
+                  查看 Statistics
+                </a>
+              </div>
+            </div>
           </div>
 
           <!-- Right Column - Status -->
           <div class="space-y-6">
+            <!-- Connectors Status (only configured) -->
+            {connectors.filter((c: any) => c.configured).length > 0 && (
+              <Card client:load>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Connectors 状态</CardTitle>
+                  <a href={`${base}/connectors`} class="text-sm text-[hsl(var(--primary))] hover:underline">
+                    查看全部 →
+                  </a>
+                </CardHeader>
+                <CardContent>
+                  <div class="space-y-2">
+                    {connectors.filter((c: any) => c.configured).map((conn: any) => (
+                      <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                        <div class="flex items-center gap-3">
+                          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                          <div>
+                            <p class="font-medium capitalize">{conn.platform}</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">平台连接器</p>
+                          </div>
+                        </div>
+                        <span class="px-2 py-1 rounded text-xs bg-green-500/10 text-green-600">
+                          已配置
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <!-- Scheduler Status -->
             <Card client:load>
               <CardHeader>
@@ -108,6 +181,35 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
                 >
                   管理调度任务
                 </a>
+              </CardContent>
+            </Card>
+
+            <!-- Callbacks Status -->
+            <Card client:load>
+              <CardHeader>
+                <CardTitle>Callbacks 状态</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {callbacks.length === 0 ? (
+                  <p class="text-sm text-[hsl(var(--muted-foreground))]">暂无 Callback 配置</p>
+                ) : (
+                  <div class="space-y-2">
+                    {callbacks.map((cb: any) => (
+                      <div class="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--accent))]">
+                        <div class="flex items-center gap-3">
+                          <span class={`w-2 h-2 rounded-full ${cb.configured ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                          <div>
+                            <p class="font-medium capitalize">{cb.platform}</p>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))]">Webhook 通知</p>
+                          </div>
+                        </div>
+                        <span class={`px-2 py-1 rounded text-xs ${cb.configured ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
+                          {cb.configured ? '已配置' : '未配置'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -139,37 +241,6 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
                 </div>
               </CardContent>
             </Card>
-
-            <!-- Quick Actions -->
-            <div class="p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
-              <h2 class="text-lg font-semibold mb-4">快速操作</h2>
-              <div class="flex flex-wrap gap-3">
-                <a
-                  href={`${base}/personas/new`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  创建 Persona
-                </a>
-                <a
-                  href={`${base}/schedulers/new`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  配置任务
-                </a>
-                <a
-                  href={`${base}/contents/new`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  生成内容
-                </a>
-                <a
-                  href={`${base}/topics`}
-                  class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                  查看话题
-                </a>
-              </div>
-            </div>
           </div>
         </div>
       </>

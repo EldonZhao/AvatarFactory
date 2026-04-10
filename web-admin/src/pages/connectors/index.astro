@@ -1,0 +1,272 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+const cookie = Astro.request.headers.get('cookie') || '';
+
+let connectorsData: any = null;
+let schedulerTasksData: any = null;
+let recommendationsData: any = null;
+let error = null;
+
+try {
+  const [connRes, tasksRes, recRes] = await Promise.all([
+    fetch(`${API_BASE}/api/admin/connectors`, { headers: { 'Cookie': cookie } }),
+    fetch(`${API_BASE}/api/admin/scheduler/tasks`, { headers: { 'Cookie': cookie } }),
+    fetch(`${API_BASE}/api/admin/recommendations/personas?limit=50`, { headers: { 'Cookie': cookie } })
+  ]);
+
+  if (connRes.ok) connectorsData = await connRes.json();
+  if (tasksRes.ok) schedulerTasksData = await tasksRes.json();
+  if (recRes.ok) recommendationsData = await recRes.json();
+} catch (e) {
+  error = `Failed to fetch data: ${e}`;
+}
+
+// Filter out wecom (it's a callback, not a connector)
+const connectors = (connectorsData?.connectors || []).filter((c: any) => c.platform !== 'wecom');
+const allTasks = schedulerTasksData?.tasks || [];
+const recommendations = recommendationsData?.recommendations || [];
+
+// Group system tasks by platform (from task config)
+// System tasks have persona_id = null and may have a platform in their config
+const systemTasks = allTasks.filter((t: any) => !t.persona_id);
+
+// Helper to get tasks for a platform
+function getTasksForPlatform(platform: string) {
+  return systemTasks.filter((t: any) =>
+    t.platform === platform ||
+    (t.task_type === 'trend_scan' && !t.platform) ||
+    (t.task_type === 'persona_recommendation' && !t.platform)
+  );
+}
+
+// Helper to get recommendations from a platform
+function getRecommendationsForPlatform(platform: string) {
+  return recommendations.filter((r: any) =>
+    r.source_platforms && r.source_platforms.includes(platform)
+  );
+}
+
+// Platform display info
+const platformInfo: Record<string, { name: string; icon: string; color: string }> = {
+  bluesky: { name: 'Bluesky', icon: '🦋', color: 'blue' },
+  twitter: { name: 'Twitter/X', icon: '𝕏', color: 'gray' },
+  xiaohongshu: { name: '小红书', icon: '📕', color: 'red' },
+  instagram: { name: 'Instagram', icon: '📷', color: 'pink' },
+  linkedin: { name: 'LinkedIn', icon: '💼', color: 'blue' },
+  threads: { name: 'Threads', icon: '🧵', color: 'gray' },
+  mastodon: { name: 'Mastodon', icon: '🐘', color: 'purple' },
+  weibo: { name: '微博', icon: '🔴', color: 'red' },
+  zhihu: { name: '知乎', icon: '知', color: 'blue' },
+  toutiao: { name: '头条', icon: '📰', color: 'red' },
+  brave_search: { name: 'Brave Search', icon: '🦁', color: 'orange' },
+  bing_search: { name: 'Bing Search', icon: '🔍', color: 'blue' },
+};
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return 'Never';
+  return new Date(dateStr).toLocaleString('zh-CN');
+}
+---
+
+<AdminLayout title="Connectors">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold gradient-text">Connectors</h1>
+        <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+          管理平台连接器和系统任务
+        </p>
+      </div>
+      <a
+        href={`${base}/recommendations`}
+        class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        查看所有推荐
+      </a>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : (
+      <>
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold">{connectors.length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Total Connectors</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold text-green-500">{connectors.filter((c: any) => c.configured).length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Configured</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold text-blue-500">{systemTasks.length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">System Tasks</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold text-purple-500">{recommendations.length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Recommendations</p>
+          </div>
+        </div>
+
+        <!-- Connectors List -->
+        <div class="space-y-4">
+          {connectors.map((connector: any) => {
+            const info = platformInfo[connector.platform] || { name: connector.platform, icon: '🔗', color: 'gray' };
+            const tasks = getTasksForPlatform(connector.platform);
+            const recs = getRecommendationsForPlatform(connector.platform);
+            const hasContent = tasks.length > 0 || recs.length > 0;
+
+            return (
+              <details class="group rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden">
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-[hsl(var(--accent))]/50 transition-colors">
+                  <div class="flex items-center gap-4">
+                    <span class="text-2xl">{info.icon}</span>
+                    <div>
+                      <h3 class="font-semibold">{info.name}</h3>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{connector.description}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    {connector.supports_topic_discovery && (
+                      <span class="px-2 py-1 rounded text-xs bg-blue-500/10 text-blue-600">Topics</span>
+                    )}
+                    {connector.supports_persona_discovery && (
+                      <span class="px-2 py-1 rounded text-xs bg-purple-500/10 text-purple-600">Personas</span>
+                    )}
+                    {connector.supports_publishing && (
+                      <span class="px-2 py-1 rounded text-xs bg-green-500/10 text-green-600">Publishing</span>
+                    )}
+                    <span class={`px-3 py-1 rounded-full text-xs font-medium ${connector.configured ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
+                      {connector.configured ? 'Configured' : 'Not Configured'}
+                    </span>
+                    <svg class="w-5 h-5 text-[hsl(var(--muted-foreground))] group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </summary>
+
+                <div class="p-4 pt-0 border-t border-[hsl(var(--border))]">
+                  {!connector.configured ? (
+                    <div class="py-6 text-center">
+                      <p class="text-[hsl(var(--muted-foreground))] mb-3">此 Connector 尚未配置</p>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                        需要设置环境变量: {connector.env_keys?.join(', ') || 'N/A'}
+                      </p>
+                    </div>
+                  ) : !hasContent ? (
+                    <div class="py-6 text-center text-[hsl(var(--muted-foreground))]">
+                      <p>暂无系统任务或推荐数据</p>
+                    </div>
+                  ) : (
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
+                      <!-- Tasks Section -->
+                      <div>
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          System Tasks ({tasks.length})
+                        </h4>
+                        {tasks.length === 0 ? (
+                          <p class="text-sm text-[hsl(var(--muted-foreground))] py-2">无关联任务</p>
+                        ) : (
+                          <div class="space-y-2">
+                            {tasks.map((task: any) => (
+                              <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+                                <div class="flex items-center justify-between mb-1">
+                                  <span class="font-medium text-sm">{task.task_type}</span>
+                                  <span class={`px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
+                                    {task.enabled ? 'Enabled' : 'Disabled'}
+                                  </span>
+                                </div>
+                                <div class="text-xs text-[hsl(var(--muted-foreground))] space-y-0.5">
+                                  <p>Schedule: {task.schedule}</p>
+                                  <p>Last Run: {formatDate(task.last_run)}</p>
+                                  <p>Run Count: {task.run_count}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <!-- Recommendations Section -->
+                      <div>
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          Recommended Personas ({recs.length})
+                        </h4>
+                        {recs.length === 0 ? (
+                          <p class="text-sm text-[hsl(var(--muted-foreground))] py-2">无推荐数据</p>
+                        ) : (
+                          <div class="space-y-2 max-h-64 overflow-y-auto">
+                            {recs.slice(0, 5).map((rec: any) => (
+                              <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+                                <div class="flex items-center justify-between mb-1">
+                                  <span class="font-medium text-sm">{rec.name}</span>
+                                  <div class="flex items-center gap-2">
+                                    <span class="text-xs text-green-500">R:{rec.relevance_score}</span>
+                                    <span class="text-xs text-blue-500">P:{rec.potential_score}</span>
+                                  </div>
+                                </div>
+                                <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2">{rec.tagline}</p>
+                              </div>
+                            ))}
+                            {recs.length > 5 && (
+                              <a href={`${base}/recommendations`} class="block text-center text-sm text-[hsl(var(--primary))] hover:underline py-2">
+                                查看更多 ({recs.length - 5} more)
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+
+        <!-- Global System Tasks (not tied to specific platform) -->
+        {systemTasks.filter((t: any) => !t.platform).length > 0 && (
+          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <h2 class="text-lg font-semibold mb-4">Global System Tasks</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {systemTasks.filter((t: any) => !t.platform).map((task: any) => (
+                <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-medium">{task.task_type}</span>
+                    <span class={`px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
+                      {task.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div class="text-sm text-[hsl(var(--muted-foreground))] space-y-1">
+                    <p>Schedule: {task.schedule}</p>
+                    <p>Last Run: {formatDate(task.last_run)}</p>
+                    <p>Run Count: {task.run_count}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+</AdminLayout>

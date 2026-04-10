@@ -4,14 +4,13 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { cn, getPlatformColor, getPlatformName } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface PersonaSummary {
   id: string;
   name: string;
   tagline?: string;
   description?: string;
-  platforms: string[];
   content_count?: number;
   expertise?: string[];
   avg_score?: number;
@@ -58,17 +57,6 @@ export function PersonaCard({ persona, index = 0, baseUrl = '' }: PersonaCardPro
                 <p className="text-sm text-[hsl(var(--muted-foreground))] line-clamp-1 mt-0.5">
                   {persona.tagline || persona.description}
                 </p>
-
-                {/* Platforms */}
-                <div className="flex gap-1.5 mt-2">
-                  {persona.platforms.map((platform) => (
-                    <span
-                      key={platform}
-                      className={cn('w-2 h-2 rounded-full', getPlatformColor(platform))}
-                      title={getPlatformName(platform)}
-                    />
-                  ))}
-                </div>
               </div>
 
               {/* Score */}
@@ -94,14 +82,10 @@ export function PersonaCard({ persona, index = 0, baseUrl = '' }: PersonaCardPro
 
             {/* Stats */}
             {persona.content_count !== undefined && (
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="p-2 rounded-lg bg-[hsl(var(--muted))]">
                   <div className="text-lg font-bold text-[hsl(var(--foreground))]">{persona.content_count}</div>
                   <div className="text-xs text-[hsl(var(--muted-foreground))]">内容</div>
-                </div>
-                <div className="p-2 rounded-lg bg-[hsl(var(--muted))]">
-                  <div className="text-lg font-bold text-green-500">{persona.platforms.length}</div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))]">平台</div>
                 </div>
                 <div className="p-2 rounded-lg bg-[hsl(var(--muted))]">
                   <div className="text-lg font-bold text-blue-500">v1</div>

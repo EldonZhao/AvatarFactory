@@ -116,7 +116,6 @@ class PersonaRequest(BaseModel):
     boundaries: Optional[BoundariesRequest] = Field(None, description="Content boundaries")
 
     # Common fields
-    platforms: List[str] = Field(default=["xiaohongshu"], description="Target platforms")
     notification: Optional[NotificationConfigRequest] = Field(None, description="Notification settings")
 
 
@@ -583,7 +582,6 @@ def register_routes(app: FastAPI):
                     "name": p.identity.name,
                     "tagline": p.identity.tagline,
                     "version": p.version,
-                    "platforms": [pt.value for pt in p.platforms],
                 })
         return {
             "count": len(personas),
@@ -635,7 +633,6 @@ def register_routes(app: FastAPI):
             payload["boundaries"] = (
                 request.boundaries.model_dump() if request.boundaries else None
             )
-            payload["platforms"] = request.platforms
             payload["notification"] = (
                 request.notification.model_dump() if request.notification else None
             )
@@ -643,7 +640,6 @@ def register_routes(app: FastAPI):
             # Simple mode: AI generates from description
             payload["structured"] = False
             payload["user_input"] = f"Create a persona: {request.description}"
-            payload["platforms"] = request.platforms
 
         message = AgentMessage(
             sender="api",

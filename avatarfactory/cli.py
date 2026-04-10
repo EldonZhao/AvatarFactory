@@ -156,9 +156,6 @@ def chat(
 @app.command()
 def create_persona(
     description: str = typer.Argument(..., help="Describe your desired persona"),
-    platform: str = typer.Option(
-        "xiaohongshu", "--platform", "-t", help="Target platform"
-    ),
 ):
     """
     Create a new persona.
@@ -176,7 +173,7 @@ def create_persona(
             receiver="orchestrator",
             task_type="chat",  # type: ignore
             payload={
-                "user_input": f"Create a persona: {description}. Platform: {platform}"
+                "user_input": f"Create a persona: {description}"
             },
             context={},
         )
@@ -268,7 +265,7 @@ def list_personas():
     table = Table(title="Personas")
     table.add_column("ID", style="cyan")
     table.add_column("Name", style="green")
-    table.add_column("Platform", style="yellow")
+    table.add_column("Tagline", style="yellow")
 
     for persona_id in personas:
         persona = kb.load_persona(persona_id)
@@ -276,7 +273,7 @@ def list_personas():
             table.add_row(
                 persona_id,
                 persona.identity.name,
-                ", ".join(p.value for p in persona.platforms),
+                persona.identity.tagline[:50] + "..." if len(persona.identity.tagline) > 50 else persona.identity.tagline,
             )
 
     console.print(table)

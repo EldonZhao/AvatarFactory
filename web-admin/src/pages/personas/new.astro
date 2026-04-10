@@ -66,19 +66,6 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
           </div>
         </div>
 
-        <!-- Platforms -->
-        <div class="space-y-4">
-          <h2 class="text-lg font-semibold">目标平台</h2>
-          <div class="flex flex-wrap gap-3">
-            {['xiaohongshu', 'bluesky', 'twitter', 'linkedin', 'threads'].map((platform) => (
-              <label class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--accent))] cursor-pointer hover:bg-[hsl(var(--accent))]/80 transition-colors">
-                <input type="checkbox" name="platforms" value={platform} class="rounded" />
-                <span class="text-sm">{platform}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
         <!-- Expertise -->
         <div class="space-y-4">
           <h2 class="text-lg font-semibold">专业领域</h2>
@@ -123,7 +110,6 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
     e.preventDefault();
 
     const formData = new FormData(form as HTMLFormElement);
-    const platforms = formData.getAll('platforms');
     const expertiseStr = formData.get('expertise') as string;
     const expertise = expertiseStr ? expertiseStr.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -131,7 +117,6 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
       name: formData.get('name'),
       tagline: formData.get('tagline') || undefined,
       description: formData.get('description'),
-      platforms,
       expertise,
     };
 

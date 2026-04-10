@@ -58,7 +58,6 @@ export interface DashboardData {
     name: string;
     tagline?: string;
     description?: string;
-    platforms: string[];
     content_count?: number;
   }>;
   connectors: Array<{
@@ -79,7 +78,6 @@ export interface PersonaSummary {
   name: string;
   tagline?: string;
   description?: string;
-  platforms: string[];
   content_count?: number;
   expertise?: string[];
   avg_score?: number;
@@ -97,7 +95,6 @@ export interface PersonaDetail {
   id: string;
   name: string;
   description: string;
-  platforms: string[];
   voice: string;
   expertise: string[];
   style_guidelines: string[];
@@ -336,7 +333,6 @@ export interface Persona {
     avoid: string[];
     compliance: string[];
   };
-  platforms: string[];
 }
 
 export async function getAllPersonas(): Promise<Persona[]> {

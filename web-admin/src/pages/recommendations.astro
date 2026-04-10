@@ -1,0 +1,283 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+
+const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+const rawBase = import.meta.env.BASE_URL || '';
+const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+const cookie = Astro.request.headers.get('cookie') || '';
+
+let recommendationsData: any = null;
+let systemTasksData: any = null;
+let error = null;
+
+try {
+  const [recResponse, tasksResponse] = await Promise.all([
+    fetch(`${API_BASE}/api/admin/recommendations/personas?limit=20`, {
+      headers: { 'Cookie': cookie }
+    }),
+    fetch(`${API_BASE}/api/admin/recommendations/system-tasks`, {
+      headers: { 'Cookie': cookie }
+    })
+  ]);
+
+  if (recResponse.ok) {
+    recommendationsData = await recResponse.json();
+  }
+  if (tasksResponse.ok) {
+    systemTasksData = await tasksResponse.json();
+  }
+} catch (e) {
+  error = `Failed to fetch data: ${e}`;
+}
+
+const recommendations = recommendationsData?.recommendations || [];
+const systemTasks = systemTasksData?.tasks || [];
+const schedulerRunning = systemTasksData?.scheduler_running || false;
+
+// Helper to format date
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return 'Never';
+  const date = new Date(dateStr);
+  return date.toLocaleString('zh-CN');
+}
+
+// Helper to get task type display name
+function getTaskTypeName(taskType: string) {
+  const names: Record<string, string> = {
+    'trend_scan': 'Trend Scan',
+    'persona_recommendation': 'Persona Recommendation',
+  };
+  return names[taskType] || taskType;
+}
+---
+
+<AdminLayout title="推荐 Personas">
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a
+          href={`${base}/connectors`}
+          class="p-2 rounded-lg hover:bg-[hsl(var(--accent))] transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </a>
+        <div>
+          <h1 class="text-2xl font-bold gradient-text">推荐 Personas</h1>
+          <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
+            系统发现的潜在 Persona 推荐
+          </p>
+        </div>
+      </div>
+      <button
+        id="refresh-btn"
+        class="px-4 py-2 rounded-lg bg-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/80 transition-colors flex items-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        刷新
+      </button>
+    </div>
+
+    {error ? (
+      <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <p class="font-medium">无法加载数据</p>
+        <p class="text-sm mt-1">{error}</p>
+      </div>
+    ) : (
+      <>
+        <!-- System Tasks Status -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">系统任务状态</h2>
+            <span class={`px-3 py-1 rounded-full text-xs font-medium ${schedulerRunning ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+              {schedulerRunning ? 'Scheduler Running' : 'Scheduler Stopped'}
+            </span>
+          </div>
+
+          {systemTasks.length === 0 ? (
+            <p class="text-[hsl(var(--muted-foreground))]">No system tasks configured</p>
+          ) : (
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {systemTasks.map((task: any) => (
+                <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-medium">{getTaskTypeName(task.task_type)}</h3>
+                    <span class={`px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
+                      {task.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div class="space-y-1 text-sm text-[hsl(var(--muted-foreground))]">
+                    <p><span class="font-medium">Schedule:</span> {task.schedule}</p>
+                    <p><span class="font-medium">Last Run:</span> {formatDate(task.last_run)}</p>
+                    <p><span class="font-medium">Next Run:</span> {task.next_run || 'Not scheduled'}</p>
+                    <p><span class="font-medium">Run Count:</span> {task.run_count}</p>
+                  </div>
+                  <button
+                    class="mt-3 px-3 py-1 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity run-task-btn"
+                    data-task-id={task.id}
+                    data-task-type={task.task_type}
+                  >
+                    Run Now
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <!-- Recommendations List -->
+        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">发现的推荐 ({recommendations.length})</h2>
+          </div>
+
+          {recommendations.length === 0 ? (
+            <div class="text-center py-8 text-[hsl(var(--muted-foreground))]">
+              <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <p class="font-medium">暂无推荐</p>
+              <p class="text-sm mt-1">运行 "Persona Recommendation" 任务来生成推荐</p>
+            </div>
+          ) : (
+            <div class="space-y-4">
+              {recommendations.map((rec: any) => (
+                <div class="p-4 rounded-lg border border-[hsl(var(--border))] hover:border-[hsl(var(--primary))] transition-colors">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-3 mb-2">
+                        <h3 class="font-semibold text-lg">{rec.name}</h3>
+                        <span class="px-2 py-0.5 rounded text-xs bg-purple-500/10 text-purple-600">
+                          {rec.domain}
+                        </span>
+                        <span class={`px-2 py-0.5 rounded text-xs ${
+                          rec.status === 'active' ? 'bg-green-500/10 text-green-600' :
+                          rec.status === 'adopted' ? 'bg-blue-500/10 text-blue-600' :
+                          'bg-gray-500/10 text-gray-600'
+                        }`}>
+                          {rec.status}
+                        </span>
+                      </div>
+                      <p class="text-[hsl(var(--muted-foreground))] mb-3">{rec.tagline}</p>
+
+                      <!-- Scores -->
+                      <div class="flex gap-4 mb-3">
+                        <div class="flex items-center gap-2">
+                          <span class="text-sm text-[hsl(var(--muted-foreground))]">Relevance:</span>
+                          <span class={`font-bold ${rec.relevance_score >= 70 ? 'text-green-500' : rec.relevance_score >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
+                            {rec.relevance_score}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="text-sm text-[hsl(var(--muted-foreground))]">Potential:</span>
+                          <span class={`font-bold ${rec.potential_score >= 70 ? 'text-green-500' : rec.potential_score >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
+                            {rec.potential_score}
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Expertise Tags -->
+                      {rec.expertise && rec.expertise.length > 0 && (
+                        <div class="flex flex-wrap gap-2 mb-3">
+                          {rec.expertise.slice(0, 5).map((exp: string) => (
+                            <span class="px-2 py-1 rounded bg-[hsl(var(--accent))] text-xs">
+                              {exp}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <!-- Source -->
+                      {rec.source_platforms && rec.source_platforms.length > 0 && (
+                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                          Source: {rec.source_platforms.join(', ')}
+                        </p>
+                      )}
+                    </div>
+
+                    <div class="ml-4">
+                      <button
+                        class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm adopt-btn"
+                        data-rec-id={rec.id}
+                        data-rec-name={rec.name}
+                      >
+                        Adopt
+                      </button>
+                    </div>
+                  </div>
+
+                  {rec.rationale && (
+                    <div class="mt-3 pt-3 border-t border-[hsl(var(--border))]">
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                        <span class="font-medium">Rationale:</span> {rec.rationale}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  // Refresh button
+  document.getElementById('refresh-btn')?.addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  // Run task buttons
+  document.querySelectorAll('.run-task-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const target = e.target as HTMLButtonElement;
+      const taskId = target.dataset.taskId;
+      const taskType = target.dataset.taskType;
+
+      if (!confirm(`Run "${taskType}" task now?`)) return;
+
+      target.disabled = true;
+      target.textContent = 'Running...';
+
+      try {
+        const response = await fetch(`/api/admin/scheduler/tasks/${taskId}/run`, {
+          method: 'POST',
+        });
+
+        if (response.ok) {
+          alert('Task started successfully. Results may take a few minutes.');
+          window.location.reload();
+        } else {
+          const error = await response.text();
+          alert('Failed to run task: ' + error);
+        }
+      } catch (err) {
+        alert('Error: ' + err);
+      } finally {
+        target.disabled = false;
+        target.textContent = 'Run Now';
+      }
+    });
+  });
+
+  // Adopt buttons (placeholder - would create persona from recommendation)
+  document.querySelectorAll('.adopt-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const target = e.target as HTMLButtonElement;
+      const recId = target.dataset.recId;
+      const recName = target.dataset.recName;
+
+      if (!confirm(`Adopt "${recName}" as a new Persona?`)) return;
+
+      // TODO: Implement adopt functionality
+      alert('Adopt functionality coming soon! This will create a new Persona based on this recommendation.');
+    });
+  });
+</script>

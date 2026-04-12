@@ -1192,3 +1192,161 @@ async def get_system_tasks_status():
         "tasks": result,
         "scheduler_running": scheduler.is_running(),
     }
+
+
+# =============================================================================
+# Trends Endpoints (for Connectors page)
+# =============================================================================
+
+
+@router.get("/trends/{platform}", dependencies=[Depends(require_admin_auth)])
+async def get_trends_by_platform(platform: str, limit: int = 10):
+    """
+    Get latest trend snapshots for a specific platform.
+
+    Returns trending topics, hashtags, and themes discovered by Trend Scan tasks.
+    """
+    orchestrator = get_orchestrator()
+    kb = orchestrator.kb
+
+    try:
+        snapshots = kb.get_latest_trend_snapshots(platform=platform, limit=limit)
+
+        return {
+            "platform": platform,
+            "count": len(snapshots),
+            "snapshots": [
+                {
+                    "id": s.id,
+                    "captured_at": s.captured_at.isoformat(),
+                    "trending_topics": s.trending_topics[:10],
+                    "trending_hashtags": s.trending_hashtags[:10],
+                    "key_themes": s.key_themes[:5],
+                    "analysis_summary": s.analysis_summary[:500] if s.analysis_summary else "",
+                }
+                for s in snapshots
+            ],
+        }
+    except Exception as e:
+        return {"platform": platform, "count": 0, "snapshots": [], "error": str(e)}
+
+
+class CreateTrendScanTaskRequest(BaseModel):
+    """Request to create a trend scan task for a platform."""
+    schedule: str = Field(default="0 8 * * *", description="Cron schedule expression")
+    limit: int = Field(default=30, description="Number of posts to fetch per scan")
+    enabled: bool = Field(default=True, description="Whether task is enabled")
+
+
+@router.get("/connectors/{platform}/task", dependencies=[Depends(require_admin_auth)])
+async def get_connector_trend_task(platform: str):
+    """
+    Get the Trend Scan task configuration for a specific platform.
+
+    Returns the task details if it exists, null otherwise.
+    """
+    scheduler = get_scheduler()
+
+    if not scheduler:
+        return {"task": None, "scheduler_available": False}
+
+    # Look for trend_scan task for this platform
+    task_id = f"trend_scan_{platform}"
+    task = scheduler.get_task(task_id)
+
+    if not task:
+        # Also check for system tasks that might target this platform
+        all_tasks = scheduler.list_tasks()
+        for t in all_tasks:
+            if t.task_type == "trend_scan" and t.platform == platform:
+                task = t
+                break
+
+    if not task:
+        return {"task": None, "scheduler_available": True}
+
+    # Get next run time
+    next_runs = scheduler.get_next_runs() if scheduler.is_running() else []
+    next_run_map = {nr["task_id"]: nr["next_run"] for nr in next_runs}
+
+    return {
+        "task": {
+            "id": task.id,
+            "name": task.name,
+            "task_type": task.task_type,
+            "platform": task.platform,
+            "schedule": task.schedule,
+            "enabled": task.enabled,
+            "last_run": task.last_run.isoformat() if task.last_run else None,
+            "last_status": task.last_status,
+            "run_count": task.run_count,
+            "next_run": next_run_map.get(task.id),
+        },
+        "scheduler_available": True,
+    }
+
+
+@router.post("/connectors/{platform}/task", dependencies=[Depends(require_admin_auth)])
+async def create_connector_trend_task(platform: str, request: CreateTrendScanTaskRequest):
+    """
+    Create or update a Trend Scan task for a specific platform.
+
+    Task ID format: trend_scan_{platform}
+    """
+    scheduler = get_scheduler()
+
+    if not scheduler:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler not available",
+        )
+
+    # Verify platform is valid
+    from avatarfactory.connectors.registry import ConnectorRegistry
+
+    all_capabilities = ConnectorRegistry.get_all_capabilities()
+    if platform not in all_capabilities:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Platform {platform} not found",
+        )
+
+    caps = all_capabilities[platform]
+    if not caps.supports_topic_discovery:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Platform {platform} does not support topic discovery",
+        )
+
+    # Task ID and name
+    task_id = f"trend_scan_{platform}"
+    task_name = f"Trend Scan - {caps.display_name}"
+
+    # Check if task exists
+    existing_task = scheduler.get_task(task_id)
+
+    if existing_task:
+        # Update existing task
+        scheduler.remove_task(task_id)
+
+    # Create task
+    task = scheduler.add_task_from_dict({
+        "id": task_id,
+        "name": task_name,
+        "task_type": "trend_scan",
+        "schedule": request.schedule,
+        "platform": platform,
+        "persona_id": None,  # System task
+        "enabled": request.enabled,
+        "config": {
+            "limit": request.limit,
+        },
+    })
+
+    return {
+        "status": "created" if not existing_task else "updated",
+        "task_id": task.id,
+        "task_name": task.name,
+        "schedule": task.schedule,
+        "platform": platform,
+    }

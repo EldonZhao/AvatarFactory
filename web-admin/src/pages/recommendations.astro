@@ -13,7 +13,7 @@ let error = null;
 
 try {
   const [recResponse, tasksResponse] = await Promise.all([
-    fetch(`${API_BASE}/api/admin/recommendations/personas?limit=20`, {
+    fetch(`${API_BASE}/api/admin/recommendations/personas?limit=50`, {
       headers: { 'Cookie': cookie }
     }),
     fetch(`${API_BASE}/api/admin/recommendations/system-tasks`, {
@@ -35,24 +35,18 @@ const recommendations = recommendationsData?.recommendations || [];
 const systemTasks = systemTasksData?.tasks || [];
 const schedulerRunning = systemTasksData?.scheduler_running || false;
 
+// Find persona_recommendation task specifically
+const personaRecommendationTask = systemTasks.find((t: any) => t.task_type === 'persona_recommendation');
+
 // Helper to format date
 function formatDate(dateStr: string | null) {
   if (!dateStr) return 'Never';
   const date = new Date(dateStr);
   return date.toLocaleString('zh-CN');
 }
-
-// Helper to get task type display name
-function getTaskTypeName(taskType: string) {
-  const names: Record<string, string> = {
-    'trend_scan': 'Trend Scan',
-    'persona_recommendation': 'Persona Recommendation',
-  };
-  return names[taskType] || taskType;
-}
 ---
 
-<AdminLayout title="推荐 Personas">
+<AdminLayout title="Personas 推荐">
   <div class="space-y-6 animate-fade-in">
     <!-- Header -->
     <div class="flex items-center justify-between">
@@ -66,9 +60,9 @@ function getTaskTypeName(taskType: string) {
           </svg>
         </a>
         <div>
-          <h1 class="text-2xl font-bold gradient-text">推荐 Personas</h1>
+          <h1 class="text-2xl font-bold gradient-text">Personas 推荐</h1>
           <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
-            系统发现的潜在 Persona 推荐
+            基于趋势分析自动发现的潜在 Persona 推荐
           </p>
         </div>
       </div>
@@ -90,44 +84,79 @@ function getTaskTypeName(taskType: string) {
       </div>
     ) : (
       <>
-        <!-- System Tasks Status -->
-        <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+        <!-- Persona Recommendation Task Card (Highlighted) -->
+        <div class="p-6 rounded-xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold">系统任务状态</h2>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold">Persona Recommendation 任务</h2>
+                <p class="text-sm text-[hsl(var(--muted-foreground))]">分析趋势数据并生成 Persona 推荐</p>
+              </div>
+            </div>
             <span class={`px-3 py-1 rounded-full text-xs font-medium ${schedulerRunning ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
               {schedulerRunning ? 'Scheduler Running' : 'Scheduler Stopped'}
             </span>
           </div>
 
-          {systemTasks.length === 0 ? (
-            <p class="text-[hsl(var(--muted-foreground))]">No system tasks configured</p>
+          {personaRecommendationTask ? (
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="p-3 rounded-lg bg-[hsl(var(--card))]">
+                <p class="text-xs text-[hsl(var(--muted-foreground))]">Schedule</p>
+                <p class="font-medium">{personaRecommendationTask.schedule}</p>
+              </div>
+              <div class="p-3 rounded-lg bg-[hsl(var(--card))]">
+                <p class="text-xs text-[hsl(var(--muted-foreground))]">Last Run</p>
+                <p class="font-medium">{formatDate(personaRecommendationTask.last_run)}</p>
+              </div>
+              <div class="p-3 rounded-lg bg-[hsl(var(--card))]">
+                <p class="text-xs text-[hsl(var(--muted-foreground))]">Run Count</p>
+                <p class="font-medium">{personaRecommendationTask.run_count}</p>
+              </div>
+              <div class="p-3 rounded-lg bg-[hsl(var(--card))] flex items-center justify-center">
+                <button
+                  class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium run-task-btn"
+                  data-task-id={personaRecommendationTask.id}
+                  data-task-type={personaRecommendationTask.task_type}
+                >
+                  Run Now
+                </button>
+              </div>
+            </div>
           ) : (
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {systemTasks.map((task: any) => (
-                <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="font-medium">{getTaskTypeName(task.task_type)}</h3>
-                    <span class={`px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
-                      {task.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                  <div class="space-y-1 text-sm text-[hsl(var(--muted-foreground))]">
-                    <p><span class="font-medium">Schedule:</span> {task.schedule}</p>
-                    <p><span class="font-medium">Last Run:</span> {formatDate(task.last_run)}</p>
-                    <p><span class="font-medium">Next Run:</span> {task.next_run || 'Not scheduled'}</p>
-                    <p><span class="font-medium">Run Count:</span> {task.run_count}</p>
-                  </div>
-                  <button
-                    class="mt-3 px-3 py-1 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity run-task-btn"
-                    data-task-id={task.id}
-                    data-task-type={task.task_type}
-                  >
-                    Run Now
-                  </button>
-                </div>
-              ))}
+            <div class="text-center py-4">
+              <p class="text-[hsl(var(--muted-foreground))] mb-3">Persona Recommendation 任务尚未配置</p>
+              <a
+                href={`${base}/schedulers/new`}
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Create Task
+              </a>
             </div>
           )}
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold">{recommendations.length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Total Recommendations</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold text-green-500">{recommendations.filter((r: any) => r.status === 'active').length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Active</p>
+          </div>
+          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
+            <p class="text-2xl font-bold text-blue-500">{recommendations.filter((r: any) => r.status === 'adopted').length}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Adopted</p>
+          </div>
         </div>
 
         <!-- Recommendations List -->

@@ -1,5 +1,6 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import { ConnectorConfigButton } from '../../components/connectors/ConnectorConfigButton';
 
 const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
 const rawBase = import.meta.env.BASE_URL || '';
@@ -8,48 +9,17 @@ const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 const cookie = Astro.request.headers.get('cookie') || '';
 
 let connectorsData: any = null;
-let schedulerTasksData: any = null;
-let recommendationsData: any = null;
 let error = null;
 
 try {
-  const [connRes, tasksRes, recRes] = await Promise.all([
-    fetch(`${API_BASE}/api/admin/connectors`, { headers: { 'Cookie': cookie } }),
-    fetch(`${API_BASE}/api/admin/scheduler/tasks`, { headers: { 'Cookie': cookie } }),
-    fetch(`${API_BASE}/api/admin/recommendations/personas?limit=50`, { headers: { 'Cookie': cookie } })
-  ]);
-
+  const connRes = await fetch(`${API_BASE}/api/admin/connectors`, { headers: { 'Cookie': cookie } });
   if (connRes.ok) connectorsData = await connRes.json();
-  if (tasksRes.ok) schedulerTasksData = await tasksRes.json();
-  if (recRes.ok) recommendationsData = await recRes.json();
 } catch (e) {
   error = `Failed to fetch data: ${e}`;
 }
 
 // Filter out wecom (it's a callback, not a connector)
 const connectors = (connectorsData?.connectors || []).filter((c: any) => c.platform !== 'wecom');
-const allTasks = schedulerTasksData?.tasks || [];
-const recommendations = recommendationsData?.recommendations || [];
-
-// Group system tasks by platform (from task config)
-// System tasks have persona_id = null and may have a platform in their config
-const systemTasks = allTasks.filter((t: any) => !t.persona_id);
-
-// Helper to get tasks for a platform
-function getTasksForPlatform(platform: string) {
-  return systemTasks.filter((t: any) =>
-    t.platform === platform ||
-    (t.task_type === 'trend_scan' && !t.platform) ||
-    (t.task_type === 'persona_recommendation' && !t.platform)
-  );
-}
-
-// Helper to get recommendations from a platform
-function getRecommendationsForPlatform(platform: string) {
-  return recommendations.filter((r: any) =>
-    r.source_platforms && r.source_platforms.includes(platform)
-  );
-}
 
 // Platform display info
 const platformInfo: Record<string, { name: string; icon: string; color: string }> = {
@@ -71,6 +41,10 @@ function formatDate(dateStr: string | null) {
   if (!dateStr) return 'Never';
   return new Date(dateStr).toLocaleString('zh-CN');
 }
+
+// Count connectors with topic discovery support
+const topicDiscoveryCount = connectors.filter((c: any) => c.supports_topic_discovery).length;
+const configuredCount = connectors.filter((c: any) => c.configured).length;
 ---
 
 <AdminLayout title="Connectors">
@@ -80,7 +54,7 @@ function formatDate(dateStr: string | null) {
       <div>
         <h1 class="text-2xl font-bold gradient-text">Connectors</h1>
         <p class="text-[hsl(var(--muted-foreground))] text-sm mt-1">
-          管理平台连接器和系统任务
+          管理平台连接器和趋势扫描任务
         </p>
       </div>
       <a
@@ -90,7 +64,7 @@ function formatDate(dateStr: string | null) {
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-        查看所有推荐
+        查看所有 Personas 推荐
       </a>
     </div>
 
@@ -102,22 +76,18 @@ function formatDate(dateStr: string | null) {
     ) : (
       <>
         <!-- Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
             <p class="text-2xl font-bold">{connectors.length}</p>
             <p class="text-sm text-[hsl(var(--muted-foreground))]">Total Connectors</p>
           </div>
           <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
-            <p class="text-2xl font-bold text-green-500">{connectors.filter((c: any) => c.configured).length}</p>
+            <p class="text-2xl font-bold text-green-500">{configuredCount}</p>
             <p class="text-sm text-[hsl(var(--muted-foreground))]">Configured</p>
           </div>
           <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
-            <p class="text-2xl font-bold text-blue-500">{systemTasks.length}</p>
-            <p class="text-sm text-[hsl(var(--muted-foreground))]">System Tasks</p>
-          </div>
-          <div class="p-4 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
-            <p class="text-2xl font-bold text-purple-500">{recommendations.length}</p>
-            <p class="text-sm text-[hsl(var(--muted-foreground))]">Recommendations</p>
+            <p class="text-2xl font-bold text-blue-500">{topicDiscoveryCount}</p>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">Supports Topics</p>
           </div>
         </div>
 
@@ -125,12 +95,10 @@ function formatDate(dateStr: string | null) {
         <div class="space-y-4">
           {connectors.map((connector: any) => {
             const info = platformInfo[connector.platform] || { name: connector.platform, icon: '🔗', color: 'gray' };
-            const tasks = getTasksForPlatform(connector.platform);
-            const recs = getRecommendationsForPlatform(connector.platform);
-            const hasContent = tasks.length > 0 || recs.length > 0;
+            const envKeys = connector.env_keys?.map((e: any) => e.key || e).filter(Boolean) || [];
 
             return (
-              <details class="group rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden">
+              <details class="group rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden" data-platform={connector.platform}>
                 <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-[hsl(var(--accent))]/50 transition-colors">
                   <div class="flex items-center gap-4">
                     <span class="text-2xl">{info.icon}</span>
@@ -140,14 +108,8 @@ function formatDate(dateStr: string | null) {
                     </div>
                   </div>
                   <div class="flex items-center gap-3">
-                    {connector.supports_topic_discovery && (
-                      <span class="px-2 py-1 rounded text-xs bg-blue-500/10 text-blue-600">Topics</span>
-                    )}
-                    {connector.supports_persona_discovery && (
-                      <span class="px-2 py-1 rounded text-xs bg-purple-500/10 text-purple-600">Personas</span>
-                    )}
-                    {connector.supports_publishing && (
-                      <span class="px-2 py-1 rounded text-xs bg-green-500/10 text-green-600">Publishing</span>
+                    {connector.configured && connector.supports_topic_discovery && (
+                      <span class="px-2 py-1 rounded text-xs bg-blue-500/10 text-blue-600">Trends</span>
                     )}
                     <span class={`px-3 py-1 rounded-full text-xs font-medium ${connector.configured ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
                       {connector.configured ? 'Configured' : 'Not Configured'}
@@ -162,79 +124,57 @@ function formatDate(dateStr: string | null) {
                   {!connector.configured ? (
                     <div class="py-6 text-center">
                       <p class="text-[hsl(var(--muted-foreground))] mb-3">此 Connector 尚未配置</p>
-                      <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                        需要设置环境变量: {connector.env_keys?.join(', ') || 'N/A'}
+                      <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+                        需要设置环境变量: {envKeys.join(', ') || 'N/A'}
                       </p>
+                      <ConnectorConfigButton
+                        client:load
+                        platform={connector.platform}
+                        buttonText="Configure"
+                      />
                     </div>
-                  ) : !hasContent ? (
-                    <div class="py-6 text-center text-[hsl(var(--muted-foreground))]">
-                      <p>暂无系统任务或推荐数据</p>
-                    </div>
-                  ) : (
+                  ) : connector.supports_topic_discovery ? (
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4">
-                      <!-- Tasks Section -->
-                      <div>
+                      <!-- Trend Scan Task Section -->
+                      <div class="connector-task-section" data-platform={connector.platform}>
                         <h4 class="font-medium mb-3 flex items-center gap-2">
                           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          System Tasks ({tasks.length})
+                          Trend Scan Task
                         </h4>
-                        {tasks.length === 0 ? (
-                          <p class="text-sm text-[hsl(var(--muted-foreground))] py-2">无关联任务</p>
-                        ) : (
-                          <div class="space-y-2">
-                            {tasks.map((task: any) => (
-                              <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
-                                <div class="flex items-center justify-between mb-1">
-                                  <span class="font-medium text-sm">{task.task_type}</span>
-                                  <span class={`px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
-                                    {task.enabled ? 'Enabled' : 'Disabled'}
-                                  </span>
-                                </div>
-                                <div class="text-xs text-[hsl(var(--muted-foreground))] space-y-0.5">
-                                  <p>Schedule: {task.schedule}</p>
-                                  <p>Last Run: {formatDate(task.last_run)}</p>
-                                  <p>Run Count: {task.run_count}</p>
-                                </div>
-                              </div>
-                            ))}
+                        <div class="task-content">
+                          <div class="animate-pulse space-y-2">
+                            <div class="h-4 bg-[hsl(var(--accent))] rounded w-3/4"></div>
+                            <div class="h-4 bg-[hsl(var(--accent))] rounded w-1/2"></div>
                           </div>
-                        )}
+                        </div>
                       </div>
 
-                      <!-- Recommendations Section -->
-                      <div>
+                      <!-- Discovered Trends Section -->
+                      <div class="connector-topics-section" data-platform={connector.platform}>
                         <h4 class="font-medium mb-3 flex items-center gap-2">
                           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                           </svg>
-                          Recommended Personas ({recs.length})
+                          Discovered Trends
                         </h4>
-                        {recs.length === 0 ? (
-                          <p class="text-sm text-[hsl(var(--muted-foreground))] py-2">无推荐数据</p>
-                        ) : (
-                          <div class="space-y-2 max-h-64 overflow-y-auto">
-                            {recs.slice(0, 5).map((rec: any) => (
-                              <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
-                                <div class="flex items-center justify-between mb-1">
-                                  <span class="font-medium text-sm">{rec.name}</span>
-                                  <div class="flex items-center gap-2">
-                                    <span class="text-xs text-green-500">R:{rec.relevance_score}</span>
-                                    <span class="text-xs text-blue-500">P:{rec.potential_score}</span>
-                                  </div>
-                                </div>
-                                <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2">{rec.tagline}</p>
-                              </div>
-                            ))}
-                            {recs.length > 5 && (
-                              <a href={`${base}/recommendations`} class="block text-center text-sm text-[hsl(var(--primary))] hover:underline py-2">
-                                查看更多 ({recs.length - 5} more)
-                              </a>
-                            )}
+                        <div class="topics-content">
+                          <div class="animate-pulse space-y-2">
+                            <div class="h-4 bg-[hsl(var(--accent))] rounded w-full"></div>
+                            <div class="h-4 bg-[hsl(var(--accent))] rounded w-2/3"></div>
                           </div>
-                        )}
+                        </div>
                       </div>
+                    </div>
+                  ) : (
+                    <div class="py-6 text-center text-[hsl(var(--muted-foreground))]">
+                      <p>此 Connector 已配置，但不支持话题发现功能。</p>
+                      <p class="text-sm mt-2">该平台仅支持: {[
+                        connector.supports_publishing && 'Publishing',
+                        connector.supports_fetching && 'Fetching',
+                        connector.supports_persona_discovery && 'Persona Discovery',
+                      ].filter(Boolean).join(', ') || '基础功能'}</p>
                     </div>
                   )}
                 </div>
@@ -242,31 +182,247 @@ function formatDate(dateStr: string | null) {
             );
           })}
         </div>
-
-        <!-- Global System Tasks (not tied to specific platform) -->
-        {systemTasks.filter((t: any) => !t.platform).length > 0 && (
-          <div class="p-6 rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))]">
-            <h2 class="text-lg font-semibold mb-4">Global System Tasks</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {systemTasks.filter((t: any) => !t.platform).map((task: any) => (
-                <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="font-medium">{task.task_type}</span>
-                    <span class={`px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}`}>
-                      {task.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                  <div class="text-sm text-[hsl(var(--muted-foreground))] space-y-1">
-                    <p>Schedule: {task.schedule}</p>
-                    <p>Last Run: {formatDate(task.last_run)}</p>
-                    <p>Run Count: {task.run_count}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </>
     )}
   </div>
 </AdminLayout>
+
+<script>
+  // Load trend task and topics data when details are opened
+  document.querySelectorAll('details[data-platform]').forEach(details => {
+    details.addEventListener('toggle', async (e) => {
+      const target = e.target as HTMLDetailsElement;
+      if (!target.open) return;
+
+      const platform = target.dataset.platform;
+      if (!platform) return;
+
+      // Check if already loaded
+      const taskSection = target.querySelector('.connector-task-section');
+      const topicsSection = target.querySelector('.connector-topics-section');
+
+      if (!taskSection || !topicsSection) return;
+      if (taskSection.classList.contains('loaded')) return;
+
+      // Mark as loaded
+      taskSection.classList.add('loaded');
+
+      // Load task data
+      try {
+        const taskResponse = await fetch(`/api/admin/connectors/${platform}/task`, {
+          credentials: 'include'
+        });
+        if (taskResponse.ok) {
+          const taskData = await taskResponse.json();
+          renderTaskContent(taskSection.querySelector('.task-content')!, taskData, platform);
+        } else {
+          taskSection.querySelector('.task-content')!.innerHTML = `
+            <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+              <p class="text-sm text-[hsl(var(--muted-foreground))]">No Trend Scan task configured.</p>
+            </div>
+          `;
+        }
+      } catch (err) {
+        taskSection.querySelector('.task-content')!.innerHTML = `
+          <p class="text-sm text-red-500">Failed to load task data</p>
+        `;
+      }
+
+      // Load trends data
+      try {
+        const topicsResponse = await fetch(`/api/admin/trends/${platform}?limit=5`, {
+          credentials: 'include'
+        });
+        if (topicsResponse.ok) {
+          const topicsData = await topicsResponse.json();
+          renderTrendsContent(topicsSection.querySelector('.topics-content')!, topicsData);
+        } else {
+          topicsSection.querySelector('.topics-content')!.innerHTML = `
+            <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+              <p class="text-sm text-[hsl(var(--muted-foreground))]">No trends discovered yet.</p>
+            </div>
+          `;
+        }
+      } catch (err) {
+        topicsSection.querySelector('.topics-content')!.innerHTML = `
+          <p class="text-sm text-red-500">Failed to load trends data</p>
+        `;
+      }
+    });
+  });
+
+  function renderTaskContent(container: Element, data: any, platform: string) {
+    if (!data.task) {
+      container.innerHTML = `
+        <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+          <p class="text-sm text-[hsl(var(--muted-foreground))] mb-3">No Trend Scan task configured for this platform.</p>
+          <button
+            class="create-task-btn px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+            data-platform="${platform}"
+          >
+            Create Trend Scan Task
+          </button>
+        </div>
+      `;
+
+      // Add click handler for create button
+      container.querySelector('.create-task-btn')?.addEventListener('click', async (e) => {
+        const btn = e.target as HTMLButtonElement;
+        btn.disabled = true;
+        btn.textContent = 'Creating...';
+
+        try {
+          const response = await fetch(`/api/admin/connectors/${platform}/task`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schedule: '0 8 * * *', limit: 30, enabled: true })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            alert(`Task created: ${result.task_name}`);
+            window.location.reload();
+          } else {
+            alert('Failed to create task');
+            btn.disabled = false;
+            btn.textContent = 'Create Trend Scan Task';
+          }
+        } catch (err) {
+          alert('Error: ' + err);
+          btn.disabled = false;
+          btn.textContent = 'Create Trend Scan Task';
+        }
+      });
+      return;
+    }
+
+    const task = data.task;
+    const formatDate = (dateStr: string | null) => {
+      if (!dateStr) return 'Never';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    };
+
+    container.innerHTML = `
+      <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-medium text-sm">${task.name || task.task_type}</span>
+          <span class="px-2 py-0.5 rounded text-xs ${task.enabled ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'}">
+            ${task.enabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+        <div class="text-xs text-[hsl(var(--muted-foreground))] space-y-0.5">
+          <p>Schedule: ${task.schedule}</p>
+          <p>Last Run: ${formatDate(task.last_run)}</p>
+          <p>Run Count: ${task.run_count}</p>
+          ${task.next_run ? `<p>Next Run: ${task.next_run}</p>` : ''}
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button
+            class="run-task-btn px-3 py-1 text-xs rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+            data-task-id="${task.id}"
+          >
+            Run Now
+          </button>
+          <a
+            href="/schedulers/${task.id}"
+            class="px-3 py-1 text-xs rounded bg-[hsl(var(--accent))] border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]/80 transition-colors"
+          >
+            Edit Task
+          </a>
+        </div>
+      </div>
+    `;
+
+    // Add click handler for run button
+    container.querySelector('.run-task-btn')?.addEventListener('click', async (e) => {
+      const btn = e.target as HTMLButtonElement;
+      const taskId = btn.dataset.taskId;
+
+      if (!confirm('Run this task now?')) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+
+      try {
+        const response = await fetch(`/api/admin/scheduler/tasks/${taskId}/run`, {
+          method: 'POST'
+        });
+
+        if (response.ok) {
+          alert('Task started successfully');
+          btn.textContent = 'Started';
+        } else {
+          alert('Failed to start task');
+          btn.disabled = false;
+          btn.textContent = 'Run Now';
+        }
+      } catch (err) {
+        alert('Error: ' + err);
+        btn.disabled = false;
+        btn.textContent = 'Run Now';
+      }
+    });
+  }
+
+  function renderTrendsContent(container: Element, data: any) {
+    if (!data.snapshots || data.snapshots.length === 0) {
+      container.innerHTML = `
+        <div class="p-3 rounded-lg bg-[hsl(var(--accent))]">
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">No trends discovered yet. Run the Trend Scan task to discover trends.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Get the latest snapshot
+    const snapshot = data.snapshots[0];
+    const trendingTopics = snapshot.trending_topics?.slice(0, 5) || [];
+    const trendingHashtags = snapshot.trending_hashtags?.slice(0, 5) || [];
+    const keyThemes = snapshot.key_themes?.slice(0, 3) || [];
+
+    const formatDate = (dateStr: string) => {
+      return new Date(dateStr).toLocaleString('zh-CN');
+    };
+
+    container.innerHTML = `
+      <div class="p-3 rounded-lg bg-[hsl(var(--accent))] space-y-3">
+        ${trendingTopics.length > 0 ? `
+          <div>
+            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Trending Topics</p>
+            <div class="flex flex-wrap gap-1.5">
+              ${trendingTopics.map((topic: string) => `
+                <span class="px-2 py-1 rounded-full text-xs bg-blue-500/10 text-blue-600">${topic}</span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${trendingHashtags.length > 0 ? `
+          <div>
+            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Hashtags</p>
+            <div class="flex flex-wrap gap-1.5">
+              ${trendingHashtags.map((tag: string) => `
+                <span class="px-2 py-1 rounded-full text-xs bg-purple-500/10 text-purple-600">#${tag.replace(/^#/, '')}</span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${keyThemes.length > 0 ? `
+          <div>
+            <p class="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-1">Key Themes</p>
+            <div class="flex flex-wrap gap-1.5">
+              ${keyThemes.map((theme: string) => `
+                <span class="px-2 py-1 rounded-full text-xs bg-green-500/10 text-green-600">${theme}</span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${snapshot.analysis_summary ? `
+          <p class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2">${snapshot.analysis_summary}</p>
+        ` : ''}
+        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+          Captured: ${formatDate(snapshot.captured_at)}
+        </p>
+      </div>
+    `;
+  }
+</script>

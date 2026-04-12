@@ -330,3 +330,78 @@ export async function testConnector(platform: string): Promise<ConnectorTestResu
     method: 'POST',
   });
 }
+
+// =============================================================================
+// Trends API (for Connectors page)
+// =============================================================================
+
+export interface TrendSnapshotSummary {
+  id: string;
+  captured_at: string;
+  trending_topics: string[];
+  trending_hashtags: string[];
+  key_themes: string[];
+  analysis_summary: string;
+}
+
+export interface PlatformTrendsResponse {
+  platform: string;
+  count: number;
+  snapshots: TrendSnapshotSummary[];
+  error?: string;
+}
+
+export async function getTrendsByPlatform(platform: string, limit: number = 10): Promise<PlatformTrendsResponse> {
+  return apiFetch<PlatformTrendsResponse>(`/api/admin/trends/${platform}?limit=${limit}`);
+}
+
+// =============================================================================
+// Connector Trend Task API
+// =============================================================================
+
+export interface ConnectorTrendTask {
+  id: string;
+  name: string;
+  task_type: string;
+  platform: string;
+  schedule: string;
+  enabled: boolean;
+  last_run: string | null;
+  last_status: string | null;
+  run_count: number;
+  next_run: string | null;
+}
+
+export interface ConnectorTrendTaskResponse {
+  task: ConnectorTrendTask | null;
+  scheduler_available: boolean;
+}
+
+export interface CreateTrendScanTaskRequest {
+  schedule?: string;
+  limit?: number;
+  enabled?: boolean;
+}
+
+export interface CreateTrendScanTaskResponse {
+  status: 'created' | 'updated';
+  task_id: string;
+  task_name: string;
+  schedule: string;
+  platform: string;
+}
+
+export async function getConnectorTrendTask(platform: string): Promise<ConnectorTrendTaskResponse> {
+  return apiFetch<ConnectorTrendTaskResponse>(`/api/admin/connectors/${platform}/task`);
+}
+
+export async function createConnectorTrendTask(
+  platform: string,
+  request: CreateTrendScanTaskRequest = {}
+): Promise<CreateTrendScanTaskResponse> {
+  return apiFetch<CreateTrendScanTaskResponse>(`/api/admin/connectors/${platform}/task`, {
+    method: 'POST',
+    body: request,
+  });
+}
+

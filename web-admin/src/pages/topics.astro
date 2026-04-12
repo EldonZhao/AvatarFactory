@@ -27,7 +27,11 @@ try {
 
 const grouped = topicsData?.grouped || {};
 const totalCount = topicsData?.count || 0;
-const personaCount = Object.keys(grouped).length;
+// Only count personas with discoveries or ideas
+const personaCount = Object.entries(grouped).filter(([_, data]: [string, any]) => {
+  const totalIdeas = data.topics?.reduce((sum: number, t: any) => sum + (t.ideas?.length || 0), 0) || 0;
+  return (data.topics?.length || 0) > 0 || totalIdeas > 0;
+}).length;
 const ideasCount = Object.values(grouped).reduce((acc: number, g: any) => acc + (g.topics?.reduce((sum: number, t: any) => sum + (t.ideas?.length || 0), 0) || 0), 0);
 ---
 
@@ -103,7 +107,12 @@ const ideasCount = Object.values(grouped).reduce((acc: number, g: any) => acc + 
 
         {Object.keys(grouped).length > 0 ? (
           <div class="space-y-4">
-            {Object.entries(grouped).map(([personaId, data]: [string, any]) => {
+            {Object.entries(grouped)
+              .filter(([_, data]: [string, any]) => {
+                const totalIdeas = data.topics.reduce((sum: number, t: any) => sum + (t.ideas?.length || 0), 0);
+                return data.topics.length > 0 || totalIdeas > 0;
+              })
+              .map(([personaId, data]: [string, any]) => {
               const totalIdeas = data.topics.reduce((sum: number, t: any) => sum + (t.ideas?.length || 0), 0);
               return (
                 <details class="group rounded-xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] overflow-hidden">

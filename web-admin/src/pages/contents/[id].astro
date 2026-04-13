@@ -82,7 +82,7 @@ function getScoreColor(score: number): string {
             </div>
             <div class="flex gap-2 shrink-0">
               <a
-                href={`${API_BASE}/content/${id}/view`}
+                href={`/content/${id}/view`}
                 target="_blank"
                 class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
               >
@@ -243,7 +243,7 @@ function getScoreColor(score: number): string {
               <h2 class="text-lg font-semibold mb-4">导出</h2>
               <div class="space-y-2">
                 <a
-                  href={`${API_BASE}/content/${id}/image`}
+                  href={`/content/${id}/image`}
                   target="_blank"
                   class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
                 >
@@ -253,7 +253,7 @@ function getScoreColor(score: number): string {
                   导出为图片
                 </a>
                 <a
-                  href={`${API_BASE}/content/${id}/images?format=xiaohongshu&output=zip`}
+                  href={`/content/${id}/images?format=xiaohongshu&output=zip`}
                   target="_blank"
                   class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
                 >

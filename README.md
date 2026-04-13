@@ -43,19 +43,50 @@ AvatarFactory turns this into an **experiment-driven workflow**.
 - **TopicAgent** - Discover hot topics and analyze trends from social platforms
 - **ReviewAgent** - 4-dimension scoring (persona consistency, platform fit, compliance, engagement)
 - **SimulationAgent** - Engagement prediction and comment scripts
+- **RecommendationAgent** - Generate persona recommendations from trending data
+- **EvolutionAgent** - Feedback analysis, evolution suggestions, approval workflows
 - **ProactiveOrchestrator** - Scheduled tasks, automatic trend scanning
 
 ### Platform Connectors
-- **Bluesky** - Full AT Protocol support (post, reply threads, fetch posts)
-- **Twitter/X** - API v2 with thread support
-- **Xiaohongshu (小红书)** - Cookie-based auth with xhs library signing
-- **WeChat Work (企业微信)** - Webhook notifications
 
-### Service Deployment
-- **FastAPI REST API** - Production-ready HTTP service
+| Platform | Auth Method | Publish | Fetch | Topic Discovery |
+|----------|-------------|---------|-------|-----------------|
+| Bluesky | AT Protocol (app password) | Yes | Yes | Yes |
+| Twitter/X | API v2 (OAuth) | Yes | Yes | Yes |
+| Xiaohongshu (小红书) | Cookie + xhs signing | Yes | Yes | Yes |
+| LinkedIn | OAuth 2.0 | Yes | Yes | No |
+| Instagram | Graph API | Yes | Yes | No |
+| Threads | Graph API | Yes | Yes | No |
+| Weibo (微博) | Cookie-based | Yes | Yes | Yes |
+| Mastodon | OAuth 2.0 | Yes | Yes | Yes |
+| Toutiao (头条) | Cookie-based | Yes | Yes | Yes |
+| Zhihu (知乎) | Cookie-based | Yes | Yes | Yes |
+
+### Search Connectors
+- **Brave Search** - Web search for trend discovery
+- **Bing Search** - Web search with Azure integration
+
+### Notifications & Callbacks
+- **WeChat Work (企业微信)** - Webhook-based team notifications (text, markdown, news card)
+- **Webhook Notifier** - Multi-format push notifications (Slack, Discord, Feishu, WeChat Work, generic)
+- **Console Notifier** - Local console output for development
+
+### Content Adapters
+
+Platform-specific content formatting and validation for each connector (character limits, hashtag rules, image requirements, etc.):
+
+Bluesky, Twitter, Xiaohongshu, LinkedIn, Instagram, Threads, Weibo, Mastodon, Toutiao, Zhihu
+
+### Service & Deployment
+- **FastAPI REST API** - Production-ready HTTP service with auth middleware
 - **Background Scheduler** - APScheduler-based task automation
-- **Docker Support** - Containerized deployment
-- **Webhook Notifications** - Slack, Discord, Feishu, WeChat Work
+- **Docker Support** - Containerized deployment with docker-compose
+- **Multi-Tenancy** - Tenant-isolated knowledge bases and connector configs
+
+### Web Interfaces
+- **Web Admin** (Astro) - Management dashboard (personas, content, connectors, scheduler, topics, stats)
+- **Web Journal** (Astro) - Public content journal
+- **Streamlit Dashboard** - Visual analytics (topology, personas, scheduler, content, topics, chat)
 
 ### Video Generation
 - **Azure TTS** - High-quality text-to-speech
@@ -82,30 +113,21 @@ setup_venv.bat
 
 macOS/Linux:
 ```bash
-# Make executable and run
 chmod +x setup_venv.sh
 ./setup_venv.sh
 ```
 
-The script will:
-- Create virtual environment
-- Install dependencies
-- Setup AvatarFactory
-- Verify installation
+The script will create a virtual environment, install dependencies, setup AvatarFactory, and verify installation.
 
 ---
 
 **Alternative: Direct install**
 
 ```bash
-# Clone the repository
 git clone https://github.com/EldonZhao/AvatarFactory.git
 cd AvatarFactory
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Install package
 pip install -e .
 
 # For service deployment
@@ -154,9 +176,19 @@ BLUESKY_PASSWORD=your-app-password
 XIAOHONGSHU_COOKIE=your_cookie_string
 XIAOHONGSHU_USER_ID=your_user_id
 
-# WeChat Work (for notifications)
+# LinkedIn
+LINKEDIN_ACCESS_TOKEN=your_oauth2_token
+```
+
+4. (Optional) Configure notifications callback:
+
+```bash
+# WeChat Work webhook
 AVATARFACTORY_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY
 AVATARFACTORY_WEBHOOK_FORMAT=wecom
+
+# Or Slack / Discord / Feishu
+AVATARFACTORY_WEBHOOK_FORMAT=slack
 ```
 
 ### Quick Start
@@ -193,8 +225,52 @@ avatarfactory show-content <content_id>
 # Publish draft
 avatarfactory publish-draft <content_id> --platform bluesky
 
+# Get content inspiration from trends
+avatarfactory inspire <persona_id> --platform bluesky
+
 # Show stats
 avatarfactory stats
+```
+
+---
+
+## CLI Reference
+
+```bash
+# Chat & Core
+avatarfactory chat [--persona PERSONA_ID]          # Interactive mode
+avatarfactory create-persona "description"          # Create persona
+avatarfactory generate "topic" [--variants N]       # Generate content
+avatarfactory list-personas                         # List all personas
+avatarfactory delete-persona <id> [--force]         # Delete persona
+avatarfactory list-content [--status draft]         # List content
+avatarfactory show-content <id>                     # Show content details
+avatarfactory publish-draft <id> --platform P       # Publish to platform
+
+# Platform Operations
+avatarfactory connect <platform>                    # Test connection
+avatarfactory fetch <platform> [--limit N]          # Fetch trending content
+avatarfactory publish <platform> "content"          # Direct publish
+avatarfactory discover <platform> [--limit N]       # Discover & analyze trends
+avatarfactory inspire <persona_id>                  # Content inspiration
+
+# Scheduler
+avatarfactory daemon start|status|stop              # Background scheduler
+avatarfactory schedule list|add|remove|run          # Task management
+avatarfactory queue add|list|remove                 # Publish queue
+
+# Service
+avatarfactory serve [--port 8000]                   # Start API server
+avatarfactory dashboard [--port 8501]               # Start Streamlit dashboard
+
+# Video
+avatarfactory video generate [--type talking_head]  # Generate video
+avatarfactory video list-voices [--locale zh-CN]    # List TTS voices
+
+# Utilities
+avatarfactory stats                                 # Knowledge base stats
+avatarfactory version                               # Version info
+avatarfactory migrate-storage [--dry-run]           # Migrate storage
 ```
 
 ---
@@ -204,38 +280,112 @@ avatarfactory stats
 ### Run as HTTP Service
 
 ```bash
-# Start the service
+# Start the API server
 avatarfactory serve --host 0.0.0.0 --port 8000
 
-# Or run scheduler only
+# Start with Streamlit dashboard
+avatarfactory serve --dashboard
+
+# Run scheduler only
 avatarfactory serve --mode scheduler
 ```
 
 ### API Endpoints
 
+**System**
 - `GET /health` - Health check
+- `GET /topology` - System topology visualization
+- `GET /connectors/status` - All connector status
+
+**Chat**
 - `POST /chat` - Process chat message
+
+**Personas**
 - `GET /personas` - List all personas
 - `GET /personas/{id}` - Get persona details
 - `POST /personas` - Create persona
+- `DELETE /personas/{id}` - Delete persona
+
+**Content**
+- `POST /content/generate` - Generate content
 - `GET /content` - List content
 - `GET /content/{id}` - Get content details
-- `POST /content/generate` - Generate content
+- `GET /content/{id}/view` - Rendered content view
+- `GET /content/{id}/image` - Content image
+- `GET /content/{id}/images` - List content images
+
+**Scheduler**
 - `GET /scheduler/status` - Scheduler status
 - `GET /scheduler/tasks` - List scheduled tasks
-- `POST /scheduler/tasks/{persona_id}/setup` - Setup proactive tasks
+- `POST /scheduler/tasks` - Create task
+- `POST /scheduler/tasks/{id}/run` - Run task now
+- `DELETE /scheduler/tasks/{persona_id}` - Remove tasks
+
+**Connectors**
+- `GET /api/connectors/` - List all connectors
+- `GET /api/connectors/{platform}` - Connector details
+- `PUT /api/connectors/{platform}` - Update config
+- `POST /api/connectors/{platform}/test` - Test connection
+- `DELETE /api/connectors/{platform}` - Remove connector
+
+**Evolution**
+- `POST /personas/{id}/evolution/analyze` - Analyze for evolution
+- `POST /personas/{id}/evolution/suggest` - Generate suggestions
+- `GET /personas/{id}/evolution/suggestions` - Get suggestions
+- `POST /personas/{id}/evolution/apply` - Apply evolution
+- `POST /personas/{id}/evolution/rollback` - Rollback
+- `GET /personas/{id}/evolution/history` - Evolution history
+
+**Agent Config**
+- `GET /personas/{id}/agents/{type}/config` - Get agent config
+- `PUT /personas/{id}/agents/{type}/config` - Update agent config
 
 ### Docker Deployment
 
 ```bash
-# Build and run
 docker-compose up -d
-
-# View logs
 docker-compose logs -f
-
-# Stop
 docker-compose down
+```
+
+---
+
+## Architecture
+
+```
+CLI (chat / commands) / FastAPI Service / Web Admin (Astro)
+    ↓
+ProactiveOrchestrator (intent routing + scheduled tasks)
+    ├→ PersonaAgent         (persona CRUD, versioning)
+    ├→ ContentAgent         (multi-variant generation + hot-topic integration)
+    ├→ TopicAgent           (hot topic mining via search & platform connectors)
+    ├→ ReviewAgent          (4-dimension scoring)
+    ├→ SimulationAgent      (engagement prediction)
+    ├→ RecommendationAgent  (persona recommendations from trends)
+    ├→ EvolutionAgent       (feedback → evolution suggestions → apply/rollback)
+    └→ KnowledgeBase        (file-based YAML/JSON persistence)
+
+Platform Connectors (via ConnectorRegistry)
+    ├→ BlueskyConnector     (AT Protocol)
+    ├→ TwitterConnector     (API v2)
+    ├→ XiaohongshuConnector (cookie + xhs signing)
+    ├→ LinkedInConnector    (OAuth 2.0)
+    ├→ InstagramConnector   (Graph API)
+    ├→ ThreadsConnector     (Graph API)
+    ├→ WeiboConnector       (cookie-based)
+    ├→ MastodonConnector    (OAuth 2.0)
+    ├→ ToutiaoConnector     (cookie-based)
+    ├→ ZhihuConnector       (cookie-based)
+    ├→ BraveSearchConnector (search API)
+    └→ BingSearchConnector  (Azure search API)
+
+Content Adapters (platform-specific formatting & validation)
+    └→ One adapter per platform (character limits, hashtags, images, etc.)
+
+Notifications & Callbacks
+    ├→ WeComConnector       (WeChat Work webhook: text, markdown, news card)
+    ├→ WebhookNotifier      (Slack, Discord, Feishu, WeChat Work, generic)
+    └→ ConsoleNotifier      (development output)
 ```
 
 ---
@@ -245,64 +395,98 @@ docker-compose down
 ```
 avatarfactory/
 ├── agents/              # AI agents
-│   ├── persona.py       # PersonaAgent (persona CRUD)
+│   ├── base.py          # BaseAgent abstract class
+│   ├── persona.py       # PersonaAgent (persona CRUD, versioning)
 │   ├── content.py       # ContentAgent (content generation)
-│   ├── topic.py         # TopicAgent (hot topic mining)
+│   ├── review.py        # ReviewAgent (4-dimension scoring)
+│   ├── simulation.py    # SimulationAgent (engagement prediction)
+│   ├── recommendation.py # RecommendationAgent (trend-based recommendations)
+│   ├── evolution.py     # EvolutionAgent (persona evolution)
 │   ├── orchestrator.py  # OrchestratorAgent (intent routing)
-│   └── proactive_orchestrator.py  # ProactiveOrchestrator
+│   └── proactive_orchestrator.py  # ProactiveOrchestrator (scheduling)
 ├── connectors/          # Platform connectors
+│   ├── base.py          # BasePlatformConnector
+│   ├── registry.py      # ConnectorRegistry (decorator-based)
 │   ├── bluesky.py       # Bluesky (AT Protocol)
-│   ├── twitter.py       # Twitter/X API v2
+│   ├── twitter.py       # Twitter/X (API v2)
 │   ├── xiaohongshu.py   # Xiaohongshu (小红书)
-│   ├── wecom.py         # WeChat Work (企业微信)
-│   └── registry.py      # Connector registry
-├── core/                # Core functionality
-│   ├── knowledges.py    # Knowledges storage
-│   └── llm_provider.py  # LLM abstraction
-├── models/              # Data models (Pydantic)
+│   ├── linkedin.py      # LinkedIn (OAuth 2.0)
+│   ├── instagram.py     # Instagram (Graph API)
+│   ├── threads.py       # Threads (Graph API)
+│   ├── weibo.py         # Weibo (微博)
+│   ├── mastodon.py      # Mastodon (OAuth 2.0)
+│   ├── toutiao.py       # Toutiao (头条)
+│   ├── zhihu.py         # Zhihu (知乎)
+│   ├── brave_search.py  # Brave Search
+│   ├── bing_search.py   # Bing Search
+│   └── wecom.py         # WeChat Work (notification callback)
 ├── adapters/            # Platform content adapters
+│   ├── base.py          # BasePlatformAdapter
+│   └── *.py             # One adapter per platform
+├── core/                # Core infrastructure
+│   ├── knowledges.py    # File-based YAML/JSON storage
+│   ├── llm_provider.py  # LLM abstraction (Anthropic, OpenAI, Azure)
+│   ├── agent_config.py  # Agent configuration management
+│   ├── credentials.py   # Credential handling
+│   ├── tenant.py        # Multi-tenant support
+│   └── tenant_kb.py     # Tenant-specific knowledge base
+├── models/              # Pydantic data models
+│   └── schemas.py       # All schemas (Persona, Content, AgentMessage, etc.)
+├── notifications/       # Notification system (callbacks)
+│   ├── base.py          # NotificationProvider, NotificationManager
+│   ├── webhook.py       # WebhookNotifier (Slack, Discord, Feishu, WeChat Work)
+│   └── console.py       # ConsoleNotifier
 ├── scheduler/           # Task scheduling
 │   ├── engine.py        # APScheduler engine
-│   └── tasks.py         # Task definitions
+│   └── tasks.py         # TaskRegistry (decorator-based)
 ├── service/             # FastAPI service
-│   └── app.py           # REST API
+│   └── app.py           # REST API (33+ endpoints)
+├── middleware/           # HTTP middleware
+│   └── auth.py          # Authentication
+├── dashboard/           # Streamlit dashboard
+│   ├── Dashboard.py     # Main entry
+│   └── pages/           # Topology, Personas, Scheduler, Content, Topics, Chat
 ├── video/               # Video generation
 │   ├── azure_tts.py     # Azure TTS
 │   ├── edge_tts.py      # Edge TTS (free)
 │   ├── azure_avatar.py  # Azure Avatar
 │   └── composer.py      # Video composer
-├── notifications/       # Notification system
-└── cli.py               # Command-line interface
+├── utils/               # Utility helpers
+└── cli.py               # Typer CLI with Rich terminal UI
+
+web-admin/               # Astro web admin (personas, content, connectors, scheduler)
+web-journal/             # Astro public journal
 
 knowledges/              # User data storage (default)
 ├── personas/            # Persona configurations
 ├── content_library/     # Generated content
 ├── experiments/         # Experiment data
-└── platform_rules/      # Platform-specific rules
+├── platform_rules/      # Platform-specific rules
+├── recommendations/     # Recommendation data
+├── scheduler/           # Scheduler state & tasks
+├── user_feedback/       # User feedback records
+└── videos/              # Generated videos
 ```
 
 ---
 
-## Current Status (v0.2.0)
+## Current Status
 
 **Implemented:**
-- Persona creation and versioning
-- Content generation with multi-variant support
-- Hot-topic driven content generation
-- Multi-dimensional review system
-- Platform connectors (Bluesky, Twitter, Xiaohongshu, WeChat Work)
-- Topic Agent for hot topic mining
-- Scheduled task automation
-- FastAPI REST API service
-- Docker deployment support
-- Video generation with TTS
-- Webhook notifications
-
-**Coming Soon:**
-- Web UI dashboard
-- Advanced analytics and reporting
-- More platform connectors
-- MCP tool ecosystem integration
+- Multi-agent system with 8 specialized agents
+- Persona creation, versioning, and evolution
+- Content generation with multi-variant and hot-topic support
+- 4-dimension review scoring system
+- 10 platform connectors + 2 search connectors
+- Platform-specific content adapters (10 platforms)
+- Notification callbacks (WeChat Work, Slack, Discord, Feishu)
+- Scheduled task automation (APScheduler)
+- FastAPI REST API (33+ endpoints) with auth middleware
+- Multi-tenancy support
+- Docker deployment
+- Video generation (Azure TTS, Edge TTS, Azure Avatar)
+- Streamlit analytics dashboard
+- Astro web admin and journal interfaces
 
 ---
 

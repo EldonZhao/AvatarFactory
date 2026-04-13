@@ -68,3 +68,4 @@ web-journal/.astro/
 # Temporary files
 *.zip
 nul
+cookies.txt

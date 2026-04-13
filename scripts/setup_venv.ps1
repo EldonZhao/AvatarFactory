@@ -111,7 +111,7 @@ Write-Host ""
 # Run verification
 Write-Host "8️⃣  Running installation verification..." -ForegroundColor Yellow
 Write-Host ""
-python verify_install.py
+python scripts/verify_install.py
 
 # Show activation instructions
 Write-Host ""

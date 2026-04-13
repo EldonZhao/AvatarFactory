@@ -99,7 +99,7 @@ echo.
 REM Run verification
 echo 8. Running installation verification...
 echo.
-python verify_install.py
+python scripts\verify_install.py
 
 REM Show activation instructions
 echo.

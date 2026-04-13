@@ -18,7 +18,7 @@ echo "✅ Virtual environment active: $VIRTUAL_ENV"
 echo ""
 
 # Run verification
-python verify_install.py
+python scripts/verify_install.py
 
 echo ""
 echo "Test complete! If all checks passed, you're ready to use AvatarFactory."

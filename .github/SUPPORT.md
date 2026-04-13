@@ -103,7 +103,7 @@ python --version
 Run the verification script:
 
 ```bash
-python verify_install.py
+python scripts/verify_install.py
 ```
 
 This checks: Python version, dependencies, LLM API connection, knowledge base access, and agent loading.
@@ -132,5 +132,5 @@ When opening a GitHub Issue, please include:
 ## Still Stuck?
 
 1. Search [existing Issues](https://github.com/EldonZhao/AvatarFactory/issues)
-2. Run `python verify_install.py` for diagnostics
+2. Run `python scripts/verify_install.py` for diagnostics
 3. Open a new Issue with the details above

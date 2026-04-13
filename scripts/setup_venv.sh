@@ -131,7 +131,7 @@ echo ""
 # Run verification
 echo "8️⃣  Running installation verification..."
 echo ""
-python verify_install.py
+python scripts/verify_install.py
 
 # Show activation instructions
 echo ""

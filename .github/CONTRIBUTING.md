@@ -19,9 +19,9 @@ cd AvatarFactory
 
 # Using virtual environment (recommended)
 # Windows PowerShell:
-.\setup_venv.ps1
+.\scripts\setup_venv.ps1
 # macOS/Linux:
-chmod +x setup_venv.sh && ./setup_venv.sh
+chmod +x scripts/setup_venv.sh && ./scripts/setup_venv.sh
 
 # Or manual install:
 python -m venv .venv

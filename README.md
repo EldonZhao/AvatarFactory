@@ -105,16 +105,16 @@ Bluesky, Twitter, Xiaohongshu, LinkedIn, Instagram, Threads, Weibo, Mastodon, To
 Windows:
 ```powershell
 # PowerShell (recommended)
-.\setup_venv.ps1
+.\scripts\setup_venv.ps1
 
 # Or CMD
-setup_venv.bat
+scripts\setup_venv.bat
 ```
 
 macOS/Linux:
 ```bash
-chmod +x setup_venv.sh
-./setup_venv.sh
+chmod +x scripts/setup_venv.sh
+./scripts/setup_venv.sh
 ```
 
 The script will create a virtual environment, install dependencies, setup AvatarFactory, and verify installation.

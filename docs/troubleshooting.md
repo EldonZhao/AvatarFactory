@@ -159,7 +159,7 @@ $env:PYTHONIOENCODING = "utf-8"
 Run the verification script to check your entire setup:
 
 ```bash
-python verify_install.py
+python scripts/verify_install.py
 ```
 
 This verifies: Python version, dependencies, LLM connection, knowledge base, and agent loading.

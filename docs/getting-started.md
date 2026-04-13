@@ -17,13 +17,13 @@ This guide covers installation, configuration, and your first run with AvatarFac
 
 **Windows PowerShell:**
 ```powershell
-.\setup_venv.ps1
+.\scripts\setup_venv.ps1
 ```
 
 **macOS/Linux:**
 ```bash
-chmod +x setup_venv.sh
-./setup_venv.sh
+chmod +x scripts/setup_venv.sh
+./scripts/setup_venv.sh
 ```
 
 The script will create a virtual environment, install dependencies, set up AvatarFactory, and verify installation.
@@ -55,7 +55,7 @@ This includes testing and code quality tools (pytest, black, ruff, mypy).
 ```bash
 avatarfactory version
 # Or run the verification script:
-python verify_install.py
+python scripts/verify_install.py
 ```
 
 ---

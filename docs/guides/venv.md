@@ -18,7 +18,7 @@ Detailed guide for setting up and managing Python virtual environments with Avat
 
 **PowerShell (recommended):**
 ```powershell
-.\setup_venv.ps1
+.\scripts\setup_venv.ps1
 ```
 
 If you see a "scripts disabled" error:
@@ -28,14 +28,14 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 **CMD:**
 ```cmd
-setup_venv.bat
+scripts\setup_venv.bat
 ```
 
 ### macOS / Linux
 
 ```bash
-chmod +x setup_venv.sh
-./setup_venv.sh
+chmod +x scripts/setup_venv.sh
+./scripts/setup_venv.sh
 ```
 
 ---
@@ -119,7 +119,7 @@ copy .env.example .env  # Windows
 ### Step 7: Verify
 
 ```bash
-python verify_install.py
+python scripts/verify_install.py
 ```
 
 ---
@@ -261,7 +261,7 @@ pip install -r requirements.txt
 - [ ] Dependencies installed (`pip list` shows packages)
 - [ ] AvatarFactory installed (`avatarfactory version` works)
 - [ ] `.env` file configured
-- [ ] `python verify_install.py` passes
+- [ ] `python scripts/verify_install.py` passes
 
 ---
 

@@ -1,0 +1,54 @@
+name: ✨ Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the feature idea! Describe what you'd like to add.
+
+  - type: textarea
+    attributes:
+      label: Describe the Feature
+      description: "What problem does this solve or what capability is missing?"
+      placeholder: |
+        Currently, we cannot do X. This makes it hard to Y.
+        I'd like to be able to Z.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Proposed Solution
+      description: "How should this work?"
+      placeholder: |
+        Add a new command: `avatarfactory ...`
+        Or add a new agent/connector/adapter.
+
+  - type: dropdown
+    attributes:
+      label: Feature Category
+      options:
+        - New Agent
+        - New Platform Connector
+        - Platform Adapter
+        - CLI Command
+        - API Endpoint
+        - Scheduler / Automation
+        - Dashboard / UI
+        - Video Generation
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternatives Considered
+      description: "Any other approaches you've thought about?"
+
+  - type: checkboxes
+    attributes:
+      label: Breaking Change
+      options:
+        - label: "This would require changes to existing APIs or workflows"

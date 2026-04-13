@@ -308,11 +308,27 @@ knowledges/              # User data storage (default)
 
 ## Contributing
 
-Contributions are welcome! Feel free to:
-- Report bugs and issues
-- Suggest new features
-- Submit pull requests
-- Improve documentation
+Contributions are welcome! Please read our [Contributing Guide](.github/CONTRIBUTING.md) to get started.
+
+- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
+- [Security Policy](.github/SECURITY.md)
+- [Support & Troubleshooting](.github/SUPPORT.md)
+
+---
+
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | Installation, configuration, first run |
+| [Configuration](docs/configuration.md) | LLM providers, connectors, environment variables |
+| [Architecture](docs/architecture.md) | Multi-agent system design |
+| [API Reference](docs/api-reference.md) | REST API endpoints |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
+| [Connectors](docs/connectors/README.md) | Platform-specific setup guides |
+| [Azure Deployment](docs/deployment/azure.md) | Deploy to Azure Web App |
+| [Docker Deployment](docs/deployment/docker.md) | Containerized deployment |
+| [Changelog](docs/changelog/v0.2.0.md) | Version history and migration guides |
 
 ---
 

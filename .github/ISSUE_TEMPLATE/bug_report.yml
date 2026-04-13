@@ -1,0 +1,80 @@
+name: 🐛 Bug Report
+description: Report a bug or broken feature
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the form below to help us investigate.
+
+  - type: input
+    attributes:
+      label: Python Version
+      description: "Run: `python --version`"
+      placeholder: "3.10.5"
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: LLM Provider
+      options:
+        - Anthropic Claude
+        - Azure OpenAI
+        - OpenAI
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Describe the Bug
+      description: "What happened? What did you expect?"
+      placeholder: |
+        1. I ran the command: `avatarfactory ...`
+        2. Expected: ...
+        3. Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Create .env with ...
+        2. Run `avatarfactory chat`
+        3. Type "..."
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Error Message / Stack Trace
+      description: "Full error output (paste here)"
+      render: bash
+
+  - type: textarea
+    attributes:
+      label: Relevant Configuration
+      description: "Your `.env` settings (redact API keys!)"
+      render: bash
+      placeholder: |
+        AVATARFACTORY_LLM_PROVIDER=anthropic
+        BLUESKY_USERNAME=...
+
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: "Screenshots, logs, or other relevant info"

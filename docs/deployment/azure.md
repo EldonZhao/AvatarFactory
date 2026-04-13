@@ -1,6 +1,6 @@
-# Azure Deployment Guide
+# Azure Deployment
 
-This guide covers deploying AvatarFactory to Azure Web App for Containers.
+Deploy AvatarFactory to Azure Web App for Containers.
 
 ## Prerequisites
 

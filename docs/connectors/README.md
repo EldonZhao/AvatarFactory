@@ -21,8 +21,8 @@ AvatarFactory supports multiple social media platforms through its connector sys
 
 | Platform | Connector | Status | Notes |
 |----------|-----------|--------|-------|
-| [Brave Search](brave_search.md) | `brave_search` | ✅ Stable | Privacy-focused web search |
-| [Bing Search](bing_search.md) | `bing_search` | ✅ Stable | Azure Cognitive Services |
+| [Brave Search](brave-search.md) | `brave_search` | ✅ Stable | Privacy-focused web search |
+| [Bing Search](bing-search.md) | `bing_search` | ✅ Stable | Azure Cognitive Services |
 | [Zhihu](zhihu.md) | `zhihu` | ✅ New | Chinese Q&A platform, cookie-based |
 
 ## Quick Start

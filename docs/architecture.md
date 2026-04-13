@@ -1,12 +1,12 @@
-# AvatarFactory AI Agent 架构设计
+# Architecture
 
-> **版本**: v1.0
-> **日期**: 2026-02-01
-> **状态**: 设计阶段
+AvatarFactory 多 Agent 系统架构设计文档。
+
+> **Version**: v1.0 | **Date**: 2026-02-01
 
 ---
 
-## 一、系统架构概览
+## 系统架构概览
 
 ### 1.1 整体架构图
 
@@ -53,7 +53,7 @@
 
 ---
 
-## 二、用户交互设计
+## 用户交互设计
 
 ### 2.1 三种交互模式
 
@@ -146,7 +146,7 @@ Agent: [Experiment Agent 分析中...]
 
 ---
 
-## 三、各 Sub-Agent 职责详解
+## Sub-Agent 职责详解
 
 ### 3.1 Orchestrator Agent（主控 Agent）
 
@@ -836,7 +836,7 @@ class ExperimentAgent:
 
 ---
 
-## 四、Agent 协作流程
+## Agent 协作流程
 
 ### 4.1 场景 1：创建新人设并生成首周内容
 
@@ -905,7 +905,7 @@ sequenceDiagram
 
 ---
 
-## 五、技术实现建议
+## 技术实现建议
 
 ### 5.1 Agent 通信协议
 
@@ -1105,7 +1105,7 @@ class OrchestratorAgent(BaseAgent):
 
 ---
 
-## 六、关键设计原则
+## 关键设计原则
 
 ### 6.1 人在回路（Human-in-the-Loop）
 
@@ -1219,7 +1219,7 @@ def publish_content(content, persona):
 
 ---
 
-## 七、MVP 开发计划
+## MVP 开发计划
 
 ### Phase 1: 核心框架（2-3 周）
 - [ ] Orchestrator Agent 基础实现
@@ -1246,7 +1246,7 @@ def publish_content(content, persona):
 
 ---
 
-## 八、关键挑战与解决方案
+## 关键挑战与解决方案
 
 ### 挑战 1：LLM 输出不稳定
 **解决方案**：
@@ -1274,7 +1274,7 @@ def publish_content(content, persona):
 
 ---
 
-## 九、未来展望
+## 未来展望
 
 ### 9.1 跨平台人设迁移
 自动将小红书人设适配到知乎、Twitter 等平台，保持核心人设一致但风格原生。

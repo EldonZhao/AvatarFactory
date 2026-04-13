@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/EldonZhao/AvatarFactory/tree/main/docs
+    about: Read guides and documentation
+  - name: 💬 Troubleshooting
+    url: https://github.com/EldonZhao/AvatarFactory/blob/main/.github/SUPPORT.md
+    about: Common issues and solutions

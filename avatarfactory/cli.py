@@ -26,7 +26,7 @@ from rich.table import Table
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
 from avatarfactory.agents.topic import TopicAgent
-from avatarfactory.core.knowledges import KnowledgeBase
+from avatarfactory.core.knowledges_db import get_knowledge_base
 from avatarfactory.core.llm_provider import LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
 from avatarfactory.connectors import get_connector, ConnectorConfig
@@ -61,7 +61,7 @@ def get_orchestrator() -> OrchestratorAgent:
         console.print(f"[red]Error initializing LLM provider: {e}[/red]")
         raise typer.Exit(1)
 
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     return OrchestratorAgent(
         knowledge_base=kb,
@@ -254,7 +254,7 @@ def generate(
 def list_personas():
     """List all personas in the knowledges."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     personas = kb.list_personas()
 
@@ -300,7 +300,7 @@ def delete_persona(
         avatarfactory delete-persona persona_abc123 --keep-content
     """
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     # Check if persona exists
     persona = kb.load_persona(persona_id)
@@ -362,7 +362,7 @@ def list_content(
 ):
     """List content in the knowledges."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     contents = kb.list_content(persona_id=persona_id, status=status)
 
@@ -401,7 +401,7 @@ def show_content(
         avatarfactory show-content content_178b3925
     """
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     content = kb.load_content(content_id)
 
@@ -495,7 +495,7 @@ def publish_draft(
     from avatarfactory.connectors.adapters import get_adapter, get_platform_limits
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     content = kb.load_content(content_id)
 
@@ -703,7 +703,7 @@ def publish_draft(
 def stats():
     """Show knowledges statistics."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     stats = kb.get_storage_stats()
 
@@ -979,7 +979,7 @@ def publish(
 def get_topic_agent() -> TopicAgent:
     """Initialize topic agent with LLM provider from environment."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     try:
         provider = LLMProviderFactory.from_env()
@@ -1737,7 +1737,7 @@ def video(
             raise typer.Exit(1)
 
         kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-        kb = KnowledgeBase(kb_path)
+        kb = get_knowledge_base(kb_path)
 
         content = kb.load_content(content_id)
         if not content:
@@ -2093,7 +2093,7 @@ def recommendations(
         avatarfactory recommendations --domain tech
     """
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     recs = kb.get_recommended_personas(limit=limit, domain=domain)
 
@@ -2136,7 +2136,7 @@ def adopt(
         avatarfactory adopt rec_persona_abc123
     """
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     # Load recommendation
     rec = kb.get_recommendation(recommendation_id)
@@ -2278,6 +2278,129 @@ def scan_trends(
     else:
         console.print(f"[red]Error: {result.get('error', 'Unknown error')}[/red]")
         raise typer.Exit(1)
+
+
+# =============================================================================
+# Database Migration Commands
+# =============================================================================
+
+@app.command()
+def migrate_db(
+    kb_path: str = typer.Option(
+        "./knowledges", "--kb-path", "-k",
+        help="Path to knowledges directory for migration"
+    ),
+    db_url: Optional[str] = typer.Option(
+        None, "--db-url", "-d",
+        help="Database URL (default: sqlite:///knowledges.db)"
+    ),
+    drop_existing: bool = typer.Option(
+        False, "--drop", "-D",
+        help="Drop existing tables before migration"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Show what would be migrated without actually migrating"
+    ),
+):
+    """
+    Migrate file-based storage to SQLite/PostgreSQL database.
+
+    This command migrates all data from the file-based knowledges directory
+    to a relational database for better performance and querying.
+
+    Example:
+        avatarfactory migrate-db
+        avatarfactory migrate-db --kb-path ./knowledges
+        avatarfactory migrate-db --db-url postgresql+asyncpg://user:pass@localhost/db
+        avatarfactory migrate-db --drop --dry-run
+    """
+    from avatarfactory.core.database.migrate import run_migration
+
+    console.print(Panel.fit(
+        "[bold cyan]Database Migration Tool[/bold cyan]\n\n"
+        f"Source: {kb_path}\n"
+        f"Database: {db_url or 'sqlite:///knowledges.db (default)'}\n"
+        f"Drop existing: {'Yes' if drop_existing else 'No'}",
+        border_style="cyan",
+    ))
+
+    if dry_run:
+        console.print("[yellow]DRY RUN - No actual migration will occur[/yellow]\n")
+        console.print("Would migrate from:")
+        console.print(f"  • Knowledges: {kb_path}")
+        console.print(f"  • To database: {db_url or 'sqlite:///knowledges.db'}")
+
+        # Check if source exists
+        from pathlib import Path
+        kb = Path(kb_path)
+        if not kb.exists():
+            console.print(f"\n[red]Error: Knowledges path not found: {kb_path}[/red]")
+            raise typer.Exit(1)
+
+        # Count potential items
+        personas_count = len(list((kb / "personas").glob("persona_*.yaml"))) if (kb / "personas").exists() else 0
+        content_count = len(list(kb.rglob("content_*.json")))
+        discovery_count = len(list(kb.rglob("discovery_*.json")))
+        tasks_count = 1 if (kb / "scheduler" / "tasks.yaml").exists() else 0
+
+        console.print(f"\nWould migrate:")
+        console.print(f"  • {personas_count} personas")
+        console.print(f"  • {content_count} contents")
+        console.print(f"  • {discovery_count} discoveries")
+        console.print(f"  • {tasks_count} task config(s)")
+        console.print("\n[yellow]Use without --dry-run to execute migration.[/yellow]")
+        return
+
+    # Set environment variable if db_url provided
+    if db_url:
+        os.environ["AVATARFACTORY_DB_URL"] = db_url
+
+    with console.status("[bold cyan]Migrating data to database...", spinner="dots"):
+        report = run_migration(
+            kb_path=kb_path,
+            drop_existing=drop_existing,
+        )
+
+    # Display results
+    console.print("\n[bold]Migration Report[/bold]")
+
+    table = Table()
+    table.add_column("Entity", style="cyan")
+    table.add_column("Migrated", style="green", justify="right")
+    table.add_column("Errors", style="red", justify="right")
+
+    table.add_row("Personas", str(report.personas_migrated), str(report.personas_errors))
+    table.add_row("Contents", str(report.contents_migrated), str(report.contents_errors))
+    table.add_row("Discoveries", str(report.discoveries_migrated), str(report.discoveries_errors))
+    table.add_row("Scheduled Tasks", str(report.tasks_migrated), str(report.tasks_errors))
+    table.add_row("Trend Snapshots", str(report.trends_migrated), str(report.trends_errors))
+    table.add_row("Recommendations", str(report.recommendations_migrated), str(report.recommendations_errors))
+
+    console.print(table)
+
+    total_migrated = (
+        report.personas_migrated + report.contents_migrated +
+        report.discoveries_migrated + report.tasks_migrated +
+        report.trends_migrated + report.recommendations_migrated
+    )
+    total_errors = (
+        report.personas_errors + report.contents_errors +
+        report.discoveries_errors + report.tasks_errors +
+        report.trends_errors + report.recommendations_errors
+    )
+
+    if total_errors > 0:
+        console.print(f"\n[yellow]⚠️ Migration completed with {total_errors} error(s)[/yellow]")
+        if report.error_details:
+            console.print("\n[bold]Error Details:[/bold]")
+            for error in report.error_details[:10]:  # Show first 10 errors
+                console.print(f"  • {error}")
+            if len(report.error_details) > 10:
+                console.print(f"  ... and {len(report.error_details) - 10} more errors")
+    else:
+        console.print(f"\n[green]✅ Migration completed successfully![/green]")
+        console.print(f"   Total records migrated: {total_migrated}")
 
 
 if __name__ == "__main__":

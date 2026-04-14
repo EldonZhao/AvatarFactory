@@ -150,6 +150,68 @@ See [connectors/README.md](connectors/README.md) for complete setup guides per p
 
 ---
 
+## Database Configuration
+
+AvatarFactory supports two storage backends:
+
+1. **File-based (default)**: YAML/JSON files in the `knowledges/` directory
+2. **Database**: SQLite or PostgreSQL for better performance and scalability
+
+### Enabling Database Storage
+
+```bash
+# Enable database storage (default: false)
+AVATARFACTORY_USE_DB=true
+
+# Database URL (optional, defaults to SQLite in knowledges directory)
+# SQLite (default when USE_DB=true):
+AVATARFACTORY_DB_URL=sqlite+aiosqlite:///./knowledges/avatarfactory.db
+
+# PostgreSQL:
+AVATARFACTORY_DB_URL=postgresql+asyncpg://user:password@localhost:5432/avatarfactory
+```
+
+### PostgreSQL Connection Pool Settings
+
+For production PostgreSQL deployments, you can tune the connection pool:
+
+```bash
+AVATARFACTORY_DB_POOL_SIZE=5          # Base pool size (default: 5)
+AVATARFACTORY_DB_MAX_OVERFLOW=10      # Max additional connections (default: 10)
+AVATARFACTORY_DB_POOL_TIMEOUT=30      # Checkout timeout in seconds (default: 30)
+AVATARFACTORY_DB_POOL_RECYCLE=1800    # Recycle connections after N seconds (default: 1800)
+```
+
+### Debug Options
+
+```bash
+AVATARFACTORY_DB_ECHO=true            # Enable SQL query logging
+```
+
+### Migration from File-based to Database
+
+If you have existing data in file-based storage, use the migration script:
+
+```bash
+# Dry run to see what would be migrated
+python -m avatarfactory.core.database.migrations.initial_migration --dry-run
+
+# Perform migration
+python -m avatarfactory.core.database.migrations.initial_migration
+```
+
+### When to Use Database Storage
+
+| Use Case | Recommended Backend |
+|----------|---------------------|
+| Local development | File-based (simpler) |
+| Single user | File-based or SQLite |
+| Multiple users/instances | PostgreSQL |
+| Production deployment | PostgreSQL |
+| Large datasets (>1000 personas) | PostgreSQL |
+
+---
+
 ## Other Settings
 
 ### Knowledge Base

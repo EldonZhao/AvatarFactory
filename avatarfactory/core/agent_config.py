@@ -7,8 +7,10 @@ Manages per-persona agent configurations for customizing agent behavior.
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from avatarfactory.core.knowledges import KnowledgeBase
 from avatarfactory.models.schemas import AgentConfig
+
+# Type alias for KnowledgeBase (supports both file-based and DB implementations)
+KnowledgeBaseType = Any
 
 
 class AgentConfigManager:
@@ -44,7 +46,7 @@ class AgentConfigManager:
         },
     }
 
-    def __init__(self, knowledge_base: KnowledgeBase):
+    def __init__(self, knowledge_base: KnowledgeBaseType):
         """
         Initialize the AgentConfigManager.
 

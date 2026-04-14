@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from avatarfactory.core.knowledges import KnowledgeBase
+from avatarfactory.core.knowledges_db import get_knowledge_base
 from avatarfactory.connectors.registry import ConnectorRegistry
 from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig, ScheduledTask
 
@@ -70,7 +70,7 @@ class DashboardDataProvider:
     def __init__(self, kb_path: Optional[str] = None):
         """Initialize the data provider."""
         self.kb_path = kb_path or os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-        self.kb = KnowledgeBase(self.kb_path)
+        self.kb = get_knowledge_base(self.kb_path)
 
         scheduler_dir = os.path.join(self.kb_path, "scheduler")
         self.scheduler = Scheduler(SchedulerConfig(data_dir=scheduler_dir))

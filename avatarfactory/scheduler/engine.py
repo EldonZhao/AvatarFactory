@@ -587,9 +587,9 @@ class Scheduler:
 
         # Check if persona has notifications enabled
         if task.persona_id:
-            from avatarfactory.core.knowledges import KnowledgeBase
+            from avatarfactory.core.knowledges_db import get_knowledge_base
             kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-            kb = KnowledgeBase(kb_path)
+            kb = get_knowledge_base(kb_path)
             persona = kb.load_persona(task.persona_id)
             if persona:
                 # Check if persona has notification disabled
@@ -832,9 +832,9 @@ class Scheduler:
 
         # Check if persona has notifications enabled
         if task.persona_id:
-            from avatarfactory.core.knowledges import KnowledgeBase
+            from avatarfactory.core.knowledges_db import get_knowledge_base
             kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-            kb = KnowledgeBase(kb_path)
+            kb = get_knowledge_base(kb_path)
             persona = kb.load_persona(task.persona_id)
             if persona:
                 # Check if persona has notification disabled

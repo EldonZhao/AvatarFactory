@@ -56,7 +56,7 @@ async def run_topic_task(task: ScheduledTask) -> Dict[str, Any]:
     - query: str (optional)
     """
     from avatarfactory.agents.topic import TopicAgent
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     persona_id = task.persona_id
@@ -68,7 +68,7 @@ async def run_topic_task(task: ScheduledTask) -> Dict[str, Any]:
         return {"success": False, "error": "persona_id required for topic task"}
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     agent = TopicAgent(knowledge_base=kb, llm_provider=provider)
@@ -112,7 +112,7 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
     """
     import random
     from avatarfactory.agents.orchestrator import OrchestratorAgent
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
     from avatarfactory.models.schemas import AgentMessage
 
@@ -124,7 +124,7 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
         return {"success": False, "error": "persona_id required for content generation"}
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     # Load persona for notification info
@@ -276,14 +276,14 @@ async def run_report_task(task: ScheduledTask) -> Dict[str, Any]:
     Expected task params:
     - persona_id: str
     """
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
 
     persona_id = task.persona_id
     if not persona_id:
         return {"success": False, "error": "persona_id required for report"}
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     # Get statistics
     stats = kb.get_storage_stats()
@@ -326,11 +326,11 @@ def _get_proactive_orchestrator():
     """Get a ProactiveOrchestrator instance for task execution."""
     import os
     from avatarfactory.agents.proactive_orchestrator import ProactiveOrchestrator
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     return ProactiveOrchestrator(knowledge_base=kb, llm_provider=provider)
@@ -425,7 +425,7 @@ async def run_evolution_analysis(task: ScheduledTask) -> Dict[str, Any]:
     """
     import os
     from avatarfactory.agents.evolution import EvolutionAgent
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     persona_id = task.persona_id
@@ -435,7 +435,7 @@ async def run_evolution_analysis(task: ScheduledTask) -> Dict[str, Any]:
         return {"success": False, "error": "persona_id required for evolution analysis"}
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     agent = EvolutionAgent(knowledge_base=kb, llm_provider=provider)
@@ -468,7 +468,7 @@ async def run_retrospective(task: ScheduledTask) -> Dict[str, Any]:
     """
     import os
     from avatarfactory.agents.evolution import EvolutionAgent
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     persona_id = task.persona_id
@@ -478,7 +478,7 @@ async def run_retrospective(task: ScheduledTask) -> Dict[str, Any]:
         return {"success": False, "error": "persona_id required for retrospective"}
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     agent = EvolutionAgent(knowledge_base=kb, llm_provider=provider)
@@ -521,7 +521,7 @@ async def run_trend_scan_task(task: ScheduledTask) -> Dict[str, Any]:
     from datetime import datetime
 
     from avatarfactory.connectors import ConnectorConfig, get_connector
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
     from avatarfactory.models.schemas import TrendSnapshot
 
@@ -529,7 +529,7 @@ async def run_trend_scan_task(task: ScheduledTask) -> Dict[str, Any]:
     limit = task.extra_params.get("limit", 30)
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     results = {}
@@ -696,13 +696,13 @@ async def run_persona_recommendation_task(task: ScheduledTask) -> Dict[str, Any]
     import os
 
     from avatarfactory.agents.recommendation import RecommendationAgent
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     count = task.extra_params.get("count", 3)
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
     provider = LLMProviderFactory.from_env()
 
     # Get today's trend snapshots
@@ -765,10 +765,10 @@ async def publish_content(item: PublishQueueItem) -> Dict[str, Any]:
     """
     import os
     from avatarfactory.connectors import ConnectorConfig, get_connector
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
 
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     # Load content
     # Note: This assumes content is stored in drafts

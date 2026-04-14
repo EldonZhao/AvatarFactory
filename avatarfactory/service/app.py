@@ -225,13 +225,13 @@ async def lifespan(app: FastAPI):
     global _orchestrator, _scheduler
 
     from avatarfactory.agents.proactive_orchestrator import ProactiveOrchestrator
-    from avatarfactory.core.knowledges import KnowledgeBase
+    from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
     from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
 
-    # Initialize knowledges
+    # Initialize knowledges (uses DB if AVATARFACTORY_USE_DB=true)
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-    kb = KnowledgeBase(kb_path)
+    kb = get_knowledge_base(kb_path)
 
     # Initialize LLM provider
     llm_provider = LLMProviderFactory.from_env()

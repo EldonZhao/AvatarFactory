@@ -15,6 +15,9 @@ anthropic = ">=0.39.0"
 pydantic = ">=2.9.2"
 pyyaml = ">=6.0.2"
 python-dotenv = ">=1.0.1"
+sqlalchemy = { version = ">=2.0.0", extras = ["asyncio"] }
+aiosqlite = ">=0.19.0"
+greenlet = ">=3.0.0"
 
 # CLI & UI
 typer = ">=0.12.5"

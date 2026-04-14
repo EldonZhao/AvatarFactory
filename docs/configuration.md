@@ -212,14 +212,17 @@ AVATARFACTORY_DB_ECHO=true            # Enable SQL query logging
 
 ### Migration from File-based to Database
 
-If you have existing data in file-based storage, use the migration script:
+If you have existing data in file-based storage, use the migration command:
 
 ```bash
 # Dry run to see what would be migrated
-python -m avatarfactory.core.database.migrations.initial_migration --dry-run
+avatarfactory migrate-db --dry-run
 
 # Perform migration
-python -m avatarfactory.core.database.migrations.initial_migration
+avatarfactory migrate-db
+
+# Or run the module directly
+python -m avatarfactory.core.database.migrate
 ```
 
 ### When to Use Database Storage

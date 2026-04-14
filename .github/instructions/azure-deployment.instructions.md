@@ -61,7 +61,7 @@ Verify: the setting should show `/home/knowledges`, not `C:/Program Files/Git/ho
 
 - The app uses SQLite stored at `/home/knowledges/avatarfactory.db`
 - Upload database via Kudu VFS API: `PUT /api/vfs/home/knowledges/avatarfactory.db`
-- Migrate from file-based storage: `python -m avatarfactory.core.database.migrations.initial_migration`
+- Migrate from file-based storage: `avatarfactory migrate-db` or `python -m avatarfactory.core.database.migrate`
 - Always restart the app after database changes
 
 ## Kudu API Operations

@@ -157,6 +157,28 @@ AvatarFactory supports two storage backends:
 1. **File-based (default)**: YAML/JSON files in the `knowledges/` directory
 2. **Database**: SQLite or PostgreSQL for better performance and scalability
 
+### Storage Architecture
+
+When database storage is enabled, AvatarFactory uses a hybrid approach:
+
+| Data Type | Storage Backend | Notes |
+|-----------|-----------------|-------|
+| Personas | Database | Full CRUD with versioning |
+| Content & Reviews | Database | Efficient queries and filtering |
+| Discoveries | Database | Historical trend data |
+| Recommendations | Database | Persona recommendations |
+| Trend Snapshots | Database | Platform trend data |
+| **Scheduler Tasks** | **File System** | `scheduler/tasks.json` |
+| **Publish Queue** | **File System** | `scheduler/publish_queue.json` |
+
+**Why Scheduler uses File Storage:**
+- APScheduler manages tasks in-memory with file persistence as its native approach
+- Runtime state (`last_run`, `run_count`) updates frequently during task execution
+- File storage avoids database transaction overhead for frequent updates
+- Simpler and more reliable for the scheduler's operational needs
+
+**Important for Azure:** Both database and scheduler files require persistent storage. Set `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true`.
+
 ### Enabling Database Storage
 
 ```bash

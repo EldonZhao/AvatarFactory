@@ -444,3 +444,41 @@ export async function createConnectorTrendTask(
   });
 }
 
+// =============================================================================
+// Chat API
+// =============================================================================
+
+export interface ChatRequest {
+  message: string;
+  persona_id?: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  metadata: Record<string, any>;
+}
+
+export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+  return apiFetch<ChatResponse>('/chat', {
+    method: 'POST',
+    body: request,
+  });
+}
+
+// Get personas list (public API, different from admin API)
+export interface PersonaListItem {
+  id: string;
+  name: string;
+  tagline?: string;
+  version?: string;
+}
+
+export interface PersonaListResponse {
+  count: number;
+  personas: PersonaListItem[];
+}
+
+export async function getPersonaList(): Promise<PersonaListResponse> {
+  return apiFetch<PersonaListResponse>('/personas');
+}
+

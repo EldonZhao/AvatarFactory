@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { ChatPage } from '../components/chat';
+---
+
+<AdminLayout title="Chat">
+  <ChatPage client:load />
+</AdminLayout>

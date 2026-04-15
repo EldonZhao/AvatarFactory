@@ -24,25 +24,40 @@ When migrating AvatarFactory development environment to a new machine, follow th
 | `personas/` | Persona YAML configuration files |
 | `content_library/` | Generated content files |
 | `recommendations/` | Persona recommendation history |
-| `scheduler/` | Legacy scheduler data (migrated to database) |
+| `scheduler/` | Scheduler tasks and publish queue (JSON persistence) |
 | `videos/` | Generated video files |
+| `experiments/` | A/B test experiments data |
+| `platform_rules/` | Platform-specific content rules |
+| `user_feedback/` | User feedback records |
 
 ### What's in `.env`
 
 ```bash
 # LLM Provider
-AVATARFACTORY_LLM_PROVIDER=anthropic
+AVATARFACTORY_LLM_PROVIDER=anthropic  # or azure_openai, openai
+AVATARFACTORY_MODEL=claude-3-5-sonnet-20241022
+AVATARFACTORY_FAST_MODEL=claude-3-5-haiku-20241022
 ANTHROPIC_API_KEY=sk-ant-...
-# or OPENAI_API_KEY, AZURE_OPENAI_* for other providers
+
+# Azure OpenAI (if using azure_openai provider)
+# AZURE_OPENAI_API_KEY=...
+# AZURE_OPENAI_ENDPOINT=https://xxx.openai.azure.com/
+# AZURE_OPENAI_API_VERSION=2024-02-15-preview
+
+# App Settings
+AVATARFACTORY_KB_PATH=./knowledges
+AVATARFACTORY_LOG_LEVEL=INFO
+AVATARFACTORY_SERVICE_URL=http://localhost:8000
 
 # Platform Connectors
 BLUESKY_USERNAME=...
 BLUESKY_PASSWORD=...
-TWITTER_API_KEY=...
 XIAOHONGSHU_COOKIE=...
+XIAOHONGSHU_USER_ID=...
 
 # Notifications
 AVATARFACTORY_WEBHOOK_URL=...
+AVATARFACTORY_WEBHOOK_FORMAT=wecom  # slack | discord | feishu | wecom | generic
 ```
 
 ## Migration Steps
@@ -73,17 +88,28 @@ cd AvatarFactory
 # Extract data to project root
 tar -xzvf ~/avatarfactory-data.tar.gz
 
+# Create and activate virtual environment
+python -m venv .venv
+# Windows: .\.venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+
 # Install Python dependencies
 pip install -e ".[service]"
 
 # Install web-admin dependencies
 cd web-admin && npm install && cd ..
 
+# Install web-journal dependencies
+cd web-journal && npm install && cd ..
+
 # Start backend service
 avatarfactory serve --host 0.0.0.0 --port 8000
 
 # Start web-admin (in another terminal)
 cd web-admin && npm run dev
+
+# Start web-journal (in another terminal)
+cd web-journal && npm run dev
 ```
 
 ## PostgreSQL Migration (Optional)

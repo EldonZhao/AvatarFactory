@@ -12,21 +12,47 @@ const cookie = Astro.request.headers.get('cookie') || '';
 
 let tasksData: any = null;
 let schedulerStatus: any = null;
+let personasData: any = null;
 let error = null;
 
 try {
-  const [tasksResponse, statusResponse] = await Promise.all([
-    fetch(`${API_BASE}/api/admin/scheduler/tasks`, {
-      headers: { 'Cookie': cookie }
-    }),
+  // Use public scheduler API for tasks (no auth needed for listing)
+  // and fetch personas separately for display names
+  const [tasksResponse, statusResponse, personasResponse] = await Promise.all([
+    fetch(`${API_BASE}/scheduler/tasks`),
     fetch(`${API_BASE}/scheduler/status`),
+    fetch(`${API_BASE}/api/personas/`),
   ]);
 
   if (tasksResponse.ok) {
-    tasksData = await tasksResponse.json();
+    const rawTasks = await tasksResponse.json();
+    // Build grouped structure from flat tasks list
+    const tasks = rawTasks.tasks || [];
+    const grouped: Record<string, { persona_name: string; tasks: any[] }> = {};
+
+    for (const task of tasks) {
+      const pid = task.persona_id || 'system';
+      if (!grouped[pid]) {
+        grouped[pid] = { persona_name: pid === 'system' ? 'System Tasks' : pid, tasks: [] };
+      }
+      grouped[pid].tasks.push(task);
+    }
+
+    tasksData = { count: tasks.length, tasks, grouped };
   }
   if (statusResponse.ok) {
     schedulerStatus = await statusResponse.json();
+  }
+  if (personasResponse.ok) {
+    personasData = await personasResponse.json();
+    // Update persona names in grouped data
+    if (tasksData?.grouped && personasData?.personas) {
+      for (const persona of personasData.personas) {
+        if (tasksData.grouped[persona.id]) {
+          tasksData.grouped[persona.id].persona_name = persona.identity?.name || persona.id;
+        }
+      }
+    }
   }
 } catch (e) {
   error = `Failed to fetch: ${e}`;

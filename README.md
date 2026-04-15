@@ -84,7 +84,19 @@ Bluesky, Twitter, Xiaohongshu, LinkedIn, Instagram, Threads, Weibo, Mastodon, To
 - **Multi-Tenancy** - Tenant-isolated knowledge bases and connector configs
 
 ### Web Interfaces
-- **Web Admin** (Astro) - Management dashboard (personas, content, connectors, scheduler, topics, stats)
+- **Web Admin** (Astro) - Management dashboard with the following features:
+  - **Dashboard** - Overview with personas, content, and task statistics
+  - **Chat** - Interactive conversation interface with AI service
+    - Real-time message exchange with Markdown rendering
+    - Persona selector for contextual conversations
+    - Quick suggestion chips for common queries
+    - Expandable metadata for response details
+  - **Personas** - Persona management (create, view, edit, delete)
+  - **Connectors** - Platform connector configuration and testing
+  - **Schedulers** - Task scheduling and management
+  - **Topics** - Hot topic discovery and trend analysis
+  - **Contents** - Content library with status filtering
+  - **Statistics** - Analytics and performance metrics
 - **Web Journal** (Astro) - Public content journal
 - **Streamlit Dashboard** - Visual analytics (topology, personas, scheduler, content, topics, chat)
 

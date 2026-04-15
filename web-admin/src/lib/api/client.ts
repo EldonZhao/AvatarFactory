@@ -109,6 +109,19 @@ export async function deleteSchedulerTask(taskId: string) {
   });
 }
 
+export async function updateSchedulerTask(taskId: string, data: UpdateSchedulerTaskRequest) {
+  return apiFetch<UpdateSchedulerTaskResponse>(`/api/scheduler/tasks/${taskId}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export async function toggleSchedulerTask(taskId: string) {
+  return apiFetch<ToggleSchedulerTaskResponse>(`/api/scheduler/tasks/${taskId}/toggle`, {
+    method: 'POST',
+  });
+}
+
 // Topics/Discoveries
 export async function getTopics() {
   return apiFetch<TopicsResponse>('/api/discoveries/');
@@ -235,6 +248,32 @@ export interface TaskRunResponse {
   task_id: string;
   status: string;
   message?: string;
+}
+
+export interface UpdateSchedulerTaskRequest {
+  name?: string;
+  schedule?: string;
+  platform?: string;
+  enabled?: boolean;
+}
+
+export interface UpdateSchedulerTaskResponse {
+  status: string;
+  task_id: string;
+  updated_fields: string[];
+  task?: {
+    id: string;
+    name: string;
+    schedule: string;
+    enabled: boolean;
+    platform?: string;
+  };
+}
+
+export interface ToggleSchedulerTaskResponse {
+  status: string;
+  task_id: string;
+  enabled: boolean;
 }
 
 export interface TopicSummary {

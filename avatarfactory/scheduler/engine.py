@@ -27,7 +27,11 @@ class SchedulerConfig(BaseModel):
     """Scheduler configuration."""
 
     # Persistence
-    data_dir: str = Field(default="./knowledges/scheduler")
+    data_dir: str = Field(
+        default_factory=lambda: os.path.join(
+            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler"
+        )
+    )
 
     # Default schedules (cron expressions)
     discovery_schedule: str = Field(
@@ -329,6 +333,45 @@ class Scheduler:
     def save_state(self) -> None:
         """Public method to manually trigger state save (useful after batch operations)."""
         self._save_state()
+
+    def update_task(self, task_id: str, updates: Dict[str, Any]) -> Optional[ScheduledTask]:
+        """
+        Update a scheduled task's properties.
+
+        Args:
+            task_id: The task ID to update
+            updates: Dictionary of fields to update (name, schedule, platform, enabled, extra_params)
+
+        Returns:
+            Updated ScheduledTask or None if not found
+        """
+        if task_id not in self._tasks:
+            return None
+
+        task = self._tasks[task_id]
+        schedule_changed = False
+
+        # Update allowed fields
+        allowed_fields = {"name", "schedule", "platform", "enabled", "extra_params"}
+        for field, value in updates.items():
+            if field in allowed_fields and hasattr(task, field):
+                if field == "schedule" and getattr(task, field) != value:
+                    schedule_changed = True
+                setattr(task, field, value)
+
+        self._save_state()
+
+        # Reschedule if running and schedule changed or enabled state changed
+        if self._running and self._scheduler:
+            if schedule_changed or "enabled" in updates:
+                try:
+                    self._scheduler.remove_job(task_id)
+                except Exception:
+                    pass
+                if task.enabled:
+                    self._schedule_task(task)
+
+        return task
 
     def remove_task(self, task_id: str) -> bool:
         """Remove a scheduled task."""

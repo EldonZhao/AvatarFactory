@@ -990,6 +990,96 @@ async def delete_scheduler_task_admin(task_id: str):
         )
 
 
+class UpdateSchedulerTaskRequest(BaseModel):
+    """Request to update an existing scheduler task."""
+    name: Optional[str] = Field(None, description="Task name")
+    schedule: Optional[str] = Field(None, description="Cron schedule expression")
+    platform: Optional[str] = Field(None, description="Target platform")
+    enabled: Optional[bool] = Field(None, description="Whether task is enabled")
+
+
+@router.put("/scheduler/tasks/{task_id}", dependencies=[Depends(require_admin_auth)])
+async def update_scheduler_task_admin(task_id: str, request: UpdateSchedulerTaskRequest):
+    """
+    Update an existing scheduler task.
+    """
+    scheduler = get_scheduler()
+    if not scheduler:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler not available",
+        )
+
+    task = scheduler.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task not found: {task_id}",
+        )
+
+    # Build updates dict excluding None values
+    updates = request.model_dump(exclude_none=True)
+
+    if not updates:
+        return {
+            "status": "no_changes",
+            "task_id": task_id,
+            "message": "No fields to update",
+        }
+
+    # Update the task
+    updated_task = scheduler.update_task(task_id, updates)
+
+    if updated_task:
+        return {
+            "status": "updated",
+            "task_id": task_id,
+            "updated_fields": list(updates.keys()),
+            "task": {
+                "id": updated_task.id,
+                "name": updated_task.name,
+                "schedule": updated_task.schedule,
+                "enabled": updated_task.enabled,
+                "platform": updated_task.platform,
+            },
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update task: {task_id}",
+        )
+
+
+@router.post("/scheduler/tasks/{task_id}/toggle", dependencies=[Depends(require_admin_auth)])
+async def toggle_scheduler_task_admin(task_id: str):
+    """
+    Toggle task enabled/disabled status.
+    """
+    scheduler = get_scheduler()
+    if not scheduler:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler not available",
+        )
+
+    task = scheduler.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task not found: {task_id}",
+        )
+
+    # Toggle the enabled state
+    new_enabled = not task.enabled
+    scheduler.update_task(task_id, {"enabled": new_enabled})
+
+    return {
+        "status": "toggled",
+        "task_id": task_id,
+        "enabled": new_enabled,
+    }
+
+
 @router.get("/topics", dependencies=[Depends(require_admin_auth)])
 async def list_topics_admin(
     persona_id: Optional[str] = None,

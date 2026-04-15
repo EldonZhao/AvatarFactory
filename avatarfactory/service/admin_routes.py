@@ -142,10 +142,11 @@ async def get_dashboard():
     published_count = len(published_contents)
     contents_count = draft_count + published_count
 
-    # Count tasks
+    # Count tasks (exclude system tasks - those without persona_id)
     tasks = scheduler.list_tasks() if scheduler else []
-    tasks_count = len(tasks)
-    active_tasks_count = sum(1 for t in tasks if t.enabled)
+    persona_tasks = [t for t in tasks if t.persona_id is not None]
+    tasks_count = len(persona_tasks)
+    active_tasks_count = sum(1 for t in persona_tasks if t.enabled)
 
     # Build recent personas list
     recent_personas = []

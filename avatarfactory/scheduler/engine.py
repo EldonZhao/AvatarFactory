@@ -170,28 +170,19 @@ class Scheduler:
         Ensure system-level scheduled tasks exist in database.
 
         These are global tasks that don't require a persona:
-        - trend_scan: Daily scan of trending topics across platforms
         - persona_recommendation: Daily persona recommendations based on trends
+
+        Note: trend_scan tasks are per-connector and configured via Connector settings.
         """
         from avatarfactory.core.database.connection import get_session
         from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
         system_tasks = [
             {
-                "task_id": "system_trend_scan",
-                "name": "Daily Trend Scan",
-                "task_type": "trend_scan",
-                "schedule": "0 8 * * *",  # Daily at 8 AM
-                "enabled": True,
-                "persona_id": None,
-                "platform": None,
-                "extra_params": {"platforms": ["bluesky"]},
-            },
-            {
                 "task_id": "system_persona_recommendation",
                 "name": "Daily Persona Recommendation",
                 "task_type": "persona_recommendation",
-                "schedule": "0 9 * * *",  # Daily at 9 AM (1 hour after trend scan)
+                "schedule": "0 9 * * *",  # Daily at 9 AM
                 "enabled": True,
                 "persona_id": None,
                 "platform": None,

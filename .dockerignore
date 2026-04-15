@@ -59,6 +59,22 @@ knowledges
 # GitHub
 .github
 
+# Logs and temporary files
+avatar-logs/
+webapp_logs/
+*.zip
+*.log
+service.log
+cookies.txt
+nul
+
+# Web frontend build artifacts (source needed for multi-stage build)
+web-admin/node_modules/
+web-journal/node_modules/
+
+# Tests
+tests/
+
 # Environment
 .env
 .env.local

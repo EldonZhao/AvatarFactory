@@ -1,7 +1,7 @@
 """
 Scheduler Engine for AvatarFactory.
 
-Provides task scheduling using APScheduler with persistence and management.
+Provides task scheduling using APScheduler with database persistence and management.
 """
 
 import asyncio
@@ -26,7 +26,7 @@ logger = logging.getLogger("avatarfactory.scheduler")
 class SchedulerConfig(BaseModel):
     """Scheduler configuration."""
 
-    # Persistence
+    # Legacy data directory for migration
     data_dir: str = Field(
         default_factory=lambda: os.path.join(
             os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler"
@@ -95,6 +95,9 @@ class Scheduler:
     """
     Main scheduler class for AvatarFactory.
 
+    Uses database storage for tasks and publish queue.
+    APScheduler handles the actual scheduling in memory.
+
     Manages background tasks for:
     - Periodic discovery and trend analysis
     - Automated content generation
@@ -106,64 +109,76 @@ class Scheduler:
         self.config = config or SchedulerConfig()
         self._scheduler = None
         self._running = False
-        self._tasks: Dict[str, ScheduledTask] = {}
-        self._publish_queue: List[PublishQueueItem] = []
+        self._tasks: Dict[str, ScheduledTask] = {}  # In-memory cache
         self._event_handlers: Dict[str, List[Callable]] = {}
 
-        # Track file modification times to detect external changes
-        self._tasks_file_mtime: Optional[float] = None
-        self._queue_file_mtime: Optional[float] = None
-
-        # Ensure data directory exists
+        # Legacy data directory for migration check
         self._data_dir = Path(self.config.data_dir)
-        self._data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Load persisted state
-        self._load_state()
+    async def _load_tasks_from_db(self) -> None:
+        """Load all tasks from database into memory cache."""
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
-        # Ensure system-level tasks exist
-        self._ensure_system_tasks()
+        try:
+            async with get_session() as session:
+                repo = SchedulerRepository(session)
+                db_tasks = await repo.list_all()
 
-    def _load_state(self) -> None:
-        """Load persisted scheduler state."""
+                self._tasks.clear()
+                for db_task in db_tasks:
+                    task = ScheduledTask(
+                        id=db_task.id,
+                        name=db_task.name,
+                        task_type=db_task.task_type,
+                        schedule=db_task.schedule,
+                        enabled=db_task.enabled,
+                        persona_id=db_task.persona_id,
+                        platform=db_task.platform,
+                        extra_params=db_task.extra_params or {},
+                        last_run=db_task.last_run,
+                        last_status=db_task.last_status,
+                        last_error=db_task.last_error,
+                        run_count=db_task.run_count or 0,
+                    )
+                    self._tasks[task.id] = task
+
+                logger.info(f"Loaded {len(self._tasks)} tasks from database")
+
+        except Exception as e:
+            logger.warning(f"Failed to load tasks from database: {e}")
+            # Fall back to JSON if database is not initialized
+            self._load_tasks_from_json()
+
+    def _load_tasks_from_json(self) -> None:
+        """Legacy: Load tasks from JSON file (for migration)."""
         tasks_file = self._data_dir / "tasks.json"
-        queue_file = self._data_dir / "publish_queue.json"
 
         if tasks_file.exists():
             try:
-                # Track file modification time
-                self._tasks_file_mtime = tasks_file.stat().st_mtime
-
                 with open(tasks_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     for task_data in data:
                         task = ScheduledTask(**task_data)
                         self._tasks[task.id] = task
+                logger.info(f"Loaded {len(self._tasks)} tasks from JSON (legacy)")
             except Exception as e:
-                logger.warning(f"Failed to load tasks: {e}")
+                logger.warning(f"Failed to load tasks from JSON: {e}")
 
-        if queue_file.exists():
-            try:
-                # Track file modification time
-                self._queue_file_mtime = queue_file.stat().st_mtime
-
-                with open(queue_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self._publish_queue = [PublishQueueItem(**item) for item in data]
-            except Exception as e:
-                logger.warning(f"Failed to load publish queue: {e}")
-
-    def _ensure_system_tasks(self) -> None:
+    async def _ensure_system_tasks(self) -> None:
         """
-        Ensure system-level scheduled tasks exist.
+        Ensure system-level scheduled tasks exist in database.
 
         These are global tasks that don't require a persona:
         - trend_scan: Daily scan of trending topics across platforms
         - persona_recommendation: Daily persona recommendations based on trends
         """
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
+
         system_tasks = [
             {
-                "id": "system_trend_scan",
+                "task_id": "system_trend_scan",
                 "name": "Daily Trend Scan",
                 "task_type": "trend_scan",
                 "schedule": "0 8 * * *",  # Daily at 8 AM
@@ -173,7 +188,7 @@ class Scheduler:
                 "extra_params": {"platforms": ["bluesky"]},
             },
             {
-                "id": "system_persona_recommendation",
+                "task_id": "system_persona_recommendation",
                 "name": "Daily Persona Recommendation",
                 "task_type": "persona_recommendation",
                 "schedule": "0 9 * * *",  # Daily at 9 AM (1 hour after trend scan)
@@ -184,167 +199,89 @@ class Scheduler:
             },
         ]
 
-        added = False
-        for task_dict in system_tasks:
-            task_id = task_dict["id"]
-            if task_id not in self._tasks:
-                task = ScheduledTask(**task_dict)
-                self._tasks[task_id] = task
-                added = True
-                logger.info(f"Added system task: {task.name}")
-
-        if added:
-            self._save_state()
-
-    def _save_state(self) -> None:
-        """
-        Persist scheduler state with external modification detection.
-
-        If the tasks file was modified externally since we loaded it,
-        we merge changes instead of blindly overwriting:
-        - Keep tasks from file that we don't have in memory (new tasks added externally)
-        - Remove tasks from memory that were deleted from file externally
-        - For tasks that exist in both, prefer memory state (has runtime updates like last_run)
-        """
-        tasks_file = self._data_dir / "tasks.json"
-        queue_file = self._data_dir / "publish_queue.json"
-
         try:
-            # Check if tasks file was modified externally
-            if tasks_file.exists() and self._tasks_file_mtime is not None:
-                current_mtime = tasks_file.stat().st_mtime
-                if current_mtime > self._tasks_file_mtime:
-                    logger.info("Detected external modification to tasks.json, merging changes...")
-                    self._merge_external_task_changes(tasks_file)
+            async with get_session() as session:
+                repo = SchedulerRepository(session)
 
-            # Save tasks
-            with open(tasks_file, "w", encoding="utf-8") as f:
-                json.dump([t.model_dump(mode='json') for t in self._tasks.values()], f, indent=2, default=str, ensure_ascii=False)
+                for task_dict in system_tasks:
+                    task_id = task_dict["task_id"]
+                    existing = await repo.get(task_id)
+                    if not existing:
+                        await repo.create_task(**task_dict)
+                        logger.info(f"Created system task: {task_dict['name']}")
 
-            # Update tracked mtime
-            self._tasks_file_mtime = tasks_file.stat().st_mtime
-
-            # Save publish queue
-            with open(queue_file, "w", encoding="utf-8") as f:
-                json.dump([q.model_dump(mode='json') for q in self._publish_queue], f, indent=2, default=str, ensure_ascii=False)
-
-            if queue_file.exists():
-                self._queue_file_mtime = queue_file.stat().st_mtime
+                        # Also add to memory cache
+                        task = ScheduledTask(
+                            id=task_id,
+                            name=task_dict["name"],
+                            task_type=task_dict["task_type"],
+                            schedule=task_dict["schedule"],
+                            enabled=task_dict["enabled"],
+                            persona_id=task_dict["persona_id"],
+                            platform=task_dict["platform"],
+                            extra_params=task_dict["extra_params"],
+                        )
+                        self._tasks[task_id] = task
 
         except Exception as e:
-            logger.error(f"Failed to save state: {e}")
+            logger.warning(f"Failed to ensure system tasks: {e}")
 
-    def _merge_external_task_changes(self, tasks_file: Path) -> None:
-        """
-        Merge external changes to tasks.json with in-memory state.
+    async def add_task(self, task: ScheduledTask) -> None:
+        """Add a scheduled task to database and memory."""
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
-        Strategy:
-        - Tasks deleted from file externally -> remove from memory
-        - Tasks added to file externally -> add to memory
-        - Tasks modified in file -> keep memory version (has runtime state)
-          but update static config (schedule, enabled, extra_params) from file
-        """
-        try:
-            with open(tasks_file, "r", encoding="utf-8") as f:
-                file_data = json.load(f)
+        async with get_session() as session:
+            repo = SchedulerRepository(session)
+            await repo.upsert_task(
+                task_id=task.id,
+                name=task.name,
+                task_type=task.task_type,
+                schedule=task.schedule,
+                enabled=task.enabled,
+                persona_id=task.persona_id,
+                platform=task.platform,
+                extra_params=task.extra_params,
+            )
 
-            file_tasks = {t["id"]: t for t in file_data}
-            file_task_ids = set(file_tasks.keys())
-            memory_task_ids = set(self._tasks.keys())
-
-            # Tasks deleted externally (in memory but not in file)
-            deleted_ids = memory_task_ids - file_task_ids
-            for task_id in deleted_ids:
-                logger.info(f"Task {task_id} was deleted externally, removing from memory")
-                del self._tasks[task_id]
-                # Also remove from APScheduler if running
-                if self._running and self._scheduler:
-                    try:
-                        self._scheduler.remove_job(task_id)
-                    except Exception:
-                        pass
-
-            # Tasks added externally (in file but not in memory)
-            added_ids = file_task_ids - memory_task_ids
-            for task_id in added_ids:
-                logger.info(f"Task {task_id} was added externally, loading into memory")
-                task = ScheduledTask(**file_tasks[task_id])
-                self._tasks[task_id] = task
-                # Schedule if running
-                if self._running and self._scheduler:
-                    self._schedule_task(task)
-
-            # Tasks in both - merge config changes but keep runtime state
-            common_ids = memory_task_ids & file_task_ids
-            for task_id in common_ids:
-                file_task = file_tasks[task_id]
-                memory_task = self._tasks[task_id]
-
-                # Update static config from file
-                updated = False
-                for field in ["name", "schedule", "enabled", "platform", "extra_params"]:
-                    if field in file_task and getattr(memory_task, field) != file_task.get(field):
-                        setattr(memory_task, field, file_task[field])
-                        updated = True
-
-                if updated:
-                    logger.info(f"Task {task_id} config updated from external changes")
-                    # Reschedule if running and schedule changed
-                    if self._running and self._scheduler:
-                        try:
-                            self._scheduler.remove_job(task_id)
-                        except Exception:
-                            pass
-                        if memory_task.enabled:
-                            self._schedule_task(memory_task)
-
-        except Exception as e:
-            logger.warning(f"Failed to merge external task changes: {e}")
-
-    def add_task(self, task: ScheduledTask, save_state: bool = True) -> None:
-        """Add a scheduled task.
-
-        Args:
-            task: The task to add
-            save_state: Whether to persist state immediately (set False for batch operations)
-        """
+        # Update memory cache
         self._tasks[task.id] = task
-        if save_state:
-            self._save_state()
 
         if self._running and self._scheduler:
             self._schedule_task(task)
 
-    def add_task_from_dict(self, task_dict: Dict[str, Any], save_state: bool = True) -> ScheduledTask:
+    def add_task_sync(self, task: ScheduledTask) -> None:
+        """Synchronous wrapper for add_task."""
+        asyncio.get_event_loop().run_until_complete(self.add_task(task))
+
+    async def add_task_from_dict(self, task_dict: Dict[str, Any]) -> ScheduledTask:
         """
         Add a scheduled task from a dictionary.
 
         Args:
-            task_dict: Dictionary with task properties (id, name, task_type, schedule, etc.)
-            save_state: Whether to persist state immediately (set False for batch operations)
+            task_dict: Dictionary with task properties
 
         Returns:
             The created ScheduledTask
         """
         task = ScheduledTask(**task_dict)
-        self.add_task(task, save_state=save_state)
+        await self.add_task(task)
         return task
 
-    def save_state(self) -> None:
-        """Public method to manually trigger state save (useful after batch operations)."""
-        self._save_state()
-
-    def update_task(self, task_id: str, updates: Dict[str, Any]) -> Optional[ScheduledTask]:
+    async def update_task(self, task_id: str, updates: Dict[str, Any]) -> Optional[ScheduledTask]:
         """
         Update a scheduled task's properties.
 
         Args:
             task_id: The task ID to update
-            updates: Dictionary of fields to update (name, schedule, platform, enabled, extra_params)
+            updates: Dictionary of fields to update
 
         Returns:
             Updated ScheduledTask or None if not found
         """
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
+
         if task_id not in self._tasks:
             return None
 
@@ -359,7 +296,10 @@ class Scheduler:
                     schedule_changed = True
                 setattr(task, field, value)
 
-        self._save_state()
+        # Persist to database
+        async with get_session() as session:
+            repo = SchedulerRepository(session)
+            await repo.update_task(task_id, updates)
 
         # Reschedule if running and schedule changed or enabled state changed
         if self._running and self._scheduler:
@@ -373,68 +313,102 @@ class Scheduler:
 
         return task
 
-    def remove_task(self, task_id: str) -> bool:
+    async def remove_task(self, task_id: str) -> bool:
         """Remove a scheduled task."""
-        if task_id in self._tasks:
-            del self._tasks[task_id]
-            self._save_state()
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
-            if self._running and self._scheduler:
-                try:
-                    self._scheduler.remove_job(task_id)
-                except Exception:
-                    pass
-            return True
-        return False
+        if task_id not in self._tasks:
+            return False
+
+        # Remove from database
+        async with get_session() as session:
+            repo = SchedulerRepository(session)
+            await repo.delete(task_id)
+
+        # Remove from memory cache
+        del self._tasks[task_id]
+
+        # Remove from APScheduler if running
+        if self._running and self._scheduler:
+            try:
+                self._scheduler.remove_job(task_id)
+            except Exception:
+                pass
+
+        return True
 
     def get_task(self, task_id: str) -> Optional[ScheduledTask]:
-        """Get a task by ID."""
+        """Get a task by ID from memory cache."""
         return self._tasks.get(task_id)
 
     def list_tasks(self) -> List[ScheduledTask]:
-        """List all scheduled tasks."""
+        """List all scheduled tasks from memory cache."""
         return list(self._tasks.values())
 
-    def remove_tasks_for_persona(self, persona_id: str) -> int:
-        """Remove all scheduled tasks for a specific persona.
+    async def remove_tasks_for_persona(self, persona_id: str) -> int:
+        """Remove all scheduled tasks for a specific persona."""
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
-        Args:
-            persona_id: The persona ID to remove tasks for
-
-        Returns:
-            Number of tasks removed
-        """
         tasks_to_remove = [
             task_id for task_id, task in self._tasks.items()
             if task.persona_id == persona_id
         ]
 
+        # Remove from database
+        async with get_session() as session:
+            repo = SchedulerRepository(session)
+            await repo.delete_by_persona(persona_id)
+
+        # Remove from memory and APScheduler
         for task_id in tasks_to_remove:
-            self.remove_task(task_id)
+            del self._tasks[task_id]
+            if self._running and self._scheduler:
+                try:
+                    self._scheduler.remove_job(task_id)
+                except Exception:
+                    pass
 
         return len(tasks_to_remove)
 
-    def enable_task(self, task_id: str) -> bool:
+    async def enable_task(self, task_id: str) -> bool:
         """Enable a task."""
-        if task_id in self._tasks:
-            self._tasks[task_id].enabled = True
-            self._save_state()
-            return True
-        return False
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
-    def disable_task(self, task_id: str) -> bool:
+        if task_id not in self._tasks:
+            return False
+
+        self._tasks[task_id].enabled = True
+
+        async with get_session() as session:
+            repo = SchedulerRepository(session)
+            await repo.toggle_enabled(task_id, True)
+
+        return True
+
+    async def disable_task(self, task_id: str) -> bool:
         """Disable a task."""
-        if task_id in self._tasks:
-            self._tasks[task_id].enabled = False
-            self._save_state()
-            return True
-        return False
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
+
+        if task_id not in self._tasks:
+            return False
+
+        self._tasks[task_id].enabled = False
+
+        async with get_session() as session:
+            repo = SchedulerRepository(session)
+            await repo.toggle_enabled(task_id, False)
+
+        return True
 
     # =========================================================================
     # Publish Queue
     # =========================================================================
 
-    def queue_publish(
+    async def queue_publish(
         self,
         content_id: str,
         platform: str,
@@ -442,30 +416,63 @@ class Scheduler:
     ) -> PublishQueueItem:
         """Add content to the publish queue."""
         import uuid
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import PublishQueueRepository
+
+        item_id = f"pub_{uuid.uuid4().hex[:8]}"
         item = PublishQueueItem(
-            id=f"pub_{uuid.uuid4().hex[:8]}",
+            id=item_id,
             content_id=content_id,
             platform=platform,
             scheduled_time=scheduled_time,
         )
-        self._publish_queue.append(item)
-        self._save_state()
+
+        async with get_session() as session:
+            repo = PublishQueueRepository(session)
+            await repo.create_item(
+                item_id=item_id,
+                content_id=content_id,
+                platform=platform,
+                scheduled_time=scheduled_time,
+            )
+
         return item
 
-    def get_publish_queue(self, status: Optional[str] = None) -> List[PublishQueueItem]:
+    async def get_publish_queue(self, status: Optional[str] = None) -> List[PublishQueueItem]:
         """Get publish queue items."""
-        if status:
-            return [q for q in self._publish_queue if q.status == status]
-        return self._publish_queue.copy()
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import PublishQueueRepository
 
-    def remove_from_queue(self, item_id: str) -> bool:
+        async with get_session() as session:
+            repo = PublishQueueRepository(session)
+            if status:
+                db_items = await repo.list_by_status(status)
+            else:
+                db_items = await repo.list_pending()
+
+        items = []
+        for db_item in db_items:
+            items.append(PublishQueueItem(
+                id=db_item.id,
+                content_id=db_item.content_id,
+                platform=db_item.platform,
+                scheduled_time=db_item.scheduled_time,
+                status=db_item.status,
+                created_at=db_item.created_at,
+                published_at=db_item.published_at,
+                error=db_item.error,
+                post_url=db_item.post_url,
+            ))
+        return items
+
+    async def remove_from_queue(self, item_id: str) -> bool:
         """Remove item from publish queue."""
-        for i, item in enumerate(self._publish_queue):
-            if item.id == item_id:
-                self._publish_queue.pop(i)
-                self._save_state()
-                return True
-        return False
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import PublishQueueRepository
+
+        async with get_session() as session:
+            repo = PublishQueueRepository(session)
+            return await repo.delete(item_id)
 
     # =========================================================================
     # Event Handlers
@@ -546,6 +553,9 @@ class Scheduler:
 
     async def _run_task_async(self, task_id: str) -> None:
         """Execute a scheduled task."""
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
+
         task = self._tasks.get(task_id)
         if not task or not task.enabled:
             return
@@ -580,7 +590,17 @@ class Scheduler:
             # Send error notification
             await self._notify_task_failed(task, str(e))
 
-        self._save_state()
+        # Update database with run status
+        try:
+            async with get_session() as session:
+                repo = SchedulerRepository(session)
+                await repo.update_run_status(
+                    task_id,
+                    task.last_status or "unknown",
+                    task.last_error,
+                )
+        except Exception as e:
+            logger.warning(f"Failed to update task status in database: {e}")
 
     async def _notify_task_completed(self, task: ScheduledTask, result: Dict[str, Any]) -> None:
         """
@@ -659,14 +679,7 @@ class Scheduler:
     async def _send_topic_webhook_notification(
         self, task: ScheduledTask, result: Dict[str, Any], webhook_url: str
     ) -> None:
-        """
-        Send topic task notification using markdown format.
-
-        Format includes:
-        - Trending topics discovered
-        - Generated ideas
-        - Key insights
-        """
+        """Send topic task notification using markdown format."""
         import httpx
 
         # Build markdown content
@@ -742,14 +755,7 @@ class Scheduler:
     async def _send_content_webhook_notification(
         self, task: ScheduledTask, result: Dict[str, Any], webhook_url: str
     ) -> None:
-        """
-        Send content task notification using news card format.
-
-        Format includes:
-        - Card title with content title
-        - Description with review score and preview
-        - Clickable link to view content in dashboard
-        """
+        """Send content task notification using news card format."""
         import os
         import httpx
 
@@ -784,15 +790,12 @@ class Scheduler:
         else:
             description = body_preview
 
-        # Build URL - link directly to the content preview page
-        # Use AVATARFACTORY_DASHBOARD_URL if set, otherwise fallback to SERVICE_URL
+        # Build URL
         dashboard_url = os.getenv("AVATARFACTORY_DASHBOARD_URL", "").rstrip("/")
         if not dashboard_url:
-            # In Azure deployment, dashboard is at the same URL
             dashboard_url = os.getenv("AVATARFACTORY_SERVICE_URL", "").rstrip("/")
 
         if dashboard_url and content_id:
-            # Link to content HTML view page
             url = f"{dashboard_url}/content/{content_id}/view"
         else:
             url = ""
@@ -817,7 +820,7 @@ class Scheduler:
                     "articles": [
                         {
                             "title": title,
-                            "description": description[:512],  # Max 512 chars
+                            "description": description[:512],
                             "url": url,
                             "picurl": "",
                         }
@@ -845,11 +848,7 @@ class Scheduler:
             logger.warning(f"Failed to send content notification: {e}")
 
     async def _notify_task_failed(self, task: ScheduledTask, error: str) -> None:
-        """
-        Send notification when task fails.
-
-        Only sends webhook notifications for discovery and content tasks.
-        """
+        """Send notification when task fails."""
         import os
         import httpx
         from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
@@ -880,12 +879,11 @@ class Scheduler:
             kb = get_knowledge_base(kb_path)
             persona = kb.load_persona(task.persona_id)
             if persona:
-                # Check if persona has notification disabled
                 if persona.notification is None or not persona.notification.enabled:
                     logger.debug(f"Skipping error notification for persona {task.persona_id}: notifications disabled")
                     return
 
-        # Build error notification using markdown format
+        # Build error notification
         content = f"### ❌ 任务失败: {task.name}\n\n"
         content += f"**类型:** {task.task_type}\n"
         content += f"**错误:** {error[:500]}"
@@ -916,38 +914,45 @@ class Scheduler:
 
     async def _process_publish_queue(self) -> None:
         """Process pending items in publish queue."""
+        from avatarfactory.core.database.connection import get_session
+        from avatarfactory.core.database.repositories.scheduler import PublishQueueRepository
+
         now = datetime.now()
-        pending = [
-            q for q in self._publish_queue
-            if q.status == "pending"
-            and (q.scheduled_time is None or q.scheduled_time <= now)
-        ]
 
-        for item in pending:
-            try:
-                # Import and run publisher
-                from avatarfactory.scheduler.tasks import publish_content
+        async with get_session() as session:
+            repo = PublishQueueRepository(session)
+            pending = await repo.list_pending(scheduled_before=now)
 
-                result = await publish_content(item)
-                item.status = "published" if result.get("success") else "failed"
-                item.published_at = datetime.now()
-                item.post_url = result.get("post_url")
-                item.error = result.get("error")
+            for item in pending:
+                try:
+                    # Import and run publisher
+                    from avatarfactory.scheduler.tasks import publish_content
 
-                self._emit("content_published", {"item": item, "result": result})
+                    publish_item = PublishQueueItem(
+                        id=item.id,
+                        content_id=item.content_id,
+                        platform=item.platform,
+                        scheduled_time=item.scheduled_time,
+                        status=item.status,
+                        created_at=item.created_at,
+                    )
+                    result = await publish_content(publish_item)
 
-            except Exception as e:
-                item.status = "failed"
-                item.error = str(e)
-                self._emit("publish_failed", {"item": item, "error": str(e)})
+                    if result.get("success"):
+                        await repo.mark_published(item.id, result.get("post_url"))
+                    else:
+                        await repo.mark_failed(item.id, result.get("error", "Unknown error"))
 
-        self._save_state()
+                    self._emit("content_published", {"item": item, "result": result})
+
+                except Exception as e:
+                    await repo.mark_failed(item.id, str(e))
+                    self._emit("publish_failed", {"item": item, "error": str(e)})
 
     def _run_publish_queue(self) -> None:
         """Execute publish queue processing (synchronous wrapper)."""
         import asyncio
 
-        # Run the async task in a new event loop
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -957,6 +962,20 @@ class Scheduler:
                 loop.close()
         except Exception as e:
             logger.error(f"Error processing publish queue: {e}")
+
+    async def initialize(self) -> None:
+        """Initialize scheduler by loading tasks from database."""
+        await self._load_tasks_from_db()
+        await self._ensure_system_tasks()
+
+    def _sync_initialize(self) -> None:
+        """Synchronous wrapper for initialize() to run in a thread."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self.initialize())
+        finally:
+            loop.close()
 
     def start(self, blocking: bool = True) -> None:
         """Start the scheduler."""
@@ -968,6 +987,25 @@ class Scheduler:
         if self._running:
             logger.warning("Scheduler is already running")
             return
+
+        # Initialize by loading tasks
+        # Check if we're already in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, schedule initialization as a task
+            # The initialize will run in background
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(self._sync_initialize)
+                future.result(timeout=30)  # Wait up to 30 seconds
+        except RuntimeError:
+            # No running loop, create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self.initialize())
+            finally:
+                loop.close()
 
         self._scheduler = BackgroundScheduler()
 
@@ -1000,7 +1038,7 @@ class Scheduler:
             if hasattr(signal, 'SIGTERM'):
                 signal.signal(signal.SIGTERM, signal_handler)
 
-            # Keep running - use a simple loop that works with AsyncIOScheduler
+            # Keep running
             try:
                 import time
                 while self._running:
@@ -1013,7 +1051,6 @@ class Scheduler:
         if self._scheduler and self._running:
             self._scheduler.shutdown(wait=True)
             self._running = False
-            self._save_state()
             logger.info("Scheduler stopped")
             self._emit("scheduler_stopped", {})
 
@@ -1031,8 +1068,6 @@ class Scheduler:
             "running": self._running,
             "tasks_count": len(self._tasks),
             "enabled_tasks": sum(1 for t in self._tasks.values() if t.enabled),
-            "queue_pending": sum(1 for q in self._publish_queue if q.status == "pending"),
-            "queue_published": sum(1 for q in self._publish_queue if q.status == "published"),
         }
 
     def get_next_runs(self) -> List[Dict[str, Any]]:
@@ -1053,3 +1088,87 @@ class Scheduler:
                     "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
                 })
         return result
+
+
+# =============================================================================
+# Migration Utilities
+# =============================================================================
+
+async def migrate_tasks_from_json(data_dir: str = "./knowledges/scheduler") -> int:
+    """
+    Migrate tasks from JSON file to database.
+
+    Args:
+        data_dir: Path to scheduler data directory
+
+    Returns:
+        Number of tasks migrated
+    """
+    from avatarfactory.core.database.connection import get_session, init_database
+    from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
+
+    tasks_file = Path(data_dir) / "tasks.json"
+    if not tasks_file.exists():
+        logger.info("No tasks.json found, nothing to migrate")
+        return 0
+
+    # Ensure database is initialized
+    await init_database()
+
+    # Load tasks from JSON
+    with open(tasks_file, "r", encoding="utf-8") as f:
+        tasks_data = json.load(f)
+
+    migrated = 0
+    async with get_session() as session:
+        repo = SchedulerRepository(session)
+
+        for task_data in tasks_data:
+            task_id = task_data.get("id")
+            if not task_id:
+                continue
+
+            # Check if already exists
+            existing = await repo.get(task_id)
+            if existing:
+                logger.debug(f"Task {task_id} already exists in database, skipping")
+                continue
+
+            # Create in database
+            await repo.create_task(
+                task_id=task_id,
+                name=task_data.get("name", ""),
+                task_type=task_data.get("task_type", ""),
+                schedule=task_data.get("schedule", ""),
+                enabled=task_data.get("enabled", True),
+                persona_id=task_data.get("persona_id"),
+                platform=task_data.get("platform"),
+                extra_params=task_data.get("extra_params", {}),
+            )
+
+            # Update run stats if present
+            if task_data.get("last_run") or task_data.get("run_count"):
+                db_task = await repo.get(task_id)
+                if db_task:
+                    if task_data.get("last_run"):
+                        try:
+                            db_task.last_run = datetime.fromisoformat(task_data["last_run"])
+                        except Exception:
+                            pass
+                    db_task.last_status = task_data.get("last_status")
+                    db_task.last_error = task_data.get("last_error")
+                    db_task.run_count = task_data.get("run_count", 0)
+                    await session.flush()
+
+            migrated += 1
+            logger.info(f"Migrated task: {task_id}")
+
+    logger.info(f"Migration complete: {migrated} tasks migrated")
+
+    # Optionally backup the JSON file
+    if migrated > 0:
+        backup_file = tasks_file.with_suffix(".json.bak")
+        tasks_file.rename(backup_file)
+        logger.info(f"Backed up original file to {backup_file}")
+
+    return migrated

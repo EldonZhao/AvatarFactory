@@ -5,10 +5,11 @@ Scheduler repository for database operations.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 
 from avatarfactory.core.database.models import (
     ScheduledTaskModel,
+    PublishQueueModel,
     TrendSnapshotModel,
     RecommendedPersonaModel,
 )
@@ -19,6 +20,20 @@ class SchedulerRepository(BaseRepository[ScheduledTaskModel]):
     """Repository for ScheduledTask CRUD and queries."""
 
     model = ScheduledTaskModel
+
+    async def list_all(self) -> List[ScheduledTaskModel]:
+        """
+        List all tasks.
+
+        Returns:
+            List of all ScheduledTaskModel instances
+        """
+        query = (
+            select(ScheduledTaskModel)
+            .order_by(ScheduledTaskModel.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
 
     async def list_enabled(self) -> List[ScheduledTaskModel]:
         """
@@ -66,6 +81,21 @@ class SchedulerRepository(BaseRepository[ScheduledTaskModel]):
         query = (
             select(ScheduledTaskModel)
             .where(ScheduledTaskModel.task_type == task_type)
+            .order_by(ScheduledTaskModel.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def list_system_tasks(self) -> List[ScheduledTaskModel]:
+        """
+        List system-level tasks (no persona association).
+
+        Returns:
+            List of ScheduledTaskModel instances
+        """
+        query = (
+            select(ScheduledTaskModel)
+            .where(ScheduledTaskModel.persona_id.is_(None))
             .order_by(ScheduledTaskModel.created_at.desc())
         )
         result = await self.session.execute(query)
@@ -141,6 +171,277 @@ class SchedulerRepository(BaseRepository[ScheduledTaskModel]):
             await self.session.flush()
             return True
         return False
+
+    async def update_task(
+        self,
+        task_id: str,
+        updates: Dict[str, Any],
+    ) -> Optional[ScheduledTaskModel]:
+        """
+        Update task properties.
+
+        Args:
+            task_id: Task ID
+            updates: Dictionary of fields to update
+
+        Returns:
+            Updated ScheduledTaskModel or None if not found
+        """
+        task = await self.get(task_id)
+        if not task:
+            return None
+
+        allowed_fields = {"name", "schedule", "platform", "enabled", "extra_params"}
+        for field, value in updates.items():
+            if field in allowed_fields and hasattr(task, field):
+                setattr(task, field, value)
+
+        task.updated_at = datetime.utcnow()
+        await self.session.flush()
+        return task
+
+    async def delete_by_persona(self, persona_id: str) -> int:
+        """
+        Delete all tasks for a specific persona.
+
+        Args:
+            persona_id: Persona ID
+
+        Returns:
+            Number of tasks deleted
+        """
+        query = (
+            delete(ScheduledTaskModel)
+            .where(ScheduledTaskModel.persona_id == persona_id)
+        )
+        result = await self.session.execute(query)
+        await self.session.flush()
+        return result.rowcount or 0
+
+    async def create_task(
+        self,
+        task_id: str,
+        name: str,
+        task_type: str,
+        schedule: str,
+        enabled: bool = True,
+        persona_id: Optional[str] = None,
+        platform: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
+    ) -> ScheduledTaskModel:
+        """
+        Create a new scheduled task.
+
+        Args:
+            task_id: Unique task ID
+            name: Task name
+            task_type: Task type
+            schedule: Cron expression
+            enabled: Whether task is enabled
+            persona_id: Optional persona association
+            platform: Optional platform
+            extra_params: Optional extra parameters
+
+        Returns:
+            Created ScheduledTaskModel
+        """
+        task = ScheduledTaskModel(
+            id=task_id,
+            name=name,
+            task_type=task_type,
+            schedule=schedule,
+            enabled=enabled,
+            persona_id=persona_id,
+            platform=platform,
+            extra_params=extra_params or {},
+            run_count=0,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        self.session.add(task)
+        await self.session.flush()
+        return task
+
+    async def upsert_task(
+        self,
+        task_id: str,
+        name: str,
+        task_type: str,
+        schedule: str,
+        enabled: bool = True,
+        persona_id: Optional[str] = None,
+        platform: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
+    ) -> ScheduledTaskModel:
+        """
+        Create or update a scheduled task.
+
+        Args:
+            task_id: Unique task ID
+            name: Task name
+            task_type: Task type
+            schedule: Cron expression
+            enabled: Whether task is enabled
+            persona_id: Optional persona association
+            platform: Optional platform
+            extra_params: Optional extra parameters
+
+        Returns:
+            Created or updated ScheduledTaskModel
+        """
+        existing = await self.get(task_id)
+        if existing:
+            existing.name = name
+            existing.task_type = task_type
+            existing.schedule = schedule
+            existing.enabled = enabled
+            existing.persona_id = persona_id
+            existing.platform = platform
+            existing.extra_params = extra_params or {}
+            existing.updated_at = datetime.utcnow()
+            await self.session.flush()
+            return existing
+        else:
+            return await self.create_task(
+                task_id=task_id,
+                name=name,
+                task_type=task_type,
+                schedule=schedule,
+                enabled=enabled,
+                persona_id=persona_id,
+                platform=platform,
+                extra_params=extra_params,
+            )
+
+
+class PublishQueueRepository(BaseRepository[PublishQueueModel]):
+    """Repository for PublishQueue CRUD and queries."""
+
+    model = PublishQueueModel
+
+    async def list_pending(
+        self,
+        scheduled_before: Optional[datetime] = None,
+    ) -> List[PublishQueueModel]:
+        """
+        List pending items ready to publish.
+
+        Args:
+            scheduled_before: Only include items scheduled before this time
+
+        Returns:
+            List of pending PublishQueueModel instances
+        """
+        conditions = [PublishQueueModel.status == "pending"]
+        if scheduled_before:
+            conditions.append(
+                (PublishQueueModel.scheduled_time.is_(None)) |
+                (PublishQueueModel.scheduled_time <= scheduled_before)
+            )
+
+        query = (
+            select(PublishQueueModel)
+            .where(and_(*conditions))
+            .order_by(PublishQueueModel.created_at.asc())
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def list_by_status(self, status: str) -> List[PublishQueueModel]:
+        """
+        List items by status.
+
+        Args:
+            status: Status filter ('pending', 'published', 'failed')
+
+        Returns:
+            List of PublishQueueModel instances
+        """
+        query = (
+            select(PublishQueueModel)
+            .where(PublishQueueModel.status == status)
+            .order_by(PublishQueueModel.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def mark_published(
+        self,
+        item_id: str,
+        post_url: Optional[str] = None,
+    ) -> bool:
+        """
+        Mark an item as published.
+
+        Args:
+            item_id: Queue item ID
+            post_url: URL of the published post
+
+        Returns:
+            True if updated, False if not found
+        """
+        item = await self.get(item_id)
+        if item:
+            item.status = "published"
+            item.published_at = datetime.utcnow()
+            item.post_url = post_url
+            await self.session.flush()
+            return True
+        return False
+
+    async def mark_failed(
+        self,
+        item_id: str,
+        error: str,
+    ) -> bool:
+        """
+        Mark an item as failed.
+
+        Args:
+            item_id: Queue item ID
+            error: Error message
+
+        Returns:
+            True if updated, False if not found
+        """
+        item = await self.get(item_id)
+        if item:
+            item.status = "failed"
+            item.error = error
+            await self.session.flush()
+            return True
+        return False
+
+    async def create_item(
+        self,
+        item_id: str,
+        content_id: str,
+        platform: str,
+        scheduled_time: Optional[datetime] = None,
+    ) -> PublishQueueModel:
+        """
+        Create a new publish queue item.
+
+        Args:
+            item_id: Unique item ID
+            content_id: Content ID to publish
+            platform: Target platform
+            scheduled_time: Optional scheduled time
+
+        Returns:
+            Created PublishQueueModel
+        """
+        item = PublishQueueModel(
+            id=item_id,
+            content_id=content_id,
+            platform=platform,
+            scheduled_time=scheduled_time,
+            status="pending",
+            created_at=datetime.utcnow(),
+        )
+        self.session.add(item)
+        await self.session.flush()
+        return item
 
 
 class TrendSnapshotRepository(BaseRepository[TrendSnapshotModel]):

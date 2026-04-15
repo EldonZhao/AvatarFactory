@@ -1,5 +1,6 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import { TaskActions } from '../../components/schedulers/TaskActions';
 
 const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
 // Remove trailing slash from BASE_URL for consistent path joining
@@ -60,6 +61,15 @@ const personaTaskCount = personaIds.reduce((sum, id) => sum + (grouped[id]?.task
         </p>
       </div>
       <div class="flex items-center gap-4">
+        <button
+          id="refresh-btn"
+          class="px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium flex items-center gap-2"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          刷新
+        </button>
         <a
           href={`${base}/schedulers/new`}
           class="px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity text-sm font-medium"
@@ -129,7 +139,7 @@ const personaTaskCount = personaIds.reduce((sum, id) => sum + (grouped[id]?.task
 
         <!-- Tasks by Persona -->
         {personaIds.length > 0 ? (
-          <div class="space-y-6">
+          <div class="space-y-6" id="tasks-container">
             {personaIds.map((personaId) => {
               const data = grouped[personaId];
               return (
@@ -154,7 +164,7 @@ const personaTaskCount = personaIds.reduce((sum, id) => sum + (grouped[id]?.task
 
                 <div class="space-y-3">
                   {data.tasks.map((task: any) => (
-                    <div class="p-4 rounded-lg bg-[hsl(var(--accent))]">
+                    <div class="p-4 rounded-lg bg-[hsl(var(--accent))]" data-task-id={task.id}>
                       <div class="flex items-start justify-between gap-4">
                         <div class="flex-1">
                           <div class="flex items-center gap-2 mb-1">
@@ -201,6 +211,10 @@ const personaTaskCount = personaIds.reduce((sum, id) => sum + (grouped[id]?.task
                             </p>
                           )}
                         </div>
+                        <!-- Task Actions (React Component) -->
+                        <div class="task-actions-container" data-task={JSON.stringify(task)}>
+                          <TaskActions task={task} onUpdated={() => window.location.reload()} client:load />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -225,3 +239,10 @@ const personaTaskCount = personaIds.reduce((sum, id) => sum + (grouped[id]?.task
     )}
   </div>
 </AdminLayout>
+
+<script>
+  // Refresh button
+  document.getElementById('refresh-btn')?.addEventListener('click', () => {
+    window.location.reload();
+  });
+</script>

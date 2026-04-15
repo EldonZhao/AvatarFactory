@@ -410,9 +410,15 @@ def create_app(
     )
 
     if enable_cors:
+        # Get allowed origins from environment or use defaults
+        # Note: allow_credentials=True requires specific origins, not "*"
+        cors_origins = os.environ.get(
+            "AVATARFACTORY_CORS_ORIGINS",
+            "http://localhost:3000,http://localhost:4321,http://127.0.0.1:3000,http://127.0.0.1:4321,http://localhost:8000,http://127.0.0.1:8000"
+        ).split(",")
         application.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=cors_origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
@@ -1499,34 +1505,8 @@ def register_routes(app: FastAPI):
 
         # Run the task in background
         async def run_task():
-            from avatarfactory.scheduler.tasks import TaskRegistry
-            import logging
-
-            logger = logging.getLogger("avatarfactory.scheduler")
-            logger.info(f"Running task manually: {task.name}")
-
-            try:
-                runner = TaskRegistry.get_runner(task.task_type)
-                if runner:
-                    result = await runner(task)
-                    task.last_run = datetime.now()
-                    task.run_count += 1
-                    task.last_status = "success" if result.get("success") else "error"
-                    task.last_error = result.get("error") if not result.get("success") else None
-
-                    # Send notification
-                    await scheduler._notify_task_completed(task, result)
-                    scheduler._save_state()
-                else:
-                    task.last_status = "error"
-                    task.last_error = f"Unknown task type: {task.task_type}"
-                    scheduler._save_state()
-            except Exception as e:
-                logger.error(f"Task {task.name} failed: {e}")
-                task.last_status = "error"
-                task.last_error = str(e)
-                await scheduler._notify_task_failed(task, str(e))
-                scheduler._save_state()
+            # Use the scheduler's built-in run method which handles database persistence
+            await scheduler._run_task_async(task_id)
 
         background_tasks.add_task(run_task)
 

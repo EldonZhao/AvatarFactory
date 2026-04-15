@@ -904,7 +904,7 @@ async def create_scheduler_task_admin(request: CreateSchedulerTaskRequest):
     task_id = f"{request.task_type}_{uuid.uuid4().hex[:8]}"
 
     # Create task via scheduler
-    task = scheduler.add_task_from_dict({
+    task = await scheduler.add_task_from_dict({
         "id": task_id,
         "name": task_name,
         "task_type": request.task_type,
@@ -976,7 +976,7 @@ async def delete_scheduler_task_admin(task_id: str):
         )
 
     # Remove the single task
-    removed = scheduler.remove_task(task_id)
+    removed = await scheduler.remove_task(task_id)
 
     if removed:
         return {
@@ -1028,7 +1028,7 @@ async def update_scheduler_task_admin(task_id: str, request: UpdateSchedulerTask
         }
 
     # Update the task
-    updated_task = scheduler.update_task(task_id, updates)
+    updated_task = await scheduler.update_task(task_id, updates)
 
     if updated_task:
         return {
@@ -1071,7 +1071,7 @@ async def toggle_scheduler_task_admin(task_id: str):
 
     # Toggle the enabled state
     new_enabled = not task.enabled
-    scheduler.update_task(task_id, {"enabled": new_enabled})
+    await scheduler.update_task(task_id, {"enabled": new_enabled})
 
     return {
         "status": "toggled",
@@ -1417,10 +1417,10 @@ async def create_connector_trend_task(platform: str, request: CreateTrendScanTas
 
     if existing_task:
         # Update existing task
-        scheduler.remove_task(task_id)
+        await scheduler.remove_task(task_id)
 
     # Create task
-    task = scheduler.add_task_from_dict({
+    task = await scheduler.add_task_from_dict({
         "id": task_id,
         "name": task_name,
         "task_type": "trend_scan",

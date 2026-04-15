@@ -87,37 +87,37 @@ export async function deleteContent(id: string) {
 
 // Scheduler
 export async function getSchedulerTasks() {
-  return apiFetch<SchedulerTasksResponse>('/api/scheduler/tasks');
+  return apiFetch<SchedulerTasksResponse>('/api/admin/scheduler/tasks');
 }
 
 export async function setupSchedulerTask(personaId: string, data: SetupTaskRequest) {
-  return apiFetch<SchedulerTask>(`/api/scheduler/tasks/${personaId}/setup`, {
+  return apiFetch<SchedulerTask>(`/api/admin/scheduler/tasks/${personaId}/setup`, {
     method: 'POST',
     body: data,
   });
 }
 
 export async function runSchedulerTask(taskId: string) {
-  return apiFetch<TaskRunResponse>(`/api/scheduler/tasks/${taskId}/run`, {
+  return apiFetch<TaskRunResponse>(`/api/admin/scheduler/tasks/${taskId}/run`, {
     method: 'POST',
   });
 }
 
 export async function deleteSchedulerTask(taskId: string) {
-  return apiFetch<void>(`/api/scheduler/tasks/${taskId}`, {
+  return apiFetch<void>(`/api/admin/scheduler/tasks/${taskId}`, {
     method: 'DELETE',
   });
 }
 
 export async function updateSchedulerTask(taskId: string, data: UpdateSchedulerTaskRequest) {
-  return apiFetch<UpdateSchedulerTaskResponse>(`/api/scheduler/tasks/${taskId}`, {
+  return apiFetch<UpdateSchedulerTaskResponse>(`/api/admin/scheduler/tasks/${taskId}`, {
     method: 'PUT',
     body: data,
   });
 }
 
 export async function toggleSchedulerTask(taskId: string) {
-  return apiFetch<ToggleSchedulerTaskResponse>(`/api/scheduler/tasks/${taskId}/toggle`, {
+  return apiFetch<ToggleSchedulerTaskResponse>(`/api/admin/scheduler/tasks/${taskId}/toggle`, {
     method: 'POST',
   });
 }

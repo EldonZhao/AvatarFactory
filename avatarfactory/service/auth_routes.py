@@ -25,6 +25,9 @@ JWT_EXPIRATION_HOURS = 24
 # Cookie settings
 COOKIE_NAME = "admin_token"
 COOKIE_MAX_AGE = JWT_EXPIRATION_HOURS * 60 * 60  # 24 hours in seconds
+# Use secure cookies only in production (when HTTPS is available)
+COOKIE_SECURE = os.getenv("AVATARFACTORY_COOKIE_SECURE", "false").lower() == "true"
+COOKIE_SAMESITE = "none" if COOKIE_SECURE else "lax"
 
 
 def _get_jwt_secret() -> str:
@@ -121,8 +124,8 @@ async def login(request: LoginRequest, response: Response):
         value=token,
         max_age=COOKIE_MAX_AGE,
         httponly=True,
-        secure=True,  # Set to True in production with HTTPS
-        samesite="none",  # "none" ensures cookie is always sent (requires Secure)
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
 
@@ -142,8 +145,8 @@ async def logout(response: Response):
         key=COOKIE_NAME,
         path="/",
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
     )
     return {"success": True, "message": "Logged out successfully"}
 

@@ -512,6 +512,26 @@ def register_routes(app: FastAPI):
         """Health check endpoint."""
         return HealthResponse(status="healthy", version="1.0.0")
 
+    @app.get("/api/public/personas", tags=["Public API"])
+    async def list_personas_public():
+        """List all personas (public API with /api prefix to avoid route conflicts)."""
+        orchestrator = get_orchestrator()
+        persona_ids = orchestrator.kb.list_personas()
+        personas = []
+        for pid in persona_ids:
+            p = orchestrator.kb.load_persona(pid)
+            if p:
+                personas.append({
+                    "id": p.id,
+                    "name": p.identity.name,
+                    "tagline": p.identity.tagline,
+                    "version": p.version,
+                })
+        return {
+            "count": len(personas),
+            "personas": personas,
+        }
+
     @app.get("/", tags=["System"])
     async def root():
         """Root endpoint with API info."""
@@ -527,6 +547,7 @@ def register_routes(app: FastAPI):
     # -------------------------------------------------------------------------
 
     @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
+    @app.post("/api/public/chat", response_model=ChatResponse, tags=["Public API"])
     async def chat(request: ChatRequest):
         """
         Process a chat message.

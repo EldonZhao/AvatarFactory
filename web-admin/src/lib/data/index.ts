@@ -3,9 +3,9 @@
  * All data is fetched from the FastAPI backend via API calls.
  */
 
-// API base URL - use environment variable or default
-// In SSR mode, we need to call the backend directly
-const API_BASE_URL = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+import { getApiBaseUrl } from '../api-base';
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface FetchOptions {
   method?: string;
@@ -250,8 +250,8 @@ export interface GlobalStats {
   personas_stats: PersonaStats[];
 }
 
-// Chronicle API base URL (no auth required)
-const CHRONICLE_API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+// Chronicle API base URL (no auth required) - reuse the same base URL logic
+const CHRONICLE_API_BASE = getApiBaseUrl();
 
 async function chronicleFetch<T>(endpoint: string): Promise<T> {
   const url = `${CHRONICLE_API_BASE}/api/chronicle${endpoint}`;

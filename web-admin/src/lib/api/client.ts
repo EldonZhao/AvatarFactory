@@ -460,7 +460,7 @@ export interface ChatResponse {
 }
 
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
-  return apiFetch<ChatResponse>('/chat', {
+  return apiFetch<ChatResponse>('/api/public/chat', {
     method: 'POST',
     body: request,
   });
@@ -479,7 +479,8 @@ export interface PersonaListResponse {
   personas: PersonaListItem[];
 }
 
+// Use /api/public/personas to avoid conflict with Astro page route /personas
 export async function getPersonaList(): Promise<PersonaListResponse> {
-  return apiFetch<PersonaListResponse>('/personas');
+  return apiFetch<PersonaListResponse>('/api/public/personas');
 }
 

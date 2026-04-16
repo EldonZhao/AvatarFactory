@@ -6,7 +6,15 @@
  */
 import type { APIRoute } from 'astro';
 
-const API_BASE = import.meta.env.API_BASE_URL || 'http://localhost:8000';
+// Use process.env for runtime configuration in Docker
+function getApiBaseUrl(): string {
+  if (typeof process !== 'undefined' && process.env?.ADMIN_API_BASE) {
+    return process.env.ADMIN_API_BASE;
+  }
+  return 'http://127.0.0.1:8000';
+}
+
+const API_BASE = getApiBaseUrl();
 
 export const ALL: APIRoute = async ({ request, params, cookies }) => {
   const path = params.path || '';

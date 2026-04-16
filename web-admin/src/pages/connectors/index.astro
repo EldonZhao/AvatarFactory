@@ -1,8 +1,9 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { ConnectorConfigButton } from '../../components/connectors/ConnectorConfigButton';
+import { getApiBaseUrl } from '../../lib/api-base';
 
-const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = getApiBaseUrl();
 const rawBase = import.meta.env.BASE_URL || '';
 const base = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 

@@ -7,8 +7,15 @@ const PUBLIC_ROUTES = ['/login', '/api/'];
 const rawBasePath = import.meta.env.BASE_URL || '';
 const BASE_PATH = rawBasePath.endsWith('/') ? rawBasePath.slice(0, -1) : rawBasePath;
 
-// API base URL for proxying
-const API_BASE = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+// API base URL for proxying - use process.env for runtime configuration in Docker
+function getApiBaseUrl(): string {
+  if (typeof process !== 'undefined' && process.env?.ADMIN_API_BASE) {
+    return process.env.ADMIN_API_BASE;
+  }
+  return 'http://127.0.0.1:8000';
+}
+
+const API_BASE = getApiBaseUrl();
 
 // Check if a route is public
 function isPublicRoute(pathname: string): boolean {
@@ -97,8 +104,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // Verify the token by calling the backend API
   try {
-    // Use the internal API URL for server-side requests
-    const apiBase = import.meta.env.API_BASE_URL || import.meta.env.ADMIN_API_BASE || 'http://127.0.0.1:8000';
+    // Use the runtime API URL for server-side requests
+    const apiBase = getApiBaseUrl();
     const response = await fetch(`${apiBase}/api/admin/auth/verify`, {
       headers: {
         Cookie: `admin_token=${token}`,

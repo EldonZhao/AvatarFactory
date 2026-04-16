@@ -22,7 +22,36 @@ export default defineConfig({
     },
     server: {
       proxy: {
+        // Proxy all API routes to backend
         '/api': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/personas': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/chat': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/scheduler': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/connectors': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/content': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/health': {
+          target: apiBase,
+          changeOrigin: true
+        },
+        '/topology': {
           target: apiBase,
           changeOrigin: true
         }

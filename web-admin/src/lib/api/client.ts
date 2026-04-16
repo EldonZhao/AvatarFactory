@@ -1,6 +1,7 @@
 // API client for Admin dashboard
-
-const API_BASE_URL = import.meta.env.API_BASE_URL || 'http://127.0.0.1:8000';
+// Use empty string for relative URLs - works with nginx reverse proxy in production
+// and with Astro dev server proxy in development
+const API_BASE_URL = '';
 
 interface FetchOptions {
   method?: string;

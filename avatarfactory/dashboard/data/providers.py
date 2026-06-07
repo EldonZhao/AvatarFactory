@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from avatarfactory.core.knowledges_db import get_knowledge_base
 from avatarfactory.connectors.registry import ConnectorRegistry
-from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig, ScheduledTask
+from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
 
 
 @dataclass

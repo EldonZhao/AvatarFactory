@@ -15,7 +15,7 @@ from avatarfactory.core.database.models import (
     DiscoveryResultModel,
 )
 from avatarfactory.core.database.repositories.base import BaseRepository
-from avatarfactory.models.schemas import Persona, PersonaVersion
+from avatarfactory.models.schemas import Persona
 
 
 class PersonaRepository(BaseRepository[PersonaModel]):

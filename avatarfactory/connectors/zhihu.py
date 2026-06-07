@@ -6,7 +6,6 @@ Note: Official API is limited. This connector uses cookie-based authentication.
 """
 
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from avatarfactory.connectors.base import (
@@ -174,8 +173,6 @@ class ZhihuConnector(BasePlatformConnector):
             return FetchResult(success=False, error="Not connected")
 
         query = kwargs.get("query")
-        content_type = kwargs.get("content_type", "question")
-
         try:
             async with httpx.AsyncClient() as client:
                 if query:

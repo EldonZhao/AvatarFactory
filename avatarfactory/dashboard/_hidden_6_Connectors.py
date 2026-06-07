@@ -7,15 +7,15 @@ Displays the status of all platform connectors and their configuration.
 import os
 import sys
 
+import streamlit as st
+from dotenv import load_dotenv
+
+from avatarfactory.dashboard.data import DashboardDataProvider
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 # Load environment variables from .env file
-from dotenv import load_dotenv
 load_dotenv()
-
-import streamlit as st
-
-from avatarfactory.dashboard.data import DashboardDataProvider
 
 st.set_page_config(
     page_title="Connectors - AvatarFactory",

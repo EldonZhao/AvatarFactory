@@ -16,7 +16,6 @@ from avatarfactory.models.schemas import (
     Content,
     ContentStructure,
     ContentType,
-    MediaAttachment,
     Persona,
     PlatformType,
     TaskType,

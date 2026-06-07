@@ -9,9 +9,8 @@ Uses MoviePy for video composition with support for:
 
 import os
 import re
-import textwrap
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from .base import VideoError
 
@@ -180,7 +179,7 @@ class VideoComposer:
             List of paths to generated card images
         """
         try:
-            from PIL import Image, ImageDraw, ImageFont
+            from PIL import Image, ImageDraw
         except ImportError:
             raise VideoError(
                 "Pillow not installed. Install with: pip install Pillow"
@@ -240,7 +239,7 @@ class VideoComposer:
 
         return card_paths
 
-    def _get_font(self) -> "ImageFont.FreeTypeFont":
+    def _get_font(self) -> Any:
         """Get font for text rendering."""
         try:
             from PIL import ImageFont
@@ -347,9 +346,9 @@ class VideoComposer:
     def _wrap_text(
         self,
         text: str,
-        font: "ImageFont.FreeTypeFont",
+        font: Any,
         max_width: int,
-        draw: "ImageDraw.Draw",
+        draw: Any,
     ) -> str:
         """Wrap text to fit within max width."""
         lines = []

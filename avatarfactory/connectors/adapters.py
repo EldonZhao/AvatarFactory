@@ -6,7 +6,7 @@ respecting each platform's content limits and formatting requirements.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from avatarfactory.models.schemas import Content
 

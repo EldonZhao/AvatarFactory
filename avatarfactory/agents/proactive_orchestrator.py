@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional
 
 from avatarfactory.agents.orchestrator import OrchestratorAgent
 from avatarfactory.agents.topic import TopicAgent
-from avatarfactory.models.schemas import AgentMessage, TaskType
 
 
 class ProactiveOrchestrator(OrchestratorAgent):

@@ -110,7 +110,6 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
     2. Unused ideas from recent discovery results
     3. Random pillar/example combination (avoiding recent topics)
     """
-    import random
     from avatarfactory.agents.orchestrator import OrchestratorAgent
     from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
@@ -118,7 +117,6 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
 
     persona_id = task.persona_id
     topic = task.extra_params.get("topic")
-    count = task.extra_params.get("count", 1)
 
     if not persona_id:
         return {"success": False, "error": "persona_id required for content generation"}
@@ -429,7 +427,6 @@ async def run_evolution_analysis(task: ScheduledTask) -> Dict[str, Any]:
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     persona_id = task.persona_id
-    period = task.extra_params.get("period", "7d")
 
     if not persona_id:
         return {"success": False, "error": "persona_id required for evolution analysis"}

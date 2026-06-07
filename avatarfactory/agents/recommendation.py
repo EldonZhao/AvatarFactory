@@ -221,7 +221,7 @@ Return as JSON:
                     body = post.get("body", "")[:200]
                     likes = post.get("likes", 0)
                     post_samples.append(f"- {body}... ({likes} likes)")
-                part += f"**Sample Posts:**\n" + "\n".join(post_samples) + "\n"
+                part += "**Sample Posts:**\n" + "\n".join(post_samples) + "\n"
 
             parts.append(part)
 

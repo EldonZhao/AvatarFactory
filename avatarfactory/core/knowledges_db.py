@@ -20,14 +20,12 @@ from avatarfactory.core.database.models import (
     SimulationModel,
     DiscoveryResultModel,
     EvolutionSuggestionModel,
-    ScheduledTaskModel,
     TrendSnapshotModel,
     RecommendedPersonaModel,
 )
 from avatarfactory.core.database.repositories.persona import PersonaRepository
 from avatarfactory.core.database.repositories.content import ContentRepository, ReviewRepository
 from avatarfactory.core.database.repositories.scheduler import (
-    SchedulerRepository,
     TrendSnapshotRepository,
     RecommendedPersonaRepository,
 )
@@ -50,7 +48,7 @@ from avatarfactory.models.schemas import (
 def _run_async(coro):
     """Run async function in sync context."""
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # We're in an async context, create a task
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -798,7 +796,7 @@ class KnowledgeBaseDB:
                 from sqlalchemy import select, func
 
                 persona_count = await session.execute(
-                    select(func.count()).select_from(PersonaModel).where(PersonaModel.is_deleted == False)
+                    select(func.count()).select_from(PersonaModel).where(PersonaModel.is_deleted.is_(False))
                 )
                 draft_count = await session.execute(
                     select(func.count()).select_from(ContentModel).where(ContentModel.status == "draft")
@@ -1197,7 +1195,7 @@ class KnowledgeBaseDB:
         """Get all trend snapshots from today."""
         async def _get():
             async with get_session() as session:
-                from sqlalchemy import select, func
+                from sqlalchemy import select
 
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -1297,7 +1295,6 @@ class KnowledgeBaseDB:
         async def _get():
             async with get_session() as session:
                 from sqlalchemy import select
-                from sqlalchemy.orm import joinedload
 
                 query = select(ReviewModel)
 

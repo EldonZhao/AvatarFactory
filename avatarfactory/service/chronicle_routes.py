@@ -440,8 +440,8 @@ async def get_content_review(content_id: str) -> Optional[Dict[str, Any]]:
 
     # First, find the content to get persona_id
     content = None
-    for status in ["draft", "published"]:
-        content = orchestrator.kb.load_content(content_id, status=status)
+    for content_status in ["draft", "published"]:
+        content = orchestrator.kb.load_content(content_id, status=content_status)
         if content:
             break
 

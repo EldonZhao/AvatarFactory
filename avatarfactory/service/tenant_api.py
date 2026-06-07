@@ -298,7 +298,7 @@ def create_admin_router() -> APIRouter:
 def create_tenant_router() -> APIRouter:
     """Create the tenant self-service API router."""
     from avatarfactory.core.tenant import TenantManager, get_tenant_manager
-    from avatarfactory.middleware.auth import get_tenant_context, TenantContext
+    from avatarfactory.middleware.auth import get_tenant_context
 
     router = APIRouter(prefix="/tenant", tags=["Tenant"])
 

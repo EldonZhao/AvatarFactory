@@ -5,9 +5,9 @@ Uses the edge-tts library which interfaces with Microsoft's Edge browser TTS ser
 No API key required.
 """
 
-import asyncio
 from pathlib import Path
 from typing import List, Optional
+from importlib.util import find_spec
 
 from .base import TTSProvider, TTSError, VoiceInfo
 
@@ -21,11 +21,7 @@ class EdgeTTSProvider(TTSProvider):
 
     def is_available(self) -> bool:
         """Check if edge-tts is installed."""
-        try:
-            import edge_tts
-            return True
-        except ImportError:
-            return False
+        return find_spec("edge_tts") is not None
 
     async def synthesize(
         self,

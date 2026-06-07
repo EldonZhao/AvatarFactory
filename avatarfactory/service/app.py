@@ -7,7 +7,6 @@ and scheduler control.
 
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 # Load environment variables from .env file
@@ -875,7 +874,6 @@ def register_routes(app: FastAPI):
         content_status = "draft"
         if not content:
             content = orchestrator.kb.load_content(content_id, status="published")
-            content_status = "published"
 
         if not content:
             raise HTTPException(
@@ -910,10 +908,8 @@ def register_routes(app: FastAPI):
 
         # Try loading from draft first, then published
         content = orchestrator.kb.load_content(content_id, status="draft")
-        content_status = "draft"
         if not content:
             content = orchestrator.kb.load_content(content_id, status="published")
-            content_status = "published"
 
         if not content:
             raise HTTPException(
@@ -1273,7 +1269,6 @@ def register_routes(app: FastAPI):
             ZIP file with PNG images or JSON with base64-encoded images
         """
         import base64
-        import io
         import zipfile
         from fastapi.responses import StreamingResponse
 
@@ -1617,7 +1612,6 @@ def register_routes(app: FastAPI):
                 })
 
         # Add connector nodes
-        from avatarfactory.connectors.registry import ConnectorRegistry
 
         connector_configs = {
             "bluesky": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],

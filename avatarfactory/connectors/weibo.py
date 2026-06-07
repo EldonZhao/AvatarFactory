@@ -6,7 +6,7 @@ Documentation: https://open.weibo.com/wiki/
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,

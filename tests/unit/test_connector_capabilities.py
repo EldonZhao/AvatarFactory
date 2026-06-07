@@ -8,10 +8,8 @@ and ConnectorRegistry capability query methods.
 import pytest
 
 from avatarfactory.connectors.base import (
-    BasePlatformConnector,
     ConnectorCapabilities,
     ConnectorConfigField,
-    ConnectorConfig,
     IntegrationType,
 )
 from avatarfactory.connectors.registry import ConnectorRegistry

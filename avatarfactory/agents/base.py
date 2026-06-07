@@ -4,8 +4,8 @@ Base Agent class and utilities for all AvatarFactory agents.
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from avatarfactory.core.llm_provider import BaseLLMProvider, LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage

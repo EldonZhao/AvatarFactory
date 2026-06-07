@@ -419,7 +419,6 @@ async def get_journal_stats() -> Dict[str, Any]:
     if cached is not None:
         return cached
 
-    from avatarfactory.service.app import get_scheduler
 
     orchestrator = _get_orchestrator()
     persona_ids = orchestrator.kb.list_personas()

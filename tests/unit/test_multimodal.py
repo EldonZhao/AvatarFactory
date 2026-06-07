@@ -10,12 +10,9 @@ Tests cover:
 - Image resolution helper
 """
 
-import base64
 import os
 import tempfile
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import List, Optional
 
 import pytest
 

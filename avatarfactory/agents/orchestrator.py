@@ -3,7 +3,7 @@ Orchestrator Agent - Main controller that coordinates all sub-agents.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from avatarfactory.agents.base import BaseAgent
 from avatarfactory.agents.content import ContentAgent
@@ -11,10 +11,7 @@ from avatarfactory.agents.persona import PersonaAgent
 from avatarfactory.agents.review import ReviewAgent
 from avatarfactory.models.schemas import (
     AgentMessage,
-    Content,
     Intent,
-    Persona,
-    ReviewReport,
     TaskType,
 )
 
@@ -59,7 +56,7 @@ class OrchestratorAgent(BaseAgent):
 
     async def process(self, message: AgentMessage) -> Any:
         """Process user request by coordinating sub-agents"""
-        self.log("INFO", f"Processing user request")
+        self.log("INFO", "Processing user request")
         return await self._handle_user_input(
             message.payload.get("user_input", ""),
             context=message.payload,
@@ -731,8 +728,6 @@ Output MUST be valid JSON:
         """Handle browsing recommended personas"""
 
         limit = parameters.get("limit", 5)
-        domain = parameters.get("domain")
-
         # Get recommendations from storage
         recommendations = self.kb.get_latest_recommendations(limit=limit)
 
@@ -977,4 +972,3 @@ Output MUST be valid JSON:
             "has_recommendations": len(recommendations) > 0,
             "message": help_text,
         }
-

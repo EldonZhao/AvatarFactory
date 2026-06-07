@@ -13,13 +13,10 @@ This module can be invoked by:
 """
 
 import argparse
-import asyncio
 import logging
 import os
-import signal
 import subprocess
 import sys
-import threading
 from datetime import datetime
 
 

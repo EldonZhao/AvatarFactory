@@ -13,12 +13,8 @@ Dependencies:
     pip install xhs
 """
 
-import json
-import re
-import time
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, List, Optional, Tuple
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,

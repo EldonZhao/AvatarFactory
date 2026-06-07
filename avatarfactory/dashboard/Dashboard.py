@@ -7,16 +7,16 @@ A Streamlit-based dashboard for visualizing and managing the AvatarFactory syste
 import os
 import sys
 
+import streamlit as st
+from dotenv import load_dotenv
+
+from avatarfactory.dashboard.data import DashboardDataProvider
+
 # Add project root to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Load environment variables from .env file
-from dotenv import load_dotenv
 load_dotenv()
-
-import streamlit as st
-
-from avatarfactory.dashboard.data import DashboardDataProvider
 
 # Page configuration
 st.set_page_config(

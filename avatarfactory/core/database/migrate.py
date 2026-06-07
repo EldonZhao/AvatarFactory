@@ -25,7 +25,6 @@ from avatarfactory.core.database.models import (
     ContentModel,
     ReviewModel,
     DiscoveryResultModel,
-    EvolutionSuggestionModel,
     ScheduledTaskModel,
     TrendSnapshotModel,
     RecommendedPersonaModel,

@@ -5,10 +5,8 @@ Instagram uses the Meta Graph API for business accounts.
 Documentation: https://developers.facebook.com/docs/instagram-api
 """
 
-import mimetypes
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,

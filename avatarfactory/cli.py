@@ -9,6 +9,18 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+from avatarfactory.agents.orchestrator import OrchestratorAgent
+from avatarfactory.agents.topic import TopicAgent
+from avatarfactory.connectors import ConnectorConfig, get_connector
+from avatarfactory.connectors.xiaohongshu import CookieExpiredError
+from avatarfactory.core.knowledges_db import get_knowledge_base
+from avatarfactory.core.llm_provider import LLMProviderFactory
+from avatarfactory.models.schemas import AgentMessage, TaskType
 
 # Load .env file from current directory or project root
 load_dotenv()
@@ -17,20 +29,6 @@ load_dotenv()
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-
-import typer
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.table import Table
-
-from avatarfactory.agents.orchestrator import OrchestratorAgent
-from avatarfactory.agents.topic import TopicAgent
-from avatarfactory.core.knowledges_db import get_knowledge_base
-from avatarfactory.core.llm_provider import LLMProviderFactory
-from avatarfactory.models.schemas import AgentMessage
-from avatarfactory.connectors import get_connector, ConnectorConfig
-from avatarfactory.connectors.xiaohongshu import CookieExpiredError
 
 app = typer.Typer(
     name="avatarfactory",
@@ -190,7 +188,7 @@ def create_persona(
     # Show persona details
     if "persona" in data:
         persona = data["persona"]
-        console.print(f"\n[bold]Persona Details:[/bold]")
+        console.print("\n[bold]Persona Details:[/bold]")
         console.print(f"  ID: {persona.get('id')}")
         console.print(f"  Name: {persona['identity'].get('name')}")
         console.print(f"  Tagline: {persona['identity'].get('tagline')}")
@@ -239,7 +237,7 @@ def generate(
     # Show content preview
     if "content" in data:
         content = data["content"]
-        console.print(f"\n[bold]Content Preview:[/bold]")
+        console.print("\n[bold]Content Preview:[/bold]")
         console.print(f"  Title: {content.get('title')}")
         console.print(f"  Platform: {content.get('platform')}")
         console.print(f"  Content ID: {content.get('id')}")
@@ -309,7 +307,7 @@ def delete_persona(
         raise typer.Exit(1)
 
     # Show persona info
-    console.print(f"\n[bold]Persona to delete:[/bold]")
+    console.print("\n[bold]Persona to delete:[/bold]")
     console.print(f"  ID: {persona_id}")
     console.print(f"  Name: {persona.identity.name}")
     console.print(f"  Tagline: {persona.identity.tagline}")
@@ -317,7 +315,7 @@ def delete_persona(
     # Count associated content
     draft_count = len(kb.list_content(persona_id, status="draft"))
     published_count = len(kb.list_content(persona_id, status="published"))
-    console.print(f"\n[bold]Associated data:[/bold]")
+    console.print("\n[bold]Associated data:[/bold]")
     console.print(f"  Drafts: {draft_count}")
     console.print(f"  Published: {published_count}")
 
@@ -465,7 +463,7 @@ def show_content(
         console.print(f"[dim]Review Score: [{score_color}]{content.review_score:.0f}/100[/{score_color}][/dim]")
 
     if content.review_issues:
-        console.print(f"\n[yellow]Review Notes:[/yellow]")
+        console.print("\n[yellow]Review Notes:[/yellow]")
         for issue in content.review_issues[:3]:
             console.print(f"  • {issue}")
 
@@ -521,7 +519,7 @@ def publish_draft(
         f"[cyan]Original length:[/cyan] {adapted.original_length} chars\n"
         f"[cyan]Platform limit:[/cyan] {limits.max_text_length} chars/post\n"
         f"[cyan]Adapted:[/cyan] {'Thread with ' + str(len(adapted.parts)) + ' posts' if adapted.is_thread else 'Single post'}"
-        + (f" [yellow](truncated)[/yellow]" if adapted.truncated else "") + "\n"
+        + (" [yellow](truncated)[/yellow]" if adapted.truncated else "") + "\n"
         f"[cyan]Tags:[/cyan] {', '.join(adapted.tags) if adapted.tags else 'None'}\n"
         f"[cyan]Images:[/cyan] {len(image_list)} provided",
         title=f"Content: {content_id}",
@@ -538,7 +536,7 @@ def publish_draft(
             console.print(f"[dim]{preview}[/dim]")
             console.print(f"[dim]({len(part)} chars)[/dim]")
     else:
-        console.print(f"\n[bold]Post Preview:[/bold]")
+        console.print("\n[bold]Post Preview:[/bold]")
         preview = adapted.parts[0][:300] + "..." if len(adapted.parts[0]) > 300 else adapted.parts[0]
         console.print(f"[dim]{preview}[/dim]")
         console.print(f"[dim]({len(adapted.parts[0])} chars)[/dim]")
@@ -665,7 +663,7 @@ def publish_draft(
         all_success = all(r.success for r in results)
 
         if all_success:
-            console.print(f"\n[green]✅ Published successfully![/green]")
+            console.print("\n[green]✅ Published successfully![/green]")
             if adapted.is_thread:
                 console.print(f"[bold]Published {len(results)} posts as a thread[/bold]")
             for i, result in enumerate(results):
@@ -677,7 +675,7 @@ def publish_draft(
 
             # Update content status in KB (mark as published)
             kb.save_content(content, status="published")
-            console.print(f"\n[dim]Content status updated to 'published'[/dim]")
+            console.print("\n[dim]Content status updated to 'published'[/dim]")
         else:
             failed = [r for r in results if not r.success]
             console.print(f"[red]❌ Failed to publish: {failed[0].error}[/red]")
@@ -687,7 +685,7 @@ def publish_draft(
             raise typer.Exit(1)
 
     except CookieExpiredError as e:
-        console.print(f"[red]❌ Cookie Expired[/red]")
+        console.print("[red]❌ Cookie Expired[/red]")
         console.print(str(e))
         # Show refresh instructions for xiaohongshu
         if target_platform in ("xiaohongshu", "xhs"):
@@ -805,7 +803,7 @@ def connect(
         if is_valid:
             console.print(f"[green]Successfully connected to {platform}![/green]")
         else:
-            console.print(f"[yellow]Connected but credentials may have limited permissions[/yellow]")
+            console.print("[yellow]Connected but credentials may have limited permissions[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Failed to connect: {e}[/red]")
@@ -853,7 +851,7 @@ def fetch(
             await connector.connect()
             return await connector.fetch_trending(query=query, limit=limit)
 
-        with console.status(f"[bold cyan]Fetching content...", spinner="dots"):
+        with console.status("[bold cyan]Fetching content...", spinner="dots"):
             result = asyncio.run(do_fetch())
 
         if not result.success:
@@ -955,11 +953,11 @@ def publish(
             await connector.connect()
             return await connector.publish(content=content, title=title, tags=tag_list)
 
-        with console.status(f"[bold cyan]Publishing...", spinner="dots"):
+        with console.status("[bold cyan]Publishing...", spinner="dots"):
             result = asyncio.run(do_publish())
 
         if result.success:
-            console.print(f"[green]Published successfully![/green]")
+            console.print("[green]Published successfully![/green]")
             if result.post_url:
                 console.print(f"URL: {result.post_url}")
             console.print(f"Post ID: {result.post_id}")
@@ -1027,7 +1025,6 @@ def discover(
             )
         else:
             # Just fetch trending without full analysis
-            from avatarfactory.models.schemas import AgentMessage, TaskType
             return await agent._discover_trending({
                 "platform": platform,
                 "query": query,
@@ -1320,7 +1317,7 @@ def daemon(
                         os.kill(daemon_pid, signal.SIGTERM)
 
                     console.print(f"[green]Daemon stopped (PID: {daemon_pid})[/green]")
-                except OSError as e:
+                except OSError:
                     console.print(f"[yellow]Daemon not running (PID {daemon_pid} not found)[/yellow]")
 
                 os.remove(pid_file)
@@ -1580,7 +1577,7 @@ def schedule(
                 loop.run_until_complete(scheduler._run_task_async(task_id))
             finally:
                 loop.close()
-            console.print(f"[green]Task completed successfully[/green]")
+            console.print("[green]Task completed successfully[/green]")
         except Exception as e:
             console.print(f"[red]Task failed: {e}[/red]")
             raise typer.Exit(1)
@@ -1675,7 +1672,7 @@ def queue(
             scheduled_time=scheduled_dt,
         )
 
-        console.print(f"[green]Added to publish queue[/green]")
+        console.print("[green]Added to publish queue[/green]")
         console.print(f"  ID: {item.id}")
         console.print(f"  Scheduled: {scheduled_dt or 'ASAP'}")
 
@@ -1803,12 +1800,12 @@ def video(
             result = asyncio.run(do_generate())
 
         if result.success:
-            console.print(f"\n[green]✅ Video generated successfully![/green]")
+            console.print("\n[green]✅ Video generated successfully![/green]")
             console.print(f"[bold]Video:[/bold] {result.video_path}")
             if result.audio_path:
                 console.print(f"[bold]Audio:[/bold] {result.audio_path}")
             console.print(f"[bold]Duration:[/bold] {result.duration_formatted}")
-            console.print(f"\n[dim]Metadata saved to video directory[/dim]")
+            console.print("\n[dim]Metadata saved to video directory[/dim]")
         else:
             console.print(f"\n[red]❌ Video generation failed: {result.error}[/red]")
             raise typer.Exit(1)
@@ -2344,7 +2341,7 @@ def migrate_db(
         discovery_count = len(list(kb.rglob("discovery_*.json")))
         tasks_count = 1 if (kb / "scheduler" / "tasks.yaml").exists() else 0
 
-        console.print(f"\nWould migrate:")
+        console.print("\nWould migrate:")
         console.print(f"  • {personas_count} personas")
         console.print(f"  • {content_count} contents")
         console.print(f"  • {discovery_count} discoveries")
@@ -2399,7 +2396,7 @@ def migrate_db(
             if len(report.error_details) > 10:
                 console.print(f"  ... and {len(report.error_details) - 10} more errors")
     else:
-        console.print(f"\n[green]✅ Migration completed successfully![/green]")
+        console.print("\n[green]✅ Migration completed successfully![/green]")
         console.print(f"   Total records migrated: {total_migrated}")
 
 

@@ -8,8 +8,9 @@ Requires:
 """
 
 import os
+from importlib.util import find_spec
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from .base import TTSProvider, TTSError, VoiceInfo
 
@@ -38,13 +39,9 @@ class AzureTTSProvider(TTSProvider):
 
     def is_available(self) -> bool:
         """Check if Azure Speech SDK is installed and configured."""
-        try:
-            import azure.cognitiveservices.speech as speechsdk
-            return bool(self.api_key)
-        except ImportError:
-            return False
+        return bool(self.api_key) and find_spec("azure.cognitiveservices.speech") is not None
 
-    def _get_speech_config(self) -> "speechsdk.SpeechConfig":
+    def _get_speech_config(self) -> Any:
         """Get Azure Speech configuration."""
         try:
             import azure.cognitiveservices.speech as speechsdk

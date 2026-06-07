@@ -6,12 +6,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 
 from avatarfactory.core.database.models import (
     ContentModel,
     ReviewModel,
-    SimulationModel,
     PersonaModel,
 )
 from avatarfactory.core.database.repositories.base import BaseRepository

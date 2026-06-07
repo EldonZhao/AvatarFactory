@@ -5,7 +5,7 @@ Provides abstract interface for all platform connectors.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional

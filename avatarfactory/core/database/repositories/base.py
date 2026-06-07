@@ -2,7 +2,7 @@
 Base repository class with common CRUD operations.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, Generic, List, Optional, Type, TypeVar
 
 from sqlalchemy import select, delete, func

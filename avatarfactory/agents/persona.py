@@ -7,7 +7,7 @@ Renamed from PersonaLabAgent to PersonaAgent as part of architecture refactoring
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from avatarfactory.agents.base import BaseAgent
 from avatarfactory.models.schemas import (

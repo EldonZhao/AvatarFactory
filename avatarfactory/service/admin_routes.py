@@ -236,7 +236,6 @@ async def create_persona_admin(request: CreatePersonaRequest):
         VoiceStyle,
         TargetAudience,
         Boundaries,
-        PlatformType,
     )
     from avatarfactory.service.cache import invalidate_persona_caches
 
@@ -605,8 +604,6 @@ async def generate_content_admin(request: GenerateContentAdminRequest):
 
     This endpoint wraps the main content generation API and adds notification support.
     """
-    import os
-    import httpx
     import logging
 
     logger = logging.getLogger("avatarfactory.service.admin")
@@ -927,7 +924,6 @@ async def run_scheduler_task_admin(task_id: str, background_tasks: BackgroundTas
     """
     Run a scheduled task immediately via Admin dashboard.
     """
-    from datetime import datetime
 
     scheduler = get_scheduler()
     if not scheduler:

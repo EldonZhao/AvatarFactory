@@ -10,9 +10,7 @@ from avatarfactory.agents.base import BaseAgent
 from avatarfactory.models.schemas import (
     AgentMessage,
     ComplianceCheck,
-    Content,
     DimensionScore,
-    Persona,
     ReviewReport,
     RiskLevel,
     TaskType,

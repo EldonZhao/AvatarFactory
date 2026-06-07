@@ -13,10 +13,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from avatarfactory.agents.base import BaseAgent
 from avatarfactory.core.agent_config import AgentConfigManager
 from avatarfactory.models.schemas import (
-    AgentConfig,
     AgentMessage,
     EvolutionArea,
-    EvolutionConfig,
     EvolutionFeedbackAnalysis,
     EvolutionSeverity,
     EvolutionSource,
@@ -25,7 +23,6 @@ from avatarfactory.models.schemas import (
     EvolutionTarget,
     Persona,
     PersonaVersion,
-    TaskType,
 )
 
 
@@ -48,7 +45,6 @@ class EvolutionAgent(BaseAgent):
         self.validate_message(message)
 
         # Route to appropriate handler based on task type
-        task_type = message.task_type
         payload = message.payload
         context = message.context
 

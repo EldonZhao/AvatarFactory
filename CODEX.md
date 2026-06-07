@@ -54,3 +54,9 @@ make check
 ```
 
 This runs formatting check, lint, and tests in one pass.
+
+## 6) PR Approval Policy
+
+- This repository is currently maintained by a single owner.
+- Owner self-approval is allowed for PRs when working solo.
+- Keep the PR checklist (tests/lint/docs) completed before self-merge.

@@ -197,3 +197,7 @@ Environment variables (see `.env.example`):
 - **NEVER** automatically deploy to Azure or any production environment
 - All deployments must be explicitly requested by the user
 - Wait for user to say "deploy" or similar before running deployment scripts
+
+### PR Approval (Solo Maintainer Exception)
+- For this repository's current solo-maintainer workflow, the owner may approve and merge their own PRs.
+- Preserve normal quality checks (tests, lint, docs) before self-approval.

@@ -9,6 +9,8 @@ Connectors are different from Adapters:
 - Connectors: API integration and network operations (online)
 """
 
+from importlib import import_module
+
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
     ConnectorCapabilities,
@@ -21,14 +23,29 @@ from avatarfactory.connectors.base import (
 )
 from avatarfactory.connectors.registry import ConnectorRegistry
 
-# Import connectors to trigger registration
-from avatarfactory.connectors import twitter, bluesky, xiaohongshu, wecom
+_CONNECTOR_MODULES = (
+    "avatarfactory.connectors.twitter",
+    "avatarfactory.connectors.bluesky",
+    "avatarfactory.connectors.xiaohongshu",
+    "avatarfactory.connectors.wecom",
+    "avatarfactory.connectors.linkedin",
+    "avatarfactory.connectors.threads",
+    "avatarfactory.connectors.instagram",
+    "avatarfactory.connectors.weibo",
+    "avatarfactory.connectors.mastodon",
+    "avatarfactory.connectors.toutiao",
+    "avatarfactory.connectors.brave_search",
+    "avatarfactory.connectors.bing_search",
+    "avatarfactory.connectors.zhihu",
+)
 
-# Import new connectors
-from avatarfactory.connectors import linkedin, threads, instagram, weibo, mastodon, toutiao
 
-# Import search connectors
-from avatarfactory.connectors import brave_search, bing_search, zhihu
+def _register_connector_modules() -> None:
+    for module_name in _CONNECTOR_MODULES:
+        import_module(module_name)
+
+
+_register_connector_modules()
 
 __all__ = [
     "BasePlatformConnector",

@@ -8,7 +8,9 @@ Click on a content item to view it in the HTML view page.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 import streamlit as st
 import httpx
@@ -42,22 +44,16 @@ with st.sidebar:
 
         if persona_options:
             gen_persona_label = st.selectbox(
-                "Persona",
-                list(persona_options.keys()),
-                key="gen_persona_select"
+                "Persona", list(persona_options.keys()), key="gen_persona_select"
             )
             gen_persona_id = persona_options[gen_persona_label]
 
             gen_topic = st.text_input(
-                "Topic",
-                placeholder="e.g., AI productivity tools comparison",
-                key="gen_topic"
+                "Topic", placeholder="e.g., AI productivity tools comparison", key="gen_topic"
             )
 
             gen_platform = st.selectbox(
-                "Platform",
-                ["xiaohongshu", "bluesky", "twitter"],
-                key="gen_platform"
+                "Platform", ["xiaohongshu", "bluesky", "twitter"], key="gen_platform"
             )
 
             gen_variants = st.slider("Variants", 1, 3, 1, key="gen_variants")
@@ -73,12 +69,14 @@ with st.sidebar:
                                         "topic": gen_topic,
                                         "persona_id": gen_persona_id,
                                         "platform": gen_platform,
-                                        "variants": gen_variants
-                                    }
+                                        "variants": gen_variants,
+                                    },
                                 )
                                 if response.status_code == 200:
                                     data = response.json()
-                                    st.success(f"Generated {len(data.get('content_ids', []))} content(s)!")
+                                    st.success(
+                                        f"Generated {len(data.get('content_ids', []))} content(s)!"
+                                    )
                                     st.rerun()
                                 else:
                                     st.error(f"Error: {response.status_code}")
@@ -107,9 +105,7 @@ with st.sidebar:
 
     # Use key parameter to track selection changes
     persona_filter_label = st.selectbox(
-        "Persona",
-        list(persona_options.keys()),
-        key="persona_filter_select"
+        "Persona", list(persona_options.keys()), key="persona_filter_select"
     )
     selected_persona = persona_options[persona_filter_label]
 
@@ -181,10 +177,7 @@ persona_name_map = {p.id: p.name for p in personas}
 
 # Content list
 if not contents:
-    st.info(
-        f"No {status_filter} content found.\n\n"
-        "Generate content using the sidebar or CLI."
-    )
+    st.info(f"No {status_filter} content found.\n\n" "Generate content using the sidebar or CLI.")
 else:
     st.markdown("### Content List")
 
@@ -203,7 +196,9 @@ else:
             title = title[:50] + "..."
 
         persona_id = content.get("persona_id", "Unknown")
-        persona_name = persona_name_map.get(persona_id, persona_id[:12] + "..." if persona_id else "Unknown")
+        persona_name = persona_name_map.get(
+            persona_id, persona_id[:12] + "..." if persona_id else "Unknown"
+        )
         platform = content.get("platform", "unknown")
         emoji = platform_emojis.get(platform, "📱")
         pillar = content.get("pillar", "N/A")
@@ -214,7 +209,9 @@ else:
 
             with col1:
                 st.markdown(f"**{title}**")
-                st.caption(f"{emoji} {platform} | {persona_name} | {pillar[:15] if pillar else 'N/A'}")
+                st.caption(
+                    f"{emoji} {platform} | {persona_name} | {pillar[:15] if pillar else 'N/A'}"
+                )
 
             with col2:
                 if score is not None:
@@ -239,16 +236,27 @@ else:
                     if export_format == "📷 Image":
                         st.markdown(f"[⬇️ Download]({api_url}/content/{content_id}/image)")
                     elif export_format == "📄 A4 Pages":
-                        st.markdown(f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=a4)")
+                        st.markdown(
+                            f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=a4)"
+                        )
                     elif export_format == "📱 Mobile":
-                        st.markdown(f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=mobile)")
+                        st.markdown(
+                            f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=mobile)"
+                        )
                     elif export_format == "📕 小红书":
-                        st.markdown(f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=xiaohongshu)")
+                        st.markdown(
+                            f"[⬇️ Download ZIP]({api_url}/content/{content_id}/images?format=xiaohongshu)"
+                        )
 
             with col4:
                 # Checkbox for selection
                 is_selected = content_id in st.session_state.selected_contents
-                if st.checkbox("Select", value=is_selected, key=f"sel_{content_id}", label_visibility="collapsed"):
+                if st.checkbox(
+                    "Select",
+                    value=is_selected,
+                    key=f"sel_{content_id}",
+                    label_visibility="collapsed",
+                ):
                     if content_id not in st.session_state.selected_contents:
                         st.session_state.selected_contents.append(content_id)
                 elif content_id in st.session_state.selected_contents:

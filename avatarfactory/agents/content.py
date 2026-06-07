@@ -16,7 +16,6 @@ from avatarfactory.models.schemas import (
     Content,
     ContentStructure,
     ContentType,
-    MediaAttachment,
     Persona,
     PlatformType,
     TaskType,
@@ -191,13 +190,15 @@ class ContentAgent(BaseAgent):
             parts.append(f"推荐创作方向: {', '.join(idea_topics)}")
 
         if parts:
-            return "\n".join([
-                "",
-                "=== 热点趋势洞察 ===",
-                *parts,
-                "请在保持人设风格的同时，适当融入这些热点元素以提高内容吸引力。",
-                "",
-            ])
+            return "\n".join(
+                [
+                    "",
+                    "=== 热点趋势洞察 ===",
+                    *parts,
+                    "请在保持人设风格的同时，适当融入这些热点元素以提高内容吸引力。",
+                    "",
+                ]
+            )
         return ""
 
     # =========================================================================
@@ -222,9 +223,7 @@ class ContentAgent(BaseAgent):
     # Content Generation
     # =========================================================================
 
-    async def _generate_content(
-        self, payload: Dict[str, Any], context: Dict[str, Any]
-    ) -> Content:
+    async def _generate_content(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Content:
         """
         Generate content based on persona and topic.
 
@@ -286,12 +285,24 @@ class ContentAgent(BaseAgent):
         # Generate content
         if variant_count == 1:
             content = await self._generate_single_content(
-                persona, pillar, topic, template, platform, trending_context,
-                content_type=content_type, reference_images=reference_images,
+                persona,
+                pillar,
+                topic,
+                template,
+                platform,
+                trending_context,
+                content_type=content_type,
+                reference_images=reference_images,
             )
         else:
             variants = await self._generate_variants(
-                persona, pillar, topic, template, platform, variant_count, trending_context,
+                persona,
+                pillar,
+                topic,
+                template,
+                platform,
+                variant_count,
+                trending_context,
                 content_type=content_type,
             )
             # Save all variants to KB
@@ -542,9 +553,7 @@ Generate {count} compelling variants in JSON array format."""
         except json.JSONDecodeError as e:
             self.log("ERROR", f"Failed to parse variants JSON: {e}")
             # Fallback: generate single content
-            single = await self._generate_single_content(
-                persona, pillar, topic, template, platform
-            )
+            single = await self._generate_single_content(persona, pillar, topic, template, platform)
             return [single]
 
         # Create Content objects
@@ -614,9 +623,7 @@ Generate {count} compelling variants in JSON array format."""
     # Platform Adaptation
     # =========================================================================
 
-    async def adapt_to_platform(
-        self, content: Content, target_platform: PlatformType
-    ) -> Content:
+    async def adapt_to_platform(self, content: Content, target_platform: PlatformType) -> Content:
         """
         Adapt existing content to a different platform.
 

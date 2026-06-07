@@ -9,9 +9,8 @@ Uses MoviePy for video composition with support for:
 
 import os
 import re
-import textwrap
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from .base import VideoError
 
@@ -21,16 +20,21 @@ def _import_moviepy():
     try:
         # MoviePy 2.x
         from moviepy import ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
+
         return ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
     except ImportError:
         try:
             # MoviePy 1.x
-            from moviepy.editor import ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
+            from moviepy.editor import (
+                ImageClip,
+                AudioFileClip,
+                CompositeVideoClip,
+                concatenate_videoclips,
+            )
+
             return ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
         except ImportError:
-            raise VideoError(
-                "moviepy not installed. Install with: pip install moviepy"
-            )
+            raise VideoError("moviepy not installed. Install with: pip install moviepy")
 
 
 class VideoComposer:
@@ -60,7 +64,7 @@ class VideoComposer:
     def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         """Convert hex color to RGB tuple."""
         hex_color = hex_color.lstrip("#")
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     async def create_slideshow(
         self,
@@ -180,11 +184,9 @@ class VideoComposer:
             List of paths to generated card images
         """
         try:
-            from PIL import Image, ImageDraw, ImageFont
+            from PIL import Image, ImageDraw
         except ImportError:
-            raise VideoError(
-                "Pillow not installed. Install with: pip install Pillow"
-            )
+            raise VideoError("Pillow not installed. Install with: pip install Pillow")
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -240,7 +242,7 @@ class VideoComposer:
 
         return card_paths
 
-    def _get_font(self) -> "ImageFont.FreeTypeFont":
+    def _get_font(self) -> Any:
         """Get font for text rendering."""
         try:
             from PIL import ImageFont
@@ -347,9 +349,9 @@ class VideoComposer:
     def _wrap_text(
         self,
         text: str,
-        font: "ImageFont.FreeTypeFont",
+        font: Any,
         max_width: int,
-        draw: "ImageDraw.Draw",
+        draw: Any,
     ) -> str:
         """Wrap text to fit within max width."""
         lines = []
@@ -392,6 +394,7 @@ def _crossfadein(duration: float):
     """Create crossfade in effect for MoviePy 2.x."""
     try:
         from moviepy.video.fx import CrossFadeIn
+
         return CrossFadeIn(duration)
     except ImportError:
         # Fallback - return a no-op for older versions
@@ -402,6 +405,7 @@ def _crossfadeout(duration: float):
     """Create crossfade out effect for MoviePy 2.x."""
     try:
         from moviepy.video.fx import CrossFadeOut
+
         return CrossFadeOut(duration)
     except ImportError:
         # Fallback - return a no-op for older versions
@@ -412,6 +416,7 @@ def _loop_clip(clip, duration: float):
     """Loop a clip to reach target duration, supporting MoviePy 2.x."""
     try:
         from moviepy.video.fx import Loop
+
         return clip.with_effects([Loop(duration=duration)])
     except ImportError:
         # MoviePy 1.x fallback

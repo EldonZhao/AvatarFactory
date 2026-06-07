@@ -7,13 +7,18 @@ Displays all personas with their details and content counts.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 import streamlit as st
 import httpx
 
 from avatarfactory.dashboard.data import DashboardDataProvider
-from avatarfactory.dashboard.components.persona_card import render_persona_card, render_persona_details
+from avatarfactory.dashboard.components.persona_card import (
+    render_persona_card,
+    render_persona_details,
+)
 
 st.set_page_config(
     page_title="Personas - AvatarFactory",
@@ -38,50 +43,48 @@ with st.sidebar:
             "Description",
             placeholder="e.g., AI tools reviewer for product managers, focusing on practical insights",
             height=100,
-            key="new_persona_desc"
+            key="new_persona_desc",
         )
 
         persona_platforms = st.multiselect(
             "Platforms",
             ["xiaohongshu", "bluesky", "twitter"],
             default=["xiaohongshu"],
-            key="new_persona_platforms"
+            key="new_persona_platforms",
         )
 
         st.markdown("**Notification Settings**")
 
         notification_enabled = st.checkbox(
-            "Enable notifications",
-            value=True,
-            key="new_persona_notif_enabled"
+            "Enable notifications", value=True, key="new_persona_notif_enabled"
         )
 
         notification_type = st.selectbox(
             "Notification Type",
             ["wecom", "slack", "discord", "feishu"],
             key="new_persona_notif_type",
-            disabled=not notification_enabled
+            disabled=not notification_enabled,
         )
 
         notify_on_content = st.checkbox(
             "Notify on content generation",
             value=True,
             key="new_persona_notify_content",
-            disabled=not notification_enabled
+            disabled=not notification_enabled,
         )
 
         notify_on_review = st.checkbox(
             "Notify on review completion",
             value=True,
             key="new_persona_notify_review",
-            disabled=not notification_enabled
+            disabled=not notification_enabled,
         )
 
         notify_on_discovery = st.checkbox(
             "Notify on discovery completion",
             value=True,
             key="new_persona_notify_discovery",
-            disabled=not notification_enabled
+            disabled=not notification_enabled,
         )
 
         if st.button("Create Persona", key="create_persona_btn", type="primary"):
@@ -96,12 +99,20 @@ with st.sidebar:
                                     "platforms": persona_platforms,
                                     "notification": {
                                         "enabled": notification_enabled,
-                                        "connector_type": notification_type if notification_enabled else "wecom",
-                                        "notify_on_content": notify_on_content if notification_enabled else False,
-                                        "notify_on_review": notify_on_review if notification_enabled else False,
-                                        "notify_on_discovery": notify_on_discovery if notification_enabled else False
-                                    }
-                                }
+                                        "connector_type": (
+                                            notification_type if notification_enabled else "wecom"
+                                        ),
+                                        "notify_on_content": (
+                                            notify_on_content if notification_enabled else False
+                                        ),
+                                        "notify_on_review": (
+                                            notify_on_review if notification_enabled else False
+                                        ),
+                                        "notify_on_discovery": (
+                                            notify_on_discovery if notification_enabled else False
+                                        ),
+                                    },
+                                },
                             )
                             if response.status_code == 200:
                                 data = response.json()
@@ -145,7 +156,7 @@ if not personas:
         "No personas found.\n\n"
         "Create your first persona using the CLI:\n"
         "```bash\n"
-        "avatarfactory create-persona \"AI tools reviewer for product managers\"\n"
+        'avatarfactory create-persona "AI tools reviewer for product managers"\n'
         "```"
     )
 else:
@@ -184,10 +195,14 @@ else:
                                 if st.button("✅ Yes, Delete", key=f"yes_delete_{persona.id}"):
                                     try:
                                         with httpx.Client(timeout=30) as client:
-                                            response = client.delete(f"{api_url}/personas/{persona.id}")
+                                            response = client.delete(
+                                                f"{api_url}/personas/{persona.id}"
+                                            )
                                             if response.status_code == 200:
                                                 st.success("Deleted!")
-                                                st.session_state[f"confirm_delete_{persona.id}"] = False
+                                                st.session_state[f"confirm_delete_{persona.id}"] = (
+                                                    False
+                                                )
                                                 st.rerun()
                                             else:
                                                 st.error(f"Error: {response.status_code}")

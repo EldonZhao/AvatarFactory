@@ -25,7 +25,6 @@ from avatarfactory.core.database.models import (
     ContentModel,
     ReviewModel,
     DiscoveryResultModel,
-    EvolutionSuggestionModel,
     ScheduledTaskModel,
     TrendSnapshotModel,
     RecommendedPersonaModel,
@@ -71,8 +70,12 @@ class MigrationReport:
             "=" * 40,
         ]
         total_errors = (
-            self.personas_errors + self.contents_errors + self.discoveries_errors +
-            self.tasks_errors + self.trends_errors + self.recommendations_errors
+            self.personas_errors
+            + self.contents_errors
+            + self.discoveries_errors
+            + self.tasks_errors
+            + self.trends_errors
+            + self.recommendations_errors
         )
         if total_errors > 0:
             lines.append(f"Total Errors: {total_errors}")
@@ -288,12 +291,8 @@ async def migrate_contents(kb_path: Path, report: MigrationReport) -> None:
                             persona_consistency_score=review_data.get(
                                 "persona_consistency", {}
                             ).get("score", 0),
-                            platform_fit_score=review_data.get("platform_fit", {}).get(
-                                "score", 0
-                            ),
-                            compliance_score=review_data.get("compliance", {}).get(
-                                "score", 0
-                            ),
+                            platform_fit_score=review_data.get("platform_fit", {}).get("score", 0),
+                            compliance_score=review_data.get("compliance", {}).get("score", 0),
                             engagement_potential_score=review_data.get(
                                 "engagement_potential", {}
                             ).get("score", 0),
@@ -461,7 +460,9 @@ async def migrate_recommendations(kb_path: Path, report: MigrationReport) -> Non
                         continue
 
                     rec = RecommendedPersonaModel(
-                        id=rec_data.get("id", f"rec_{rec_file.stem}_{hash(rec_data.get('name', ''))}"),
+                        id=rec_data.get(
+                            "id", f"rec_{rec_file.stem}_{hash(rec_data.get('name', ''))}"
+                        ),
                         created_at=parse_datetime(rec_data.get("created_at")) or datetime.utcnow(),
                         source_platforms=rec_data.get("source_platforms"),
                         source_trends=rec_data.get("source_trends"),

@@ -5,10 +5,8 @@ Instagram uses the Meta Graph API for business accounts.
 Documentation: https://developers.facebook.com/docs/instagram-api
 """
 
-import mimetypes
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
@@ -74,9 +72,7 @@ class InstagramConnector(BasePlatformConnector):
                     label="Business Account ID",
                     field_type="text",
                     required=True,
-                    description=(
-                        "Instagram Business or Creator account ID"
-                    ),
+                    description=("Instagram Business or Creator account ID"),
                     env_var="INSTAGRAM_BUSINESS_ACCOUNT_ID",
                 ),
             ],
@@ -203,14 +199,10 @@ class InstagramConnector(BasePlatformConnector):
             async with httpx.AsyncClient() as client:
                 if len(images) == 1:
                     # Single image post
-                    result = await self._publish_single_image(
-                        client, images[0], caption
-                    )
+                    result = await self._publish_single_image(client, images[0], caption)
                 else:
                     # Carousel post (multiple images)
-                    result = await self._publish_carousel(
-                        client, images, caption
-                    )
+                    result = await self._publish_carousel(client, images, caption)
 
                 return result
 
@@ -239,8 +231,8 @@ class InstagramConnector(BasePlatformConnector):
         )
 
         if container_response.status_code != 200:
-            error = container_response.json().get("error", {}).get(
-                "message", container_response.text
+            error = (
+                container_response.json().get("error", {}).get("message", container_response.text)
             )
             return PublishResult(
                 success=False,
@@ -296,9 +288,7 @@ class InstagramConnector(BasePlatformConnector):
         )
 
         if carousel_response.status_code != 200:
-            error = carousel_response.json().get("error", {}).get(
-                "message", carousel_response.text
-            )
+            error = carousel_response.json().get("error", {}).get("message", carousel_response.text)
             return PublishResult(
                 success=False,
                 error=f"Failed to create carousel: {error}",
@@ -397,18 +387,20 @@ class InstagramConnector(BasePlatformConnector):
 
                     results = []
                     for post in posts[:limit]:
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": post.get("id", ""),
-                            "author": self._username,
-                            "body": post.get("caption", ""),
-                            "likes": post.get("like_count", 0),
-                            "comments": post.get("comments_count", 0),
-                            "url": post.get("permalink"),
-                            "media_url": post.get("media_url"),
-                            "media_type": post.get("media_type"),
-                            "published_at": post.get("timestamp"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": post.get("id", ""),
+                                "author": self._username,
+                                "body": post.get("caption", ""),
+                                "likes": post.get("like_count", 0),
+                                "comments": post.get("comments_count", 0),
+                                "url": post.get("permalink"),
+                                "media_url": post.get("media_url"),
+                                "media_type": post.get("media_type"),
+                                "published_at": post.get("timestamp"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,

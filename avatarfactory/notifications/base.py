@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 class NotificationPriority(str, Enum):
     """Notification priority levels."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -134,25 +135,23 @@ class NotificationManager:
 
         if providers:
             target_providers = [
-                self._providers[name]
-                for name in providers
-                if name in self._providers
+                self._providers[name] for name in providers if name in self._providers
             ]
         else:
-            target_providers = [
-                p for p in self._providers.values() if p.is_enabled()
-            ]
+            target_providers = [p for p in self._providers.values() if p.is_enabled()]
 
         for provider in target_providers:
             try:
                 result = await provider.send(message)
                 results.append(result)
             except Exception as e:
-                results.append(NotificationResult(
-                    success=False,
-                    provider=provider.name,
-                    error=str(e),
-                ))
+                results.append(
+                    NotificationResult(
+                        success=False,
+                        provider=provider.name,
+                        error=str(e),
+                    )
+                )
 
         return results
 

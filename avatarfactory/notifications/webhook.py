@@ -9,10 +9,9 @@ Supports various webhook formats including:
 - WeCom/WeChat Work webhook
 """
 
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from avatarfactory.notifications.base import (
     NotificationMessage,
@@ -125,50 +124,50 @@ class WebhookNotifier(NotificationProvider):
             "urgent": "#ff0000",
         }.get(message.priority.value, "#36a64f")
 
-        blocks = [
+        blocks: List[Dict[str, Any]] = [
             {
                 "type": "header",
                 "text": {
                     "type": "plain_text",
                     "text": message.title,
-                }
+                },
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": message.body,
-                }
+                },
             },
         ]
 
         if message.action_url:
-            blocks.append({
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "View",
-                        },
-                        "url": message.action_url,
-                    }
-                ]
-            })
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "View",
+                            },
+                            "url": message.action_url,
+                        }
+                    ],
+                }
+            )
 
-        return {
-            "attachments": [{"color": color, "blocks": blocks}]
-        }
+        return {"attachments": [{"color": color, "blocks": blocks}]}
 
     def _format_discord(self, message: NotificationMessage) -> Dict[str, Any]:
         """Discord webhook format."""
         color = {
             "low": 0x808080,
-            "normal": 0x00ff00,
-            "high": 0xffcc00,
-            "urgent": 0xff0000,
-        }.get(message.priority.value, 0x00ff00)
+            "normal": 0x00FF00,
+            "high": 0xFFCC00,
+            "urgent": 0xFF0000,
+        }.get(message.priority.value, 0x00FF00)
 
         embed = {
             "title": message.title,
@@ -205,10 +204,10 @@ class WebhookNotifier(NotificationProvider):
                         "text": {
                             "tag": "lark_md",
                             "content": message.body,
-                        }
+                        },
                     }
                 ],
-            }
+            },
         }
 
     def _format_wecom(self, message: NotificationMessage) -> Dict[str, Any]:
@@ -217,7 +216,7 @@ class WebhookNotifier(NotificationProvider):
             "msgtype": "markdown",
             "markdown": {
                 "content": f"### {message.title}\n{message.body}",
-            }
+            },
         }
 
     def validate_config(self) -> bool:

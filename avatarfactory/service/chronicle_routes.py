@@ -26,6 +26,7 @@ def _get_orchestrator():
     """Get the orchestrator instance from app state."""
     try:
         from avatarfactory.service.app import get_orchestrator
+
         return get_orchestrator()
     except HTTPException:
         raise
@@ -58,41 +59,45 @@ async def list_personas() -> Dict[str, Any]:
     for pid in persona_ids:
         persona = orchestrator.kb.load_persona(pid)
         if persona:
-            personas.append({
-                "id": persona.id,
-                "version": persona.version,
-                "created_at": persona.created_at.isoformat() if persona.created_at else None,
-                "updated_at": persona.updated_at.isoformat() if persona.updated_at else None,
-                "identity": {
-                    "name": persona.identity.name,
-                    "tagline": persona.identity.tagline,
-                    "expertise": persona.identity.expertise,
-                },
-                "target_audience": {
-                    "primary": persona.target_audience.primary,
-                    "pain_points": persona.target_audience.pain_points,
-                    "goals": persona.target_audience.goals,
-                },
-                "voice_style": {
-                    "tone": persona.voice_style.tone,
-                    "language_patterns": persona.voice_style.language_patterns,
-                    "emoji_usage": persona.voice_style.emoji_usage,
-                },
-                "content_pillars": [
-                    {
-                        "name": p.name,
-                        "description": p.description,
-                        "frequency": p.frequency,
-                        "examples": p.examples,
-                    }
-                    for p in persona.content_pillars
-                ],
-                "boundaries": {
-                    "avoid": persona.boundaries.avoid if persona.boundaries else [],
-                    "compliance": persona.boundaries.compliance if persona.boundaries else [],
-                },
-                "notification": persona.notification.model_dump() if persona.notification else None,
-            })
+            personas.append(
+                {
+                    "id": persona.id,
+                    "version": persona.version,
+                    "created_at": persona.created_at.isoformat() if persona.created_at else None,
+                    "updated_at": persona.updated_at.isoformat() if persona.updated_at else None,
+                    "identity": {
+                        "name": persona.identity.name,
+                        "tagline": persona.identity.tagline,
+                        "expertise": persona.identity.expertise,
+                    },
+                    "target_audience": {
+                        "primary": persona.target_audience.primary,
+                        "pain_points": persona.target_audience.pain_points,
+                        "goals": persona.target_audience.goals,
+                    },
+                    "voice_style": {
+                        "tone": persona.voice_style.tone,
+                        "language_patterns": persona.voice_style.language_patterns,
+                        "emoji_usage": persona.voice_style.emoji_usage,
+                    },
+                    "content_pillars": [
+                        {
+                            "name": p.name,
+                            "description": p.description,
+                            "frequency": p.frequency,
+                            "examples": p.examples,
+                        }
+                        for p in persona.content_pillars
+                    ],
+                    "boundaries": {
+                        "avoid": persona.boundaries.avoid if persona.boundaries else [],
+                        "compliance": persona.boundaries.compliance if persona.boundaries else [],
+                    },
+                    "notification": (
+                        persona.notification.model_dump() if persona.notification else None
+                    ),
+                }
+            )
 
     result = {
         "count": len(personas),
@@ -161,6 +166,7 @@ async def get_persona(persona_id: str) -> Optional[Dict[str, Any]]:
 async def get_persona_stats(persona_id: str) -> Dict[str, Any]:
     """Get statistics for a persona."""
     import logging
+
     logger = logging.getLogger(__name__)
 
     try:
@@ -192,7 +198,11 @@ async def get_persona_stats(persona_id: str) -> Dict[str, Any]:
         for content in contents:
             try:
                 pillar = content.pillar or "unknown"
-                platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+                platform = (
+                    content.platform.value
+                    if hasattr(content.platform, "value")
+                    else str(content.platform)
+                )
 
                 content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
                 content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
@@ -211,7 +221,9 @@ async def get_persona_stats(persona_id: str) -> Dict[str, Any]:
 
         avg_score = 0
         if review_count > 0:
-            avg_score = (total_consistency + total_platform_fit + total_compliance + total_engagement) / (review_count * 4)
+            avg_score = (
+                total_consistency + total_platform_fit + total_compliance + total_engagement
+            ) / (review_count * 4)
 
         return {
             "persona_id": persona_id,
@@ -222,10 +234,14 @@ async def get_persona_stats(persona_id: str) -> Dict[str, Any]:
             "content_by_pillar": content_by_pillar,
             "content_by_platform": content_by_platform,
             "score_distribution": {
-                "persona_consistency": round(total_consistency / review_count) if review_count > 0 else 0,
+                "persona_consistency": (
+                    round(total_consistency / review_count) if review_count > 0 else 0
+                ),
                 "platform_fit": round(total_platform_fit / review_count) if review_count > 0 else 0,
                 "compliance": round(total_compliance / review_count) if review_count > 0 else 0,
-                "engagement_potential": round(total_engagement / review_count) if review_count > 0 else 0,
+                "engagement_potential": (
+                    round(total_engagement / review_count) if review_count > 0 else 0
+                ),
             },
         }
     except HTTPException:
@@ -255,7 +271,9 @@ async def get_persona_history(persona_id: str) -> List[Dict[str, Any]]:
     return [
         {
             "version": v.version,
-            "timestamp": v.timestamp.isoformat() if hasattr(v.timestamp, 'isoformat') else str(v.timestamp),
+            "timestamp": (
+                v.timestamp.isoformat() if hasattr(v.timestamp, "isoformat") else str(v.timestamp)
+            ),
             "changes": v.changes,
             "reason": v.reason,
             "expected_impact": v.expected_impact,
@@ -308,8 +326,7 @@ async def get_persona_content(persona_id: str) -> List[Dict[str, Any]]:
 
 @router.get("/personas/{persona_id}/timeline")
 async def get_persona_timeline(
-    persona_id: str,
-    limit: int = Query(50, ge=1, le=500)
+    persona_id: str, limit: int = Query(50, ge=1, le=500)
 ) -> List[Dict[str, Any]]:
     """Get timeline events for a persona."""
     orchestrator = _get_orchestrator()
@@ -332,7 +349,9 @@ async def get_persona_timeline(
 
 def _content_to_dict(content, status: str) -> Dict[str, Any]:
     """Convert content object to dictionary."""
-    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+    platform = (
+        content.platform.value if hasattr(content.platform, "value") else str(content.platform)
+    )
     return {
         "id": content.id,
         "persona_id": content.persona_id,
@@ -341,10 +360,16 @@ def _content_to_dict(content, status: str) -> Dict[str, Any]:
         "body": content.body,
         "pillar": content.pillar,
         "platform": platform,
-        "structure": {
-            "sections": content.structure.sections if content.structure else [],
-            "style_constraints": content.structure.style_constraints if content.structure else {},
-        } if content.structure else None,
+        "structure": (
+            {
+                "sections": content.structure.sections if content.structure else [],
+                "style_constraints": (
+                    content.structure.style_constraints if content.structure else {}
+                ),
+            }
+            if content.structure
+            else None
+        ),
         "tags": content.tags,
         "metadata": content.metadata,
         "review_score": content.review_score,
@@ -355,9 +380,7 @@ def _content_to_dict(content, status: str) -> Dict[str, Any]:
 
 
 @router.get("/content")
-async def list_all_content(
-    limit: int = Query(100, ge=1, le=500)
-) -> List[Dict[str, Any]]:
+async def list_all_content(limit: int = Query(100, ge=1, le=500)) -> List[Dict[str, Any]]:
     """Get all content across all personas (cached)."""
     # Try cache first
     cache_key = f"chronicle:content:list:{limit}"
@@ -407,9 +430,7 @@ async def list_all_content_ids() -> List[str]:
 
 
 @router.get("/content/recent")
-async def get_recent_content(
-    limit: int = Query(10, ge=1, le=100)
-) -> List[Dict[str, Any]]:
+async def get_recent_content(limit: int = Query(10, ge=1, le=100)) -> List[Dict[str, Any]]:
     """Get most recent content."""
     return await list_all_content(limit=limit)
 
@@ -440,8 +461,8 @@ async def get_content_review(content_id: str) -> Optional[Dict[str, Any]]:
 
     # First, find the content to get persona_id
     content = None
-    for status in ["draft", "published"]:
-        content = orchestrator.kb.load_content(content_id, status=status)
+    for content_status in ["draft", "published"]:
+        content = orchestrator.kb.load_content(content_id, status=content_status)
         if content:
             break
 
@@ -455,7 +476,11 @@ async def get_content_review(content_id: str) -> Optional[Dict[str, Any]]:
 
     return {
         "content_id": review.content_id,
-        "reviewed_at": review.reviewed_at.isoformat() if hasattr(review.reviewed_at, 'isoformat') else str(review.reviewed_at),
+        "reviewed_at": (
+            review.reviewed_at.isoformat()
+            if hasattr(review.reviewed_at, "isoformat")
+            else str(review.reviewed_at)
+        ),
         "persona_consistency": {
             "score": review.persona_consistency.score,
             "issues": review.persona_consistency.issues,
@@ -675,36 +700,41 @@ async def get_dashboard() -> Dict[str, Any]:
         personas_with_stats = []
         for summary in persona_summaries[:6]:  # Limit to 6 for dashboard
             pid = summary["id"]
-            stats = batch_stats.get(pid, {
-                "persona_id": pid,
-                "total_content": 0,
-                "published_content": 0,
-                "draft_content": 0,
-                "avg_review_score": 0,
-                "content_by_pillar": {},
-                "content_by_platform": {},
-                "score_distribution": {
-                    "persona_consistency": 0,
-                    "platform_fit": 0,
-                    "compliance": 0,
-                    "engagement_potential": 0,
-                },
-            })
-            personas_with_stats.append({
-                "persona": {
-                    "id": summary["id"],
-                    "version": summary.get("version", "v1.0"),
-                    "created_at": summary.get("created_at"),
-                    "updated_at": summary.get("updated_at"),
-                    "identity": {
-                        "name": summary["name"],
-                        "tagline": summary.get("tagline", ""),
-                        "expertise": summary.get("expertise", []),
+            stats = batch_stats.get(
+                pid,
+                {
+                    "persona_id": pid,
+                    "total_content": 0,
+                    "published_content": 0,
+                    "draft_content": 0,
+                    "avg_review_score": 0,
+                    "content_by_pillar": {},
+                    "content_by_platform": {},
+                    "score_distribution": {
+                        "persona_consistency": 0,
+                        "platform_fit": 0,
+                        "compliance": 0,
+                        "engagement_potential": 0,
                     },
-                    "platforms": summary.get("platforms", []),
                 },
-                "stats": stats,
-            })
+            )
+            personas_with_stats.append(
+                {
+                    "persona": {
+                        "id": summary["id"],
+                        "version": summary.get("version", "v1.0"),
+                        "created_at": summary.get("created_at"),
+                        "updated_at": summary.get("updated_at"),
+                        "identity": {
+                            "name": summary["name"],
+                            "tagline": summary.get("tagline", ""),
+                            "expertise": summary.get("expertise", []),
+                        },
+                        "platforms": summary.get("platforms", []),
+                    },
+                    "stats": stats,
+                }
+            )
 
         # Get recent content with reviews using batch loading
         recent_content_raw = orchestrator.kb.list_content_with_reviews_batch(
@@ -723,18 +753,24 @@ async def get_dashboard() -> Dict[str, Any]:
                 platform = c.get("platform", "")
                 if hasattr(platform, "value"):
                     platform = platform.value
-                recent_content.append({
-                    "id": c["id"],
-                    "persona_id": c.get("persona_id"),
-                    "created_at": c.get("created_at"),
-                    "title": c.get("title", ""),
-                    "body": c.get("body", ""),
-                    "pillar": c.get("pillar"),
-                    "platform": platform,
-                    "tags": c.get("tags", []),
-                    "review_score": c.get("review", {}).get("overall_score") if c.get("review") else c.get("review_score"),
-                    "status": c.get("_status", "draft"),
-                })
+                recent_content.append(
+                    {
+                        "id": c["id"],
+                        "persona_id": c.get("persona_id"),
+                        "created_at": c.get("created_at"),
+                        "title": c.get("title", ""),
+                        "body": c.get("body", ""),
+                        "pillar": c.get("pillar"),
+                        "platform": platform,
+                        "tags": c.get("tags", []),
+                        "review_score": (
+                            c.get("review", {}).get("overall_score")
+                            if c.get("review")
+                            else c.get("review_score")
+                        ),
+                        "status": c.get("_status", "draft"),
+                    }
+                )
                 if len(recent_content) >= 6:
                     break
 
@@ -746,18 +782,20 @@ async def get_dashboard() -> Dict[str, Any]:
         if scheduler:
             tasks = [t for t in scheduler.list_tasks() if t.enabled]
             for t in tasks[:5]:
-                active_tasks.append({
-                    "id": t.id,
-                    "name": t.name,
-                    "task_type": t.task_type,
-                    "schedule": t.schedule,
-                    "enabled": t.enabled,
-                    "persona_id": t.persona_id,
-                    "platform": t.platform,
-                    "last_run": t.last_run.isoformat() if t.last_run else None,
-                    "last_status": t.last_status,
-                    "run_count": t.run_count,
-                })
+                active_tasks.append(
+                    {
+                        "id": t.id,
+                        "name": t.name,
+                        "task_type": t.task_type,
+                        "schedule": t.schedule,
+                        "enabled": t.enabled,
+                        "persona_id": t.persona_id,
+                        "platform": t.platform,
+                        "last_run": t.last_run.isoformat() if t.last_run else None,
+                        "last_status": t.last_status,
+                        "run_count": t.run_count,
+                    }
+                )
 
         # Calculate global stats from batch stats
         total_content = sum(s.get("total_content", 0) for s in batch_stats.values())
@@ -791,7 +829,9 @@ async def get_dashboard() -> Dict[str, Any]:
             "total_drafts": total_drafts,
             "avg_review_score": round(total_score / score_count) if score_count > 0 else 0,
             "active_tasks": len(active_tasks),
-            "content_by_day": [{"date": date, "count": count} for date, count in content_by_day.items()],
+            "content_by_day": [
+                {"date": date, "count": count} for date, count in content_by_day.items()
+            ],
         }
 
         return {
@@ -806,9 +846,7 @@ async def get_dashboard() -> Dict[str, Any]:
 
 
 async def _build_timeline_events_optimized(
-    orchestrator,
-    persona_id: Optional[str] = None,
-    limit: int = 50
+    orchestrator, persona_id: Optional[str] = None, limit: int = 50
 ) -> List[Dict[str, Any]]:
     """
     Build timeline events using batch loading for better performance.
@@ -834,16 +872,30 @@ async def _build_timeline_events_optimized(
                 # Add persona version events from history
                 history = orchestrator.kb.get_persona_history(pid)
                 for version in history:
-                    timestamp = version.timestamp.isoformat() if hasattr(version.timestamp, 'isoformat') else str(version.timestamp)
-                    events.append({
-                        "id": f"{pid}-{version.version}",
-                        "type": "persona_created" if version.version == "v1.0" else "persona_updated",
-                        "timestamp": timestamp,
-                        "title": "创建人设" if version.version == "v1.0" else f"更新至 {version.version}",
-                        "description": ", ".join(version.changes) if version.changes else "",
-                        "persona_id": pid,
-                        "metadata": {"reason": version.reason, "author": version.author},
-                    })
+                    timestamp = (
+                        version.timestamp.isoformat()
+                        if hasattr(version.timestamp, "isoformat")
+                        else str(version.timestamp)
+                    )
+                    events.append(
+                        {
+                            "id": f"{pid}-{version.version}",
+                            "type": (
+                                "persona_created"
+                                if version.version == "v1.0"
+                                else "persona_updated"
+                            ),
+                            "timestamp": timestamp,
+                            "title": (
+                                "创建人设"
+                                if version.version == "v1.0"
+                                else f"更新至 {version.version}"
+                            ),
+                            "description": ", ".join(version.changes) if version.changes else "",
+                            "persona_id": pid,
+                            "metadata": {"reason": version.reason, "author": version.author},
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load history for persona {pid}: {e}")
 
@@ -857,31 +909,43 @@ async def _build_timeline_events_optimized(
                 for content in drafts:
                     if content.id not in published_ids:
                         timestamp = content.created_at.isoformat() if content.created_at else ""
-                        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                        events.append({
+                        platform = (
+                            content.platform.value
+                            if hasattr(content.platform, "value")
+                            else str(content.platform)
+                        )
+                        events.append(
+                            {
+                                "id": f"content-{content.id}",
+                                "type": "content_created",
+                                "timestamp": timestamp,
+                                "title": "创建草稿",
+                                "description": content.title,
+                                "persona_id": pid,
+                                "content_id": content.id,
+                                "metadata": {"platform": platform, "pillar": content.pillar},
+                            }
+                        )
+
+                for content in published:
+                    timestamp = content.created_at.isoformat() if content.created_at else ""
+                    platform = (
+                        content.platform.value
+                        if hasattr(content.platform, "value")
+                        else str(content.platform)
+                    )
+                    events.append(
+                        {
                             "id": f"content-{content.id}",
-                            "type": "content_created",
+                            "type": "content_published",
                             "timestamp": timestamp,
-                            "title": "创建草稿",
+                            "title": "发布内容",
                             "description": content.title,
                             "persona_id": pid,
                             "content_id": content.id,
                             "metadata": {"platform": platform, "pillar": content.pillar},
-                        })
-
-                for content in published:
-                    timestamp = content.created_at.isoformat() if content.created_at else ""
-                    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                    events.append({
-                        "id": f"content-{content.id}",
-                        "type": "content_published",
-                        "timestamp": timestamp,
-                        "title": "发布内容",
-                        "description": content.title,
-                        "persona_id": pid,
-                        "content_id": content.id,
-                        "metadata": {"platform": platform, "pillar": content.pillar},
-                    })
+                        }
+                    )
 
                 # Add review events using batch-loaded reviews (no N+1!)
                 contents = drafts + published
@@ -893,16 +957,18 @@ async def _build_timeline_events_optimized(
                             timestamp = reviewed_at.isoformat()
                         else:
                             timestamp = str(reviewed_at)
-                        events.append({
-                            "id": f"review-{content.id}",
-                            "type": "review_completed",
-                            "timestamp": timestamp,
-                            "title": "审核完成",
-                            "description": f"评分: {review.get('overall_score', 0)}",
-                            "persona_id": pid,
-                            "content_id": content.id,
-                            "metadata": {"score": review.get("overall_score", 0)},
-                        })
+                        events.append(
+                            {
+                                "id": f"review-{content.id}",
+                                "type": "review_completed",
+                                "timestamp": timestamp,
+                                "title": "审核完成",
+                                "description": f"评分: {review.get('overall_score', 0)}",
+                                "persona_id": pid,
+                                "content_id": content.id,
+                                "metadata": {"score": review.get("overall_score", 0)},
+                            }
+                        )
             except Exception as e:
                 logger.warning(f"Failed to load content/reviews for persona {pid}: {e}")
 
@@ -912,15 +978,21 @@ async def _build_timeline_events_optimized(
             for task in scheduler.list_tasks():
                 if task.last_run and (not persona_id or task.persona_id == persona_id):
                     timestamp = task.last_run.isoformat() if task.last_run else ""
-                    events.append({
-                        "id": f"task-{task.id}-{timestamp}",
-                        "type": "task_executed",
-                        "timestamp": timestamp,
-                        "title": f"执行任务: {task.name}",
-                        "description": "成功" if task.last_status == "success" else f"失败: {task.last_error}",
-                        "persona_id": task.persona_id,
-                        "metadata": {"task_type": task.task_type, "status": task.last_status},
-                    })
+                    events.append(
+                        {
+                            "id": f"task-{task.id}-{timestamp}",
+                            "type": "task_executed",
+                            "timestamp": timestamp,
+                            "title": f"执行任务: {task.name}",
+                            "description": (
+                                "成功"
+                                if task.last_status == "success"
+                                else f"失败: {task.last_error}"
+                            ),
+                            "persona_id": task.persona_id,
+                            "metadata": {"task_type": task.task_type, "status": task.last_status},
+                        }
+                    )
 
     except Exception as e:
         logger.error(f"Failed to build timeline events: {e}")
@@ -951,9 +1023,7 @@ async def get_batch_persona_stats(persona_ids: Optional[List[str]] = None) -> Di
 
 
 async def _build_timeline_events(
-    orchestrator,
-    persona_id: Optional[str] = None,
-    limit: int = 50
+    orchestrator, persona_id: Optional[str] = None, limit: int = 50
 ) -> List[Dict[str, Any]]:
     """Build timeline events with error handling."""
     from avatarfactory.service.app import get_scheduler
@@ -972,16 +1042,30 @@ async def _build_timeline_events(
                 # Add persona version events from history
                 history = orchestrator.kb.get_persona_history(pid)
                 for version in history:
-                    timestamp = version.timestamp.isoformat() if hasattr(version.timestamp, 'isoformat') else str(version.timestamp)
-                    events.append({
-                        "id": f"{pid}-{version.version}",
-                        "type": "persona_created" if version.version == "v1.0" else "persona_updated",
-                        "timestamp": timestamp,
-                        "title": "创建人设" if version.version == "v1.0" else f"更新至 {version.version}",
-                        "description": ", ".join(version.changes) if version.changes else "",
-                        "persona_id": pid,
-                        "metadata": {"reason": version.reason, "author": version.author},
-                    })
+                    timestamp = (
+                        version.timestamp.isoformat()
+                        if hasattr(version.timestamp, "isoformat")
+                        else str(version.timestamp)
+                    )
+                    events.append(
+                        {
+                            "id": f"{pid}-{version.version}",
+                            "type": (
+                                "persona_created"
+                                if version.version == "v1.0"
+                                else "persona_updated"
+                            ),
+                            "timestamp": timestamp,
+                            "title": (
+                                "创建人设"
+                                if version.version == "v1.0"
+                                else f"更新至 {version.version}"
+                            ),
+                            "description": ", ".join(version.changes) if version.changes else "",
+                            "persona_id": pid,
+                            "metadata": {"reason": version.reason, "author": version.author},
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load history for persona {pid}: {e}")
 
@@ -995,48 +1079,66 @@ async def _build_timeline_events(
                 for content in drafts:
                     if content.id not in published_ids:
                         timestamp = content.created_at.isoformat() if content.created_at else ""
-                        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                        events.append({
+                        platform = (
+                            content.platform.value
+                            if hasattr(content.platform, "value")
+                            else str(content.platform)
+                        )
+                        events.append(
+                            {
+                                "id": f"content-{content.id}",
+                                "type": "content_created",
+                                "timestamp": timestamp,
+                                "title": "创建草稿",
+                                "description": content.title,
+                                "persona_id": pid,
+                                "content_id": content.id,
+                                "metadata": {"platform": platform, "pillar": content.pillar},
+                            }
+                        )
+
+                for content in published:
+                    timestamp = content.created_at.isoformat() if content.created_at else ""
+                    platform = (
+                        content.platform.value
+                        if hasattr(content.platform, "value")
+                        else str(content.platform)
+                    )
+                    events.append(
+                        {
                             "id": f"content-{content.id}",
-                            "type": "content_created",
+                            "type": "content_published",
                             "timestamp": timestamp,
-                            "title": "创建草稿",
+                            "title": "发布内容",
                             "description": content.title,
                             "persona_id": pid,
                             "content_id": content.id,
                             "metadata": {"platform": platform, "pillar": content.pillar},
-                        })
-
-                for content in published:
-                    timestamp = content.created_at.isoformat() if content.created_at else ""
-                    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                    events.append({
-                        "id": f"content-{content.id}",
-                        "type": "content_published",
-                        "timestamp": timestamp,
-                        "title": "发布内容",
-                        "description": content.title,
-                        "persona_id": pid,
-                        "content_id": content.id,
-                        "metadata": {"platform": platform, "pillar": content.pillar},
-                    })
+                        }
+                    )
 
                 # Add review events
                 contents = drafts + published
                 for content in contents:
                     review = orchestrator.kb.load_review_report(content.id, pid)
                     if review:
-                        timestamp = review.reviewed_at.isoformat() if hasattr(review.reviewed_at, 'isoformat') else str(review.reviewed_at)
-                        events.append({
-                            "id": f"review-{content.id}",
-                            "type": "review_completed",
-                            "timestamp": timestamp,
-                            "title": "审核完成",
-                            "description": f"评分: {review.overall_score}",
-                            "persona_id": pid,
-                            "content_id": content.id,
-                            "metadata": {"score": review.overall_score},
-                        })
+                        timestamp = (
+                            review.reviewed_at.isoformat()
+                            if hasattr(review.reviewed_at, "isoformat")
+                            else str(review.reviewed_at)
+                        )
+                        events.append(
+                            {
+                                "id": f"review-{content.id}",
+                                "type": "review_completed",
+                                "timestamp": timestamp,
+                                "title": "审核完成",
+                                "description": f"评分: {review.overall_score}",
+                                "persona_id": pid,
+                                "content_id": content.id,
+                                "metadata": {"score": review.overall_score},
+                            }
+                        )
             except Exception as e:
                 logger.warning(f"Failed to load content/reviews for persona {pid}: {e}")
 
@@ -1046,15 +1148,21 @@ async def _build_timeline_events(
             for task in scheduler.list_tasks():
                 if task.last_run and (not persona_id or task.persona_id == persona_id):
                     timestamp = task.last_run.isoformat() if task.last_run else ""
-                    events.append({
-                        "id": f"task-{task.id}-{timestamp}",
-                        "type": "task_executed",
-                        "timestamp": timestamp,
-                        "title": f"执行任务: {task.name}",
-                        "description": "成功" if task.last_status == "success" else f"失败: {task.last_error}",
-                        "persona_id": task.persona_id,
-                        "metadata": {"task_type": task.task_type, "status": task.last_status},
-                    })
+                    events.append(
+                        {
+                            "id": f"task-{task.id}-{timestamp}",
+                            "type": "task_executed",
+                            "timestamp": timestamp,
+                            "title": f"执行任务: {task.name}",
+                            "description": (
+                                "成功"
+                                if task.last_status == "success"
+                                else f"失败: {task.last_error}"
+                            ),
+                            "persona_id": task.persona_id,
+                            "metadata": {"task_type": task.task_type, "status": task.last_status},
+                        }
+                    )
 
     except Exception as e:
         logger.error(f"Failed to build timeline events: {e}")
@@ -1066,8 +1174,7 @@ async def _build_timeline_events(
 
 @router.get("/timeline")
 async def get_timeline(
-    persona_id: Optional[str] = None,
-    limit: int = Query(50, ge=1, le=500)
+    persona_id: Optional[str] = None, limit: int = Query(50, ge=1, le=500)
 ) -> List[Dict[str, Any]]:
     """Get global timeline events."""
     orchestrator = _get_orchestrator()
@@ -1149,28 +1256,36 @@ async def get_global_stats() -> Dict[str, Any]:
 
         for content in persona_content:
             pillar = content.pillar or "unknown"
-            platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+            platform = (
+                content.platform.value
+                if hasattr(content.platform, "value")
+                else str(content.platform)
+            )
             content_by_pillar[pillar] = content_by_pillar.get(pillar, 0) + 1
             content_by_platform[platform] = content_by_platform.get(platform, 0) + 1
             if content.review_score:
                 p_total_score += content.review_score
                 p_score_count += 1
 
-        personas_stats.append({
-            "persona_id": pid,
-            "total_content": len(persona_content),
-            "published_content": len(published_content),
-            "draft_content": len(persona_content) - len(published_content),
-            "avg_review_score": round(p_total_score / p_score_count) if p_score_count > 0 else 0,
-            "content_by_pillar": content_by_pillar,
-            "content_by_platform": content_by_platform,
-            "score_distribution": {
-                "persona_consistency": 0,
-                "platform_fit": 0,
-                "compliance": 0,
-                "engagement_potential": 0,
-            },
-        })
+        personas_stats.append(
+            {
+                "persona_id": pid,
+                "total_content": len(persona_content),
+                "published_content": len(published_content),
+                "draft_content": len(persona_content) - len(published_content),
+                "avg_review_score": (
+                    round(p_total_score / p_score_count) if p_score_count > 0 else 0
+                ),
+                "content_by_pillar": content_by_pillar,
+                "content_by_platform": content_by_platform,
+                "score_distribution": {
+                    "persona_consistency": 0,
+                    "platform_fit": 0,
+                    "compliance": 0,
+                    "engagement_potential": 0,
+                },
+            }
+        )
 
     # Count active tasks
     active_tasks = 0
@@ -1184,6 +1299,8 @@ async def get_global_stats() -> Dict[str, Any]:
         "total_drafts": draft_count,
         "avg_review_score": round(total_score / score_count) if score_count > 0 else 0,
         "active_tasks": active_tasks,
-        "content_by_day": [{"date": date, "count": count} for date, count in content_by_day.items()],
+        "content_by_day": [
+            {"date": date, "count": count} for date, count in content_by_day.items()
+        ],
         "personas_stats": personas_stats,
     }

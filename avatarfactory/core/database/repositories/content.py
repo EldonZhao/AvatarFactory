@@ -6,12 +6,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 
 from avatarfactory.core.database.models import (
     ContentModel,
     ReviewModel,
-    SimulationModel,
     PersonaModel,
 )
 from avatarfactory.core.database.repositories.base import BaseRepository
@@ -355,9 +354,9 @@ class ReviewRepository(BaseRepository[ReviewModel]):
         """
         query = select(
             func.count().filter(ReviewModel.overall_score >= 80).label("high"),
-            func.count().filter(
-                and_(ReviewModel.overall_score >= 60, ReviewModel.overall_score < 80)
-            ).label("medium"),
+            func.count()
+            .filter(and_(ReviewModel.overall_score >= 60, ReviewModel.overall_score < 80))
+            .label("medium"),
             func.count().filter(ReviewModel.overall_score < 60).label("low"),
         )
 

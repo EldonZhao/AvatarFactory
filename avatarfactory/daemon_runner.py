@@ -13,23 +13,16 @@ This module can be invoked by:
 """
 
 import argparse
-import asyncio
 import logging
 import os
-import signal
 import subprocess
 import sys
-import threading
 from datetime import datetime
 
 
 def setup_logging(mode: str = "scheduler"):
     """Set up logging for the daemon."""
-    log_dir = os.path.join(
-        os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
-        "scheduler",
-        "logs"
-    )
+    log_dir = os.path.join(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler", "logs")
     os.makedirs(log_dir, exist_ok=True)
 
     log_file = os.path.join(log_dir, f"{mode}_{datetime.now().strftime('%Y%m%d')}.log")
@@ -40,7 +33,7 @@ def setup_logging(mode: str = "scheduler"):
         handlers=[
             logging.FileHandler(log_file, encoding="utf-8"),
             logging.StreamHandler(),
-        ]
+        ],
     )
 
     return logging.getLogger(f"avatarfactory.{mode}")
@@ -55,10 +48,7 @@ def run_scheduler_only():
         from avatarfactory.scheduler import Scheduler, SchedulerConfig
 
         config = SchedulerConfig(
-            data_dir=os.path.join(
-                os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
-                "scheduler"
-            )
+            data_dir=os.path.join(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler")
         )
         scheduler = Scheduler(config)
 
@@ -151,12 +141,19 @@ def start_dashboard_process(host: str = "localhost", port: int = 8501) -> subpro
 
     return subprocess.Popen(
         [
-            sys.executable, "-m", "streamlit", "run",
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
             str(dashboard_path),
-            "--server.port", str(port),
-            "--server.address", host,
-            "--server.headless", "true",
-            "--browser.gatherUsageStats", "false",
+            "--server.port",
+            str(port),
+            "--server.address",
+            host,
+            "--server.headless",
+            "true",
+            "--browser.gatherUsageStats",
+            "false",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -177,40 +174,26 @@ Examples:
   python -m avatarfactory.daemon_runner --mode scheduler
   python -m avatarfactory.daemon_runner --mode full --port 8000
   python -m avatarfactory.daemon_runner --mode full --dashboard
-        """
+        """,
     )
     parser.add_argument(
         "--mode",
         choices=["scheduler", "full"],
         default="full",
-        help="Run mode: scheduler (background only) or full (API + scheduler)"
+        help="Run mode: scheduler (background only) or full (API + scheduler)",
     )
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (full mode only)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on (full mode only)")
     parser.add_argument(
-        "--host",
-        default="0.0.0.0",
-        help="Host to bind to (full mode only)"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Port to listen on (full mode only)"
-    )
-    parser.add_argument(
-        "--reload",
-        action="store_true",
-        help="Enable auto-reload for development (full mode only)"
+        "--reload", action="store_true", help="Enable auto-reload for development (full mode only)"
     )
     parser.add_argument(
         "--dashboard",
         action="store_true",
-        help="Also start the Streamlit dashboard (full mode only)"
+        help="Also start the Streamlit dashboard (full mode only)",
     )
     parser.add_argument(
-        "--dashboard-port",
-        type=int,
-        default=8501,
-        help="Port for the dashboard (default: 8501)"
+        "--dashboard-port", type=int, default=8501, help="Port for the dashboard (default: 8501)"
     )
 
     args = parser.parse_args()

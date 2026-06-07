@@ -57,6 +57,6 @@ This runs formatting check, lint, and tests in one pass.
 
 ## 6) PR Approval Policy
 
-- This repository is currently maintained by a single owner.
-- Owner self-approval is allowed for PRs when working solo.
-- Keep the PR checklist (tests/lint/docs) completed before self-merge.
+- All PRs must be approved by the repository owner (`@EldonZhao`) before merge.
+- Do not merge without explicit owner approval, even in solo-maintainer mode.
+- Keep the PR checklist (tests/lint/docs) completed before requesting approval.

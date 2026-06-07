@@ -6,7 +6,7 @@ Documentation: https://developer.twitter.com/en/docs/twitter-api
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
@@ -68,10 +68,7 @@ class TwitterConnector(BasePlatformConnector):
                     label="Access Token",
                     field_type="password",
                     required=False,
-                    description=(
-                        "Bearer token for app-only access,"
-                        " or OAuth access token"
-                    ),
+                    description=("Bearer token for app-only access," " or OAuth access token"),
                     env_var="TWITTER_ACCESS_TOKEN",
                 ),
                 ConnectorConfigField(
@@ -79,10 +76,7 @@ class TwitterConnector(BasePlatformConnector):
                     label="Access Token Secret",
                     field_type="password",
                     required=False,
-                    description=(
-                        "OAuth access token secret"
-                        " (required for publishing)"
-                    ),
+                    description=("OAuth access token secret" " (required for publishing)"),
                     env_var="TWITTER_ACCESS_TOKEN_SECRET",
                 ),
             ],
@@ -104,7 +98,9 @@ class TwitterConnector(BasePlatformConnector):
         try:
             import httpx
         except ImportError:
-            raise ImportError("httpx required for Twitter connector. Install with: pip install httpx")
+            raise ImportError(
+                "httpx required for Twitter connector. Install with: pip install httpx"
+            )
 
         # Twitter supports multiple auth methods
         # 1. Bearer Token (app-only, read-only)
@@ -331,19 +327,21 @@ class TwitterConnector(BasePlatformConnector):
                         author = users.get(author_id, {})
                         metrics = tweet.get("public_metrics", {})
 
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": tweet.get("id", ""),
-                            "author": author.get("username", ""),
-                            "author_id": author_id,
-                            "body": tweet.get("text", ""),
-                            "likes": metrics.get("like_count", 0),
-                            "comments": metrics.get("reply_count", 0),
-                            "shares": metrics.get("retweet_count", 0),
-                            "views": metrics.get("impression_count", 0),
-                            "published_at": tweet.get("created_at"),
-                            "url": f"https://twitter.com/{author.get('username')}/status/{tweet.get('id')}",
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": tweet.get("id", ""),
+                                "author": author.get("username", ""),
+                                "author_id": author_id,
+                                "body": tweet.get("text", ""),
+                                "likes": metrics.get("like_count", 0),
+                                "comments": metrics.get("reply_count", 0),
+                                "shares": metrics.get("retweet_count", 0),
+                                "views": metrics.get("impression_count", 0),
+                                "published_at": tweet.get("created_at"),
+                                "url": f"https://twitter.com/{author.get('username')}/status/{tweet.get('id')}",
+                            }
+                        )
 
                     return FetchResult(
                         success=True,
@@ -412,17 +410,19 @@ class TwitterConnector(BasePlatformConnector):
                     for tweet in tweets[:limit]:
                         metrics = tweet.get("public_metrics", {})
 
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": tweet.get("id", ""),
-                            "author": self._username or "",
-                            "author_id": target_user,
-                            "body": tweet.get("text", ""),
-                            "likes": metrics.get("like_count", 0),
-                            "comments": metrics.get("reply_count", 0),
-                            "shares": metrics.get("retweet_count", 0),
-                            "published_at": tweet.get("created_at"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": tweet.get("id", ""),
+                                "author": self._username or "",
+                                "author_id": target_user,
+                                "body": tweet.get("text", ""),
+                                "likes": metrics.get("like_count", 0),
+                                "comments": metrics.get("reply_count", 0),
+                                "shares": metrics.get("retweet_count", 0),
+                                "published_at": tweet.get("created_at"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,

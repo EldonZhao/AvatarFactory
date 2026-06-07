@@ -9,7 +9,6 @@ from typing import Optional
 
 from avatarfactory.core.tenant import TenantAPIKey, TenantManager, get_tenant_manager
 
-
 # Try to import FastAPI components
 try:
     from fastapi import HTTPException, Request, status
@@ -93,17 +92,13 @@ if FASTAPI_AVAILABLE:
                 self._tenant_manager = get_tenant_manager(self.kb_path)
             return self._tenant_manager
 
-        async def dispatch(
-            self, request: Request, call_next: RequestResponseEndpoint
-        ) -> Response:
+        async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
             """Process the request and inject tenant context."""
             path = request.url.path
 
             # Skip auth for public paths
             if self._is_public_path(path):
-                request.state.tenant = TenantContext(
-                    tenant_id=TenantManager.DEFAULT_TENANT_ID
-                )
+                request.state.tenant = TenantContext(tenant_id=TenantManager.DEFAULT_TENANT_ID)
                 return await call_next(request)
 
             # Check for admin key on admin paths
@@ -138,9 +133,7 @@ if FASTAPI_AVAILABLE:
                 )
             else:
                 # No API key - use default tenant (backward compatible)
-                request.state.tenant = TenantContext(
-                    tenant_id=TenantManager.DEFAULT_TENANT_ID
-                )
+                request.state.tenant = TenantContext(tenant_id=TenantManager.DEFAULT_TENANT_ID)
 
             return await call_next(request)
 

@@ -5,12 +5,11 @@ Provides secure storage and retrieval of sensitive credentials
 using Fernet symmetric encryption.
 """
 
-import base64
 import hashlib
 import os
 import secrets
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 try:
     from cryptography.fernet import Fernet, InvalidToken

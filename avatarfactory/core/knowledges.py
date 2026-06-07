@@ -65,14 +65,14 @@ class KnowledgeBase:
         # Save current config (use mode='json' to serialize enums as strings)
         config_path = persona_dir / "config.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
-            yaml.dump(persona.model_dump(mode='json'), f, allow_unicode=True, sort_keys=False)
+            yaml.dump(persona.model_dump(mode="json"), f, allow_unicode=True, sort_keys=False)
 
         # Save to versions directory
         versions_dir = persona_dir / "versions"
         versions_dir.mkdir(exist_ok=True)
         version_path = versions_dir / f"{persona.version}.yaml"
         with open(version_path, "w", encoding="utf-8") as f:
-            yaml.dump(persona.model_dump(mode='json'), f, allow_unicode=True, sort_keys=False)
+            yaml.dump(persona.model_dump(mode="json"), f, allow_unicode=True, sort_keys=False)
 
     def load_persona(self, persona_id: str) -> Optional[Persona]:
         """Load a persona by ID"""
@@ -190,7 +190,9 @@ class KnowledgeBase:
                                 file_path.unlink()
                                 result["content_deleted"] += 1
                         except Exception as e:
-                            result["errors"].append(f"Failed to delete legacy content {file_path}: {e}")
+                            result["errors"].append(
+                                f"Failed to delete legacy content {file_path}: {e}"
+                            )
 
         # Count discovery files
         discovery_dir = persona_dir / "discovery"
@@ -378,13 +380,9 @@ class KnowledgeBase:
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
 
-    def load_review_report(
-        self, content_id: str, persona_id: str
-    ) -> Optional[ReviewReport]:
+    def load_review_report(self, content_id: str, persona_id: str) -> Optional[ReviewReport]:
         """Load review report"""
-        report_path = (
-            self.base_path / "personas" / persona_id / "reviews" / f"{content_id}.json"
-        )
+        report_path = self.base_path / "personas" / persona_id / "reviews" / f"{content_id}.json"
         if not report_path.exists():
             return None
 
@@ -396,9 +394,7 @@ class KnowledgeBase:
     # Simulation Reports
     # ========================================================================
 
-    def save_simulation_report(
-        self, report: SimulationReport, persona_id: str
-    ) -> None:
+    def save_simulation_report(self, report: SimulationReport, persona_id: str) -> None:
         """Save simulation report"""
         persona_dir = self.base_path / "personas" / persona_id
         simulations_dir = persona_dir / "simulations"
@@ -413,11 +409,7 @@ class KnowledgeBase:
     ) -> Optional[SimulationReport]:
         """Load simulation report"""
         report_path = (
-            self.base_path
-            / "personas"
-            / persona_id
-            / "simulations"
-            / f"{content_id}.json"
+            self.base_path / "personas" / persona_id / "simulations" / f"{content_id}.json"
         )
         if not report_path.exists():
             return None
@@ -485,13 +477,9 @@ class KnowledgeBase:
         with open(retro_path, "w", encoding="utf-8") as f:
             json.dump(retro.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
 
-    def load_retrospective(
-        self, week: str, persona_id: str
-    ) -> Optional[WeeklyRetrospective]:
+    def load_retrospective(self, week: str, persona_id: str) -> Optional[WeeklyRetrospective]:
         """Load retrospective by week"""
-        retro_path = (
-            self.base_path / "personas" / persona_id / "retrospectives" / f"{week}.json"
-        )
+        retro_path = self.base_path / "personas" / persona_id / "retrospectives" / f"{week}.json"
         if not retro_path.exists():
             return None
 
@@ -566,9 +554,7 @@ class KnowledgeBase:
         evolution_dir.mkdir(parents=True, exist_ok=True)
         return evolution_dir
 
-    def save_evolution_suggestion(
-        self, persona_id: str, suggestion: EvolutionSuggestion
-    ) -> None:
+    def save_evolution_suggestion(self, persona_id: str, suggestion: EvolutionSuggestion) -> None:
         """
         Save an evolution suggestion.
 
@@ -662,9 +648,7 @@ class KnowledgeBase:
         result.sort(key=lambda x: x.created_at, reverse=True)
         return result[:limit]
 
-    def save_feedback_analysis(
-        self, persona_id: str, analysis: EvolutionFeedbackAnalysis
-    ) -> None:
+    def save_feedback_analysis(self, persona_id: str, analysis: EvolutionFeedbackAnalysis) -> None:
         """
         Save feedback analysis results.
 
@@ -678,9 +662,7 @@ class KnowledgeBase:
         with open(analysis_path, "w", encoding="utf-8") as f:
             json.dump(analysis.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
 
-    def load_feedback_analysis(
-        self, persona_id: str
-    ) -> Optional[EvolutionFeedbackAnalysis]:
+    def load_feedback_analysis(self, persona_id: str) -> Optional[EvolutionFeedbackAnalysis]:
         """
         Load latest feedback analysis.
 
@@ -700,9 +682,7 @@ class KnowledgeBase:
             data = json.load(f)
         return EvolutionFeedbackAnalysis(**data)
 
-    def save_agent_config(
-        self, persona_id: str, agent_type: str, config: AgentConfig
-    ) -> None:
+    def save_agent_config(self, persona_id: str, agent_type: str, config: AgentConfig) -> None:
         """
         Save per-persona agent configuration.
 
@@ -726,9 +706,7 @@ class KnowledgeBase:
         # Save persona
         self.save_persona(persona)
 
-    def load_agent_config(
-        self, persona_id: str, agent_type: str
-    ) -> Optional[AgentConfig]:
+    def load_agent_config(self, persona_id: str, agent_type: str) -> Optional[AgentConfig]:
         """
         Load per-persona agent configuration.
 
@@ -754,9 +732,7 @@ class KnowledgeBase:
         # Otherwise parse from dict
         return AgentConfig(**config_data)
 
-    def get_persona_version(
-        self, persona_id: str, version: str
-    ) -> Optional[Persona]:
+    def get_persona_version(self, persona_id: str, version: str) -> Optional[Persona]:
         """
         Load a specific version of a persona.
 
@@ -1236,24 +1212,23 @@ class KnowledgeBase:
                     data = yaml.safe_load(f)
 
                 identity = data.get("identity", {})
-                summaries.append({
-                    "id": data.get("id", persona_dir.name),
-                    "name": identity.get("name", "Unknown"),
-                    "tagline": identity.get("tagline", ""),
-                    "expertise": identity.get("expertise", []),
-                    "platforms": data.get("platforms", []),
-                    "created_at": data.get("created_at"),
-                    "updated_at": data.get("updated_at"),
-                    "version": data.get("version", "v1.0"),
-                })
+                summaries.append(
+                    {
+                        "id": data.get("id", persona_dir.name),
+                        "name": identity.get("name", "Unknown"),
+                        "tagline": identity.get("tagline", ""),
+                        "expertise": identity.get("expertise", []),
+                        "platforms": data.get("platforms", []),
+                        "created_at": data.get("created_at"),
+                        "updated_at": data.get("updated_at"),
+                        "version": data.get("version", "v1.0"),
+                    }
+                )
             except Exception:
                 continue
 
         # Sort by created_at descending
-        summaries.sort(
-            key=lambda x: x.get("created_at") or "",
-            reverse=True
-        )
+        summaries.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return summaries
 
     def list_content_with_reviews_batch(
@@ -1316,10 +1291,14 @@ class KnowledgeBase:
                         content_data["review"] = {
                             "overall_score": review_data.get("overall_score", 0),
                             "reviewed_at": review_data.get("reviewed_at"),
-                            "persona_consistency": review_data.get("persona_consistency", {}).get("score", 0),
+                            "persona_consistency": review_data.get("persona_consistency", {}).get(
+                                "score", 0
+                            ),
                             "platform_fit": review_data.get("platform_fit", {}).get("score", 0),
                             "compliance": review_data.get("compliance", {}).get("score", 0),
-                            "engagement_potential": review_data.get("engagement_potential", {}).get("score", 0),
+                            "engagement_potential": review_data.get("engagement_potential", {}).get(
+                                "score", 0
+                            ),
                         }
                     else:
                         content_data["review"] = None
@@ -1330,10 +1309,7 @@ class KnowledgeBase:
                     continue
 
         # Sort by created_at descending
-        contents.sort(
-            key=lambda x: x.get("created_at") or "",
-            reverse=True
-        )
+        contents.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return contents[:limit]
 
     def get_batch_persona_stats(
@@ -1432,7 +1408,9 @@ class KnowledgeBase:
 
             avg_score = 0
             if review_count > 0:
-                avg_score = (total_consistency + total_platform_fit + total_compliance + total_engagement) / (review_count * 4)
+                avg_score = (
+                    total_consistency + total_platform_fit + total_compliance + total_engagement
+                ) / (review_count * 4)
 
             stats[pid] = {
                 "persona_id": pid,
@@ -1443,10 +1421,16 @@ class KnowledgeBase:
                 "content_by_pillar": content_by_pillar,
                 "content_by_platform": content_by_platform,
                 "score_distribution": {
-                    "persona_consistency": round(total_consistency / review_count) if review_count > 0 else 0,
-                    "platform_fit": round(total_platform_fit / review_count) if review_count > 0 else 0,
+                    "persona_consistency": (
+                        round(total_consistency / review_count) if review_count > 0 else 0
+                    ),
+                    "platform_fit": (
+                        round(total_platform_fit / review_count) if review_count > 0 else 0
+                    ),
                     "compliance": round(total_compliance / review_count) if review_count > 0 else 0,
-                    "engagement_potential": round(total_engagement / review_count) if review_count > 0 else 0,
+                    "engagement_potential": (
+                        round(total_engagement / review_count) if review_count > 0 else 0
+                    ),
                 },
             }
 
@@ -1491,4 +1475,3 @@ class KnowledgeBase:
                     continue
 
         return reviews
-

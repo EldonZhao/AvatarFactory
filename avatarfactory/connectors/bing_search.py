@@ -52,10 +52,7 @@ class BingSearchConnector(BasePlatformConnector):
                     label="API Key",
                     field_type="password",
                     required=True,
-                    description=(
-                        "Azure Cognitive Services API key"
-                        " for Bing Search"
-                    ),
+                    description=("Azure Cognitive Services API key" " for Bing Search"),
                     env_var="BING_SEARCH_API_KEY",
                 ),
                 ConnectorConfigField(
@@ -63,13 +60,8 @@ class BingSearchConnector(BasePlatformConnector):
                     label="Endpoint URL",
                     field_type="url",
                     required=False,
-                    description=(
-                        "Custom Bing Search endpoint"
-                        " (defaults to standard endpoint)"
-                    ),
-                    placeholder=(
-                        "https://api.bing.microsoft.com/v7.0"
-                    ),
+                    description=("Custom Bing Search endpoint" " (defaults to standard endpoint)"),
+                    placeholder=("https://api.bing.microsoft.com/v7.0"),
                     env_var="BING_SEARCH_ENDPOINT",
                 ),
             ],
@@ -191,37 +183,43 @@ class BingSearchConnector(BasePlatformConnector):
                 if search_type == "web":
                     web_pages = data.get("webPages", {}).get("value", [])
                     for item in web_pages[:limit]:
-                        results.append({
-                            "id": item.get("url", ""),
-                            "title": item.get("name", ""),
-                            "description": item.get("snippet", ""),
-                            "url": item.get("url", ""),
-                            "source": "bing_search",
-                            "created_at": item.get("dateLastCrawled"),
-                        })
+                        results.append(
+                            {
+                                "id": item.get("url", ""),
+                                "title": item.get("name", ""),
+                                "description": item.get("snippet", ""),
+                                "url": item.get("url", ""),
+                                "source": "bing_search",
+                                "created_at": item.get("dateLastCrawled"),
+                            }
+                        )
                 elif search_type == "news":
                     news_items = data.get("value", [])
                     for item in news_items[:limit]:
-                        results.append({
-                            "id": item.get("url", ""),
-                            "title": item.get("name", ""),
-                            "description": item.get("description", ""),
-                            "url": item.get("url", ""),
-                            "source": "bing_news",
-                            "created_at": item.get("datePublished"),
-                            "provider": item.get("provider", [{}])[0].get("name", ""),
-                        })
+                        results.append(
+                            {
+                                "id": item.get("url", ""),
+                                "title": item.get("name", ""),
+                                "description": item.get("description", ""),
+                                "url": item.get("url", ""),
+                                "source": "bing_news",
+                                "created_at": item.get("datePublished"),
+                                "provider": item.get("provider", [{}])[0].get("name", ""),
+                            }
+                        )
                 elif search_type == "images":
                     images = data.get("value", [])
                     for item in images[:limit]:
-                        results.append({
-                            "id": item.get("contentUrl", ""),
-                            "title": item.get("name", ""),
-                            "description": "",
-                            "url": item.get("hostPageUrl", ""),
-                            "thumbnail_url": item.get("thumbnailUrl", ""),
-                            "source": "bing_images",
-                        })
+                        results.append(
+                            {
+                                "id": item.get("contentUrl", ""),
+                                "title": item.get("name", ""),
+                                "description": "",
+                                "url": item.get("hostPageUrl", ""),
+                                "thumbnail_url": item.get("thumbnailUrl", ""),
+                                "source": "bing_images",
+                            }
+                        )
 
                 return FetchResult(
                     success=True,

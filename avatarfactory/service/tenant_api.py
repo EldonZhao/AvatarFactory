@@ -15,8 +15,7 @@ try:
     from fastapi import APIRouter, HTTPException, Request, status, Depends
 except ImportError:
     raise ImportError(
-        "FastAPI is required for tenant API. "
-        "Install with: pip install avatarfactory[service]"
+        "FastAPI is required for tenant API. " "Install with: pip install avatarfactory[service]"
     )
 
 
@@ -27,6 +26,7 @@ except ImportError:
 
 class TenantCreateRequest(BaseModel):
     """Request to create a tenant."""
+
     name: str = Field(..., description="Tenant display name")
     contact_email: Optional[str] = Field(None, description="Contact email")
     max_personas: int = Field(default=10, ge=1, le=100)
@@ -36,6 +36,7 @@ class TenantCreateRequest(BaseModel):
 
 class TenantResponse(BaseModel):
     """Tenant response model."""
+
     id: str
     name: str
     status: str
@@ -49,16 +50,15 @@ class TenantResponse(BaseModel):
 
 class APIKeyCreateRequest(BaseModel):
     """Request to create an API key."""
+
     name: str = Field(default="Default", description="Key name/description")
-    scopes: List[str] = Field(
-        default=["read", "write"],
-        description="Permission scopes"
-    )
+    scopes: List[str] = Field(default=["read", "write"], description="Permission scopes")
     expires_at: Optional[datetime] = Field(None, description="Expiration datetime")
 
 
 class APIKeyResponse(BaseModel):
     """API key response model (without the actual key)."""
+
     id: str
     tenant_id: str
     key_prefix: str
@@ -71,11 +71,13 @@ class APIKeyResponse(BaseModel):
 
 class APIKeyCreatedResponse(APIKeyResponse):
     """Response when creating an API key (includes the key once)."""
+
     api_key: str = Field(..., description="The API key (only shown once!)")
 
 
 class LLMConfigRequest(BaseModel):
     """Request to configure LLM provider."""
+
     provider: str = Field(..., description="Provider: anthropic, azure_openai, openai")
     api_key: str = Field(..., description="API key for the provider")
     model: Optional[str] = Field(None, description="Model name")
@@ -87,6 +89,7 @@ class LLMConfigRequest(BaseModel):
 
 class LLMConfigResponse(BaseModel):
     """LLM configuration response (without API key)."""
+
     provider: str
     model: str
     azure_endpoint: Optional[str]
@@ -97,14 +100,15 @@ class LLMConfigResponse(BaseModel):
 
 class ConnectorCredentialsRequest(BaseModel):
     """Request to configure connector credentials."""
+
     credentials: Dict[str, str] = Field(
-        ...,
-        description="Credential key-value pairs for the connector"
+        ..., description="Credential key-value pairs for the connector"
     )
 
 
 class ConnectorStatusResponse(BaseModel):
     """Connector status response."""
+
     connector_type: str
     configured: bool
     created_at: Optional[str]
@@ -126,6 +130,7 @@ def create_admin_router() -> APIRouter:
         """Get tenant manager, ensuring admin authentication."""
         # Note: Admin auth is handled by middleware
         import os
+
         kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
         return get_tenant_manager(kb_path)
 
@@ -298,13 +303,14 @@ def create_admin_router() -> APIRouter:
 def create_tenant_router() -> APIRouter:
     """Create the tenant self-service API router."""
     from avatarfactory.core.tenant import TenantManager, get_tenant_manager
-    from avatarfactory.middleware.auth import get_tenant_context, TenantContext
+    from avatarfactory.middleware.auth import get_tenant_context
 
     router = APIRouter(prefix="/tenant", tags=["Tenant"])
 
     def get_manager() -> TenantManager:
         """Get tenant manager."""
         import os
+
         kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
         return get_tenant_manager(kb_path)
 
@@ -428,6 +434,7 @@ def create_tenant_router() -> APIRouter:
 
         # Validate connector type
         from avatarfactory.connectors.registry import ConnectorRegistry
+
         if not ConnectorRegistry.is_registered(connector_type):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

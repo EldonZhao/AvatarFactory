@@ -14,12 +14,11 @@ import asyncio
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import httpx
 
 from .base import AvatarProvider, TTSError
-
 
 # Available avatar characters
 AVATAR_CHARACTERS = {
@@ -121,16 +120,14 @@ class AzureAvatarProvider(AvatarProvider):
         """
         if not self.api_key:
             raise TTSError(
-                "Azure Speech API key not configured. "
-                "Set AZURE_SPEECH_KEY environment variable."
+                "Azure Speech API key not configured. " "Set AZURE_SPEECH_KEY environment variable."
             )
 
         avatar = AVATAR_CHARACTERS.get(avatar_character.lower())
         if not avatar:
             available = ", ".join(AVATAR_CHARACTERS.keys())
             raise TTSError(
-                f"Unknown avatar character: {avatar_character}. "
-                f"Available: {available}"
+                f"Unknown avatar character: {avatar_character}. " f"Available: {available}"
             )
 
         output_path = Path(output_path)
@@ -179,9 +176,7 @@ class AzureAvatarProvider(AvatarProvider):
                 "voice": voice,
             },
             "inputKind": "SSML",
-            "inputs": [
-                {"content": ssml}
-            ],
+            "inputs": [{"content": ssml}],
             "avatarConfig": {
                 "talkingAvatarCharacter": avatar_character,
                 "talkingAvatarStyle": avatar_style,
@@ -246,9 +241,7 @@ class AzureAvatarProvider(AvatarProvider):
                     outputs = data.get("outputs", {})
                     video_url = outputs.get("result")
                     if not video_url:
-                        raise TTSError(
-                            "Synthesis succeeded but no video URL in response"
-                        )
+                        raise TTSError("Synthesis succeeded but no video URL in response")
                     return video_url
 
                 elif status == "failed":
@@ -264,9 +257,7 @@ class AzureAvatarProvider(AvatarProvider):
                 else:
                     raise TTSError(f"Unknown synthesis status: {status}")
 
-        raise TTSError(
-            f"Avatar synthesis timed out after {timeout_seconds} seconds"
-        )
+        raise TTSError(f"Avatar synthesis timed out after {timeout_seconds} seconds")
 
     async def _download_video(self, video_url: str, output_path: Path) -> None:
         """Download the synthesized video."""
@@ -274,9 +265,7 @@ class AzureAvatarProvider(AvatarProvider):
             response = await client.get(video_url, timeout=300)
 
             if response.status_code != 200:
-                raise TTSError(
-                    f"Failed to download video: {response.status_code}"
-                )
+                raise TTSError(f"Failed to download video: {response.status_code}")
 
             with open(output_path, "wb") as f:
                 f.write(response.content)

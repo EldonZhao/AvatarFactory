@@ -58,7 +58,8 @@ def render_persona_card(
         notification_badge = '<span style="background: #f5f5f5; color: #999; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 8px;">🔕 notifications off</span>'
 
     with st.container():
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="
             border: 1px solid #e0e0e0;
             border-radius: 12px;
@@ -84,7 +85,9 @@ def render_persona_card(
                 <span>✅ {published_count} published</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
         if show_actions:
             col1, col2, col3 = st.columns(3)

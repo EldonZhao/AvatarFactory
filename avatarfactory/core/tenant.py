@@ -8,7 +8,6 @@ Provides models and management for:
 - Per-tenant connector credentials
 """
 
-import json
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +18,6 @@ from pydantic import BaseModel, Field
 
 from avatarfactory.core.credentials import CredentialManager, get_credential_manager
 
-
 # =============================================================================
 # Models
 # =============================================================================
@@ -27,6 +25,7 @@ from avatarfactory.core.credentials import CredentialManager, get_credential_man
 
 class TenantStatus(str):
     """Tenant status values."""
+
     ACTIVE = "active"
     SUSPENDED = "suspended"
     DELETED = "deleted"
@@ -39,6 +38,7 @@ class Tenant(BaseModel):
     Represents a tenant in the multi-tenant system with their
     configuration, quotas, and metadata.
     """
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = Field(..., description="Tenant display name")
     created_at: datetime = Field(default_factory=datetime.now)
@@ -61,6 +61,7 @@ class TenantAPIKey(BaseModel):
 
     The actual API key is never stored - only its hash.
     """
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     tenant_id: str
     key_hash: str = Field(..., description="SHA-256 hash of the API key")
@@ -71,7 +72,7 @@ class TenantAPIKey(BaseModel):
     status: str = Field(default="active")
     scopes: List[str] = Field(
         default_factory=lambda: ["read", "write"],
-        description="Permission scopes: read, write, admin"
+        description="Permission scopes: read, write, admin",
     )
 
 
@@ -81,6 +82,7 @@ class TenantLLMConfig(BaseModel):
 
     API keys are stored encrypted.
     """
+
     provider: str = Field(default="anthropic", description="LLM provider")
     model: str = Field(default="claude-3-5-sonnet-20241022", description="Model name")
     api_key_encrypted: str = Field(default="", description="Encrypted API key")
@@ -101,10 +103,10 @@ class TenantConnectorCredentials(BaseModel):
 
     All credential values are stored encrypted.
     """
+
     connector_type: str = Field(..., description="Platform connector type")
     credentials_encrypted: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Encrypted credential key-value pairs"
+        default_factory=dict, description="Encrypted credential key-value pairs"
     )
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -116,6 +118,7 @@ class TenantConfig(BaseModel):
 
     Stored in {kb_path}/{tenant_id}/tenant_config.yaml
     """
+
     tenant: Tenant
     llm_config: Optional[TenantLLMConfig] = Field(default=None)
     connectors: Dict[str, TenantConnectorCredentials] = Field(default_factory=dict)
@@ -343,6 +346,7 @@ class TenantManager:
 
         if hard_delete:
             import shutil
+
             tenant_dir = self.kb_path / tenant_id
             if tenant_dir.exists():
                 shutil.rmtree(tenant_dir)
@@ -397,9 +401,7 @@ class TenantManager:
         # Check quota
         existing_keys = self.list_api_keys(tenant_id)
         if len(existing_keys) >= tenant.max_api_keys:
-            raise ValueError(
-                f"API key quota exceeded. Maximum: {tenant.max_api_keys}"
-            )
+            raise ValueError(f"API key quota exceeded. Maximum: {tenant.max_api_keys}")
 
         # Generate API key
         raw_key = CredentialManager.generate_api_key()
@@ -492,9 +494,7 @@ class TenantManager:
             keys = yaml.safe_load(f) or {}
 
         return [
-            TenantAPIKey(**data)
-            for data in keys.values()
-            if data.get("tenant_id") == tenant_id
+            TenantAPIKey(**data) for data in keys.values() if data.get("tenant_id") == tenant_id
         ]
 
     def revoke_api_key(self, key_id: str) -> bool:
@@ -662,9 +662,7 @@ class TenantManager:
             return None
 
         # Decrypt credentials
-        return self._credential_manager.decrypt_dict(
-            connector_config.credentials_encrypted
-        )
+        return self._credential_manager.decrypt_dict(connector_config.credentials_encrypted)
 
     def set_connector_credentials(
         self,

@@ -114,15 +114,19 @@ def render_task_timeline(
                 col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 0.5, 0.5])
 
                 with col1:
-                    st.markdown(f"""
+                    st.markdown(
+                        f"""
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="color: {status_color}; font-size: 18px;">{status_icon}</span>
                         <span style="font-weight: 500;">{task.get('name', task_id)}</span>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """,
+                        unsafe_allow_html=True,
+                    )
 
                 with col2:
-                    st.markdown(f"""
+                    st.markdown(
+                        f"""
                     <span style="
                         background: #f0f0f0;
                         padding: 4px 8px;
@@ -130,7 +134,9 @@ def render_task_timeline(
                         font-size: 12px;
                         font-family: monospace;
                     ">{task.get('schedule', 'N/A')}</span>
-                    """, unsafe_allow_html=True)
+                    """,
+                        unsafe_allow_html=True,
+                    )
 
                 with col3:
                     st.caption(f"Last: {last_run_str} ({run_count} runs)")
@@ -181,7 +187,8 @@ def render_next_runs(next_runs: List[Dict[str, Any]]) -> None:
         next_run = run.get("next_run", "N/A")
         task_name = run.get("task_name", task_id)
 
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="
             display: flex;
             justify-content: space-between;
@@ -200,7 +207,9 @@ def render_next_runs(next_runs: List[Dict[str, Any]]) -> None:
                 font-size: 12px;
             ">{next_run}</span>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 def render_task_stats(tasks: List[Dict[str, Any]]) -> None:

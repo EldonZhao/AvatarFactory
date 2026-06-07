@@ -108,8 +108,7 @@ class TTLCache:
         with self._lock:
             now = time.time()
             expired = [
-                key for key, (_, timestamp) in self._cache.items()
-                if now - timestamp > self._ttl
+                key for key, (_, timestamp) in self._cache.items() if now - timestamp > self._ttl
             ]
             for key in expired:
                 del self._cache[key]
@@ -125,10 +124,7 @@ class TTLCache:
         with self._lock:
             now = time.time()
             total = len(self._cache)
-            expired = sum(
-                1 for _, timestamp in self._cache.values()
-                if now - timestamp > self._ttl
-            )
+            expired = sum(1 for _, timestamp in self._cache.values() if now - timestamp > self._ttl)
             return {
                 "total_entries": total,
                 "expired_entries": expired,

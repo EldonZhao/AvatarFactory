@@ -15,7 +15,7 @@ from avatarfactory.core.database.models import (
     DiscoveryResultModel,
 )
 from avatarfactory.core.database.repositories.base import BaseRepository
-from avatarfactory.models.schemas import Persona, PersonaVersion
+from avatarfactory.models.schemas import Persona
 
 
 class PersonaRepository(BaseRepository[PersonaModel]):
@@ -120,8 +120,9 @@ class PersonaRepository(BaseRepository[PersonaModel]):
 
         # Sum ideas from discoveries
         ideas_sum = await self.session.execute(
-            select(func.sum(DiscoveryResultModel.ideas_count))
-            .where(DiscoveryResultModel.persona_id == id)
+            select(func.sum(DiscoveryResultModel.ideas_count)).where(
+                DiscoveryResultModel.persona_id == id
+            )
         )
 
         return {

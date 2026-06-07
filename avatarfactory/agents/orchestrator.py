@@ -3,7 +3,7 @@ Orchestrator Agent - Main controller that coordinates all sub-agents.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from avatarfactory.agents.base import BaseAgent
 from avatarfactory.agents.content import ContentAgent
@@ -11,10 +11,7 @@ from avatarfactory.agents.persona import PersonaAgent
 from avatarfactory.agents.review import ReviewAgent
 from avatarfactory.models.schemas import (
     AgentMessage,
-    Content,
     Intent,
-    Persona,
-    ReviewReport,
     TaskType,
 )
 
@@ -51,6 +48,7 @@ class OrchestratorAgent(BaseAgent):
         """Lazily initialize evolution agent."""
         if self._evolution_agent is None:
             from avatarfactory.agents.evolution import EvolutionAgent
+
             self._evolution_agent = EvolutionAgent(
                 knowledge_base=self.kb,
                 llm_provider=self.llm_provider,
@@ -59,7 +57,7 @@ class OrchestratorAgent(BaseAgent):
 
     async def process(self, message: AgentMessage) -> Any:
         """Process user request by coordinating sub-agents"""
-        self.log("INFO", f"Processing user request")
+        self.log("INFO", "Processing user request")
         return await self._handle_user_input(
             message.payload.get("user_input", ""),
             context=message.payload,
@@ -128,9 +126,7 @@ class OrchestratorAgent(BaseAgent):
             self.log("ERROR", f"Handler failed: {e}")
             return {"status": "error", "message": str(e)}
 
-    async def _understand_intent(
-        self, user_input: str, has_persona: bool = True
-    ) -> Intent:
+    async def _understand_intent(self, user_input: str, has_persona: bool = True) -> Intent:
         """Parse user input to understand intent"""
 
         # Different prompt based on whether user has a persona selected
@@ -410,10 +406,12 @@ Output MUST be valid JSON:
             # Build message with top ideas
             ideas_text = ""
             if ideas:
-                ideas_text = "\n\nTop content ideas:\n" + "\n".join([
-                    f"  • {idea.get('topic', '')} ({idea.get('estimated_engagement', 'medium')} engagement)"
-                    for idea in ideas[:5]
-                ])
+                ideas_text = "\n\nTop content ideas:\n" + "\n".join(
+                    [
+                        f"  • {idea.get('topic', '')} ({idea.get('estimated_engagement', 'medium')} engagement)"
+                        for idea in ideas[:5]
+                    ]
+                )
 
             return {
                 "trending_count": trending_count,
@@ -533,26 +531,30 @@ Output MUST be valid JSON:
         # Format suggestions for display
         suggestion_list = []
         for s in suggestions:
-            suggestion_list.append({
-                "id": s.id,
-                "severity": s.severity.value,
-                "area": s.area.value,
-                "suggestion": s.suggestion,
-                "rationale": s.rationale,
-                "expected_impact": s.expected_impact,
-            })
+            suggestion_list.append(
+                {
+                    "id": s.id,
+                    "severity": s.severity.value,
+                    "area": s.area.value,
+                    "suggestion": s.suggestion,
+                    "rationale": s.rationale,
+                    "expected_impact": s.expected_impact,
+                }
+            )
 
         return {
             "suggestions": suggestion_list,
             "count": len(suggestions),
             "message": (
                 f"🔄 Generated {len(suggestions)} suggestion(s):\n\n"
-                + "\n".join([
-                    f"  [{s['severity']}] {s['area']}: {s['suggestion']}\n"
-                    f"     Rationale: {s['rationale']}\n"
-                    f"     Use 'approve suggestion {s['id']}' or 'reject suggestion {s['id']}' to review."
-                    for s in suggestion_list
-                ])
+                + "\n".join(
+                    [
+                        f"  [{s['severity']}] {s['area']}: {s['suggestion']}\n"
+                        f"     Rationale: {s['rationale']}\n"
+                        f"     Use 'approve suggestion {s['id']}' or 'reject suggestion {s['id']}' to review."
+                        for s in suggestion_list
+                    ]
+                )
             ),
         }
 
@@ -622,24 +624,25 @@ Output MUST be valid JSON:
 
         suggestion_list = []
         for s in suggestions:
-            suggestion_list.append({
-                "id": s.id,
-                "severity": s.severity.value,
-                "area": s.area.value,
-                "suggestion": s.suggestion,
-                "confidence": s.confidence,
-                "created_at": s.created_at.isoformat(),
-            })
+            suggestion_list.append(
+                {
+                    "id": s.id,
+                    "severity": s.severity.value,
+                    "area": s.area.value,
+                    "suggestion": s.suggestion,
+                    "confidence": s.confidence,
+                    "created_at": s.created_at.isoformat(),
+                }
+            )
 
         return {
             "suggestions": suggestion_list,
             "count": len(suggestions),
             "message": (
                 f"📋 {len(suggestions)} {status} suggestion(s):\n\n"
-                + "\n".join([
-                    f"  [{s['severity']}] {s['id']}: {s['suggestion']}"
-                    for s in suggestion_list
-                ])
+                + "\n".join(
+                    [f"  [{s['severity']}] {s['id']}: {s['suggestion']}" for s in suggestion_list]
+                )
             ),
         }
 
@@ -665,10 +668,7 @@ Output MUST be valid JSON:
                 persona_id, original_input
             )
             # Filter to agent config suggestions
-            config_suggestions = [
-                s for s in suggestions
-                if s.area.value == "agent_config"
-            ]
+            config_suggestions = [s for s in suggestions if s.area.value == "agent_config"]
             if config_suggestions:
                 return {
                     "suggestions": [s.model_dump(mode="json") for s in config_suggestions],
@@ -678,6 +678,7 @@ Output MUST be valid JSON:
         # Apply direct config updates
         if updates:
             from avatarfactory.core.agent_config import AgentConfigManager
+
             config_manager = AgentConfigManager(self.kb)
             new_config = config_manager.update_config(persona_id, agent_type, updates)
             return {
@@ -731,8 +732,6 @@ Output MUST be valid JSON:
         """Handle browsing recommended personas"""
 
         limit = parameters.get("limit", 5)
-        domain = parameters.get("domain")
-
         # Get recommendations from storage
         recommendations = self.kb.get_latest_recommendations(limit=limit)
 
@@ -751,27 +750,31 @@ Output MUST be valid JSON:
         # Format recommendations
         rec_list = []
         for rec in recommendations:
-            rec_list.append({
-                "id": rec.id,
-                "name": rec.name,
-                "tagline": rec.tagline,
-                "domain": rec.domain,
-                "expertise": rec.expertise,
-                "target_audience": rec.target_audience,
-                "relevance_score": rec.relevance_score,
-                "potential_score": rec.potential_score,
-                "rationale": rec.rationale,
-            })
+            rec_list.append(
+                {
+                    "id": rec.id,
+                    "name": rec.name,
+                    "tagline": rec.tagline,
+                    "domain": rec.domain,
+                    "expertise": rec.expertise,
+                    "target_audience": rec.target_audience,
+                    "relevance_score": rec.relevance_score,
+                    "potential_score": rec.potential_score,
+                    "rationale": rec.rationale,
+                }
+            )
 
         # Build display message
-        rec_text = "\n\n".join([
-            f"**{i+1}. {r['name']}** ({r['domain']})\n"
-            f"   {r['tagline']}\n"
-            f"   目标受众: {r['target_audience']}\n"
-            f"   热度: {r['relevance_score']:.0f} | 潜力: {r['potential_score']:.0f}\n"
-            f"   ID: `{r['id']}`"
-            for i, r in enumerate(rec_list)
-        ])
+        rec_text = "\n\n".join(
+            [
+                f"**{i+1}. {r['name']}** ({r['domain']})\n"
+                f"   {r['tagline']}\n"
+                f"   目标受众: {r['target_audience']}\n"
+                f"   热度: {r['relevance_score']:.0f} | 潜力: {r['potential_score']:.0f}\n"
+                f"   ID: `{r['id']}`"
+                for i, r in enumerate(rec_list)
+            ]
+        )
 
         return {
             "recommendations": rec_list,
@@ -793,6 +796,7 @@ Output MUST be valid JSON:
         if not rec_id:
             # Try to extract from input
             import re
+
             match = re.search(r"rec_persona_\w+", original_input)
             if match:
                 rec_id = match.group(0)
@@ -852,18 +856,22 @@ Output MUST be valid JSON:
         for pid in persona_ids[:10]:  # Limit to 10
             persona = self.kb.load_persona(pid)
             if persona:
-                personas.append({
-                    "id": persona.id,
-                    "name": persona.identity.name,
-                    "tagline": persona.identity.tagline,
-                    "expertise": persona.identity.expertise[:3],
-                    "version": persona.version,
-                })
+                personas.append(
+                    {
+                        "id": persona.id,
+                        "name": persona.identity.name,
+                        "tagline": persona.identity.tagline,
+                        "expertise": persona.identity.expertise[:3],
+                        "version": persona.version,
+                    }
+                )
 
-        personas_text = "\n".join([
-            f"{i+1}. **{p['name']}** - {p['tagline']}\n   ID: `{p['id']}` | 版本: {p['version']}"
-            for i, p in enumerate(personas)
-        ])
+        personas_text = "\n".join(
+            [
+                f"{i+1}. **{p['name']}** - {p['tagline']}\n   ID: `{p['id']}` | 版本: {p['version']}"
+                for i, p in enumerate(personas)
+            ]
+        )
 
         return {
             "personas": personas,
@@ -934,9 +942,7 @@ Output MUST be valid JSON:
             ),
         }
 
-    async def _handle_help(
-        self, parameters: Dict[str, Any], original_input: str
-    ) -> Dict[str, Any]:
+    async def _handle_help(self, parameters: Dict[str, Any], original_input: str) -> Dict[str, Any]:
         """Handle help request - guide user on what they can do"""
 
         # Check if there are any personas
@@ -977,4 +983,3 @@ Output MUST be valid JSON:
             "has_recommendations": len(recommendations) > 0,
             "message": help_text,
         }
-

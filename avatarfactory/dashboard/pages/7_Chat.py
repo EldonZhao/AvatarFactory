@@ -8,7 +8,9 @@ with integrated Evolution suggestions management.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 import streamlit as st
 import httpx
@@ -46,10 +48,7 @@ def send_chat_message(message: str) -> str:
         with httpx.Client(timeout=180) as client:
             response = client.post(
                 f"{api_url}/chat",
-                json={
-                    "message": message,
-                    "persona_id": st.session_state.chat_persona_id
-                }
+                json={"message": message, "persona_id": st.session_state.chat_persona_id},
             )
             if response.status_code == 200:
                 data = response.json()
@@ -72,7 +71,7 @@ def fetch_pending_suggestions(persona_id: str) -> list:
         with httpx.Client(timeout=10) as client:
             response = client.get(
                 f"{api_url}/personas/{persona_id}/evolution/suggestions",
-                params={"status": "pending"}
+                params={"status": "pending"},
             )
             if response.status_code == 200:
                 return response.json().get("suggestions", [])
@@ -87,7 +86,7 @@ def approve_suggestion(persona_id: str, suggestion_id: str) -> bool:
         with httpx.Client(timeout=30) as client:
             response = client.post(
                 f"{api_url}/personas/{persona_id}/evolution/suggestions/{suggestion_id}/review",
-                json={"approved": True}
+                json={"approved": True},
             )
             return response.status_code == 200
     except Exception:
@@ -100,7 +99,7 @@ def reject_suggestion(persona_id: str, suggestion_id: str, reason: str = None) -
         with httpx.Client(timeout=30) as client:
             response = client.post(
                 f"{api_url}/personas/{persona_id}/evolution/suggestions/{suggestion_id}/review",
-                json={"approved": False, "rejection_reason": reason}
+                json={"approved": False, "rejection_reason": reason},
             )
             return response.status_code == 200
     except Exception:
@@ -161,7 +160,7 @@ with st.sidebar:
             current_labels,
             index=current_index,
             key="chat_persona_select",
-            help="Select 'Explore' to browse recommendations or get help"
+            help="Select 'Explore' to browse recommendations or get help",
         )
         st.session_state.chat_persona_id = persona_options[selected_label]
 
@@ -193,11 +192,7 @@ with st.sidebar:
                 confidence = suggestion.get("confidence", 0)
 
                 # Severity badge color
-                severity_colors = {
-                    "minor": "🟢",
-                    "moderate": "🟡",
-                    "major": "🔴"
-                }
+                severity_colors = {"minor": "🟢", "moderate": "🟡", "major": "🔴"}
                 badge = severity_colors.get(severity, "⚪")
 
                 with st.expander(f"{badge} [{severity}] {area}", expanded=(idx == 0)):
@@ -214,7 +209,9 @@ with st.sidebar:
                     # Action buttons
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✅ Approve", key=f"approve_{sug_id}", use_container_width=True):
+                        if st.button(
+                            "✅ Approve", key=f"approve_{sug_id}", use_container_width=True
+                        ):
                             if approve_suggestion(st.session_state.chat_persona_id, sug_id):
                                 st.success("Applied!")
                                 st.session_state.evolution_refresh += 1
@@ -244,7 +241,7 @@ with st.sidebar:
                     with httpx.Client(timeout=60) as client:
                         response = client.post(
                             f"{api_url}/personas/{st.session_state.chat_persona_id}/evolution/analyze",
-                            params={"period": "7d"}
+                            params={"period": "7d"},
                         )
                         if response.status_code == 200:
                             data = response.json()
@@ -351,5 +348,8 @@ if prompt := st.chat_input(placeholder_text):
         st.session_state.chat_messages.append({"role": "assistant", "content": assistant_message})
 
     # Check if evolution suggestions were generated (refresh sidebar)
-    if any(keyword in prompt.lower() for keyword in ["更", "改", "调整", "优化", "casual", "formal", "shorter", "longer"]):
+    if any(
+        keyword in prompt.lower()
+        for keyword in ["更", "改", "调整", "优化", "casual", "formal", "shorter", "longer"]
+    ):
         st.session_state.evolution_refresh += 1

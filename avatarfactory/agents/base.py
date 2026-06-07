@@ -4,8 +4,8 @@ Base Agent class and utilities for all AvatarFactory agents.
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from avatarfactory.core.llm_provider import BaseLLMProvider, LLMProviderFactory
 from avatarfactory.models.schemas import AgentMessage
@@ -17,6 +17,7 @@ KnowledgeBaseType = Any  # Duck typing for KnowledgeBase or KnowledgeBaseDB
 @dataclass
 class PublishResult:
     """Result of a multi-platform publish operation."""
+
     platform: str
     success: bool
     post_id: Optional[str] = None
@@ -29,9 +30,10 @@ class BaseAgent(ABC):
 
     def __init__(
         self,
-        agent_id: str,
         knowledge_base: KnowledgeBaseType,
         llm_provider: Optional[BaseLLMProvider] = None,
+        *,
+        agent_id: str,
         # Deprecated parameters (kept for backward compatibility)
         anthropic_client: Optional[Any] = None,
         model: Optional[str] = None,
@@ -59,6 +61,7 @@ class BaseAgent(ABC):
         """Lazily initialize agent config manager."""
         if self._config_manager is None:
             from avatarfactory.core.agent_config import AgentConfigManager
+
             self._config_manager = AgentConfigManager(self.kb)
         return self._config_manager
 

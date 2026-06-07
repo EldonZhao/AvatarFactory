@@ -24,9 +24,11 @@ class TaskRegistry:
     @classmethod
     def register(cls, task_type: str) -> Callable:
         """Decorator to register a task runner."""
+
         def decorator(func: Callable) -> Callable:
             cls._runners[task_type] = func
             return func
+
         return decorator
 
     @classmethod
@@ -110,7 +112,6 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
     2. Unused ideas from recent discovery results
     3. Random pillar/example combination (avoiding recent topics)
     """
-    import random
     from avatarfactory.agents.orchestrator import OrchestratorAgent
     from avatarfactory.core.knowledges_db import get_knowledge_base
     from avatarfactory.core.llm_provider import LLMProviderFactory
@@ -118,7 +119,6 @@ async def run_content_task(task: ScheduledTask) -> Dict[str, Any]:
 
     persona_id = task.persona_id
     topic = task.extra_params.get("topic")
-    count = task.extra_params.get("count", 1)
 
     if not persona_id:
         return {"success": False, "error": "persona_id required for content generation"}
@@ -308,11 +308,13 @@ async def run_report_task(task: ScheduledTask) -> Dict[str, Any]:
     )[:5]
 
     for content in sorted_contents:
-        report["top_content"].append({
-            "id": content.id,
-            "title": content.title,
-            "score": content.review_score,
-        })
+        report["top_content"].append(
+            {
+                "id": content.id,
+                "title": content.title,
+                "score": content.review_score,
+            }
+        )
 
     return {"success": True, "report": report}
 
@@ -429,7 +431,6 @@ async def run_evolution_analysis(task: ScheduledTask) -> Dict[str, Any]:
     from avatarfactory.core.llm_provider import LLMProviderFactory
 
     persona_id = task.persona_id
-    period = task.extra_params.get("period", "7d")
 
     if not persona_id:
         return {"success": False, "error": "persona_id required for evolution analysis"}
@@ -566,6 +567,7 @@ async def run_trend_scan_task(task: ScheduledTask) -> Dict[str, Any]:
                     body = post.get("body", "")
                     # Extract hashtags
                     import re
+
                     tags = re.findall(r"#(\w+)", body)
                     hashtags.update(tags)
                     # Use first line or sentence as topic
@@ -574,9 +576,7 @@ async def run_trend_scan_task(task: ScheduledTask) -> Dict[str, Any]:
                         topics.add(first_line)
 
                 # Analyze trends with LLM
-                analysis = await _analyze_trends_for_snapshot(
-                    provider, posts[:20], platform
-                )
+                analysis = await _analyze_trends_for_snapshot(provider, posts[:20], platform)
 
                 # Create snapshot
                 snapshot = TrendSnapshot(
@@ -634,9 +634,7 @@ async def _analyze_trends_for_snapshot(
         return {"summary": "", "themes": [], "patterns": []}
 
     # Build posts context
-    posts_text = "\n".join([
-        f"- {p.get('body', '')[:200]}" for p in posts[:15]
-    ])
+    posts_text = "\n".join([f"- {p.get('body', '')[:200]}" for p in posts[:15]])
 
     prompt = f"""Analyze these trending posts from {platform} and extract:
 1. A brief summary of overall trends (2-3 sentences)
@@ -665,6 +663,7 @@ Return as JSON:
 
         # Parse JSON
         import json
+
         if "```json" in response:
             start = response.find("```json") + 7
             end = response.find("```", start)

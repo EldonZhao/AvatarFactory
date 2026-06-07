@@ -7,7 +7,9 @@ Displays content ideas from discovery scans, grouped by persona.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 import streamlit as st
 
@@ -39,26 +41,24 @@ with st.sidebar:
         persona_options[f"{p.name} ({p.id[:12]}...)"] = p.id
 
     persona_filter_label = st.selectbox(
-        "Persona",
-        list(persona_options.keys()),
-        key="topic_persona_filter"
+        "Persona", list(persona_options.keys()), key="topic_persona_filter"
     )
     selected_persona = persona_options[persona_filter_label]
 
     # Platform filter
     platform_filter = st.selectbox(
-        "Platform",
-        ["All", "bluesky", "xiaohongshu", "twitter"],
-        key="topic_platform_filter"
+        "Platform", ["All", "bluesky", "xiaohongshu", "twitter"], key="topic_platform_filter"
     )
     selected_platform = None if platform_filter == "All" else platform_filter
 
     # Limit per persona
     discoveries_per_persona = st.slider(
         "Discoveries per persona",
-        1, 10, 5,
+        1,
+        10,
+        5,
         key="discoveries_per_persona",
-        help="Number of recent discoveries to show per persona"
+        help="Number of recent discoveries to show per persona",
     )
 
     if st.button("🔄 Refresh"):
@@ -140,9 +140,7 @@ else:
 for persona_id in persona_ids:
     # Get recent discoveries for this persona (limited)
     discoveries = provider.kb.list_discovery_history(
-        persona_id,
-        platform=selected_platform,
-        limit=discoveries_per_persona
+        persona_id, platform=selected_platform, limit=discoveries_per_persona
     )
 
     persona_name = persona_name_map.get(persona_id, persona_id[:12] + "...")
@@ -153,19 +151,21 @@ for persona_id in persona_ids:
         created_at = discovery.get("created_at", "")[:10]
 
         for idea in ideas:
-            all_ideas.append({
-                "persona_id": persona_id,
-                "persona_name": persona_name,
-                "platform": platform,
-                "discovery_date": created_at,
-                "topic": idea.get("topic", "Untitled"),
-                "hook": idea.get("hook", ""),
-                "angle": idea.get("angle", ""),
-                "content_type": idea.get("content_type", "post"),
-                "pillar": idea.get("suggested_pillar", ""),
-                "engagement": idea.get("estimated_engagement", "medium"),
-                "reasoning": idea.get("reasoning", ""),
-            })
+            all_ideas.append(
+                {
+                    "persona_id": persona_id,
+                    "persona_name": persona_name,
+                    "platform": platform,
+                    "discovery_date": created_at,
+                    "topic": idea.get("topic", "Untitled"),
+                    "hook": idea.get("hook", ""),
+                    "angle": idea.get("angle", ""),
+                    "content_type": idea.get("content_type", "post"),
+                    "pillar": idea.get("suggested_pillar", ""),
+                    "engagement": idea.get("estimated_engagement", "medium"),
+                    "reasoning": idea.get("reasoning", ""),
+                }
+            )
 
 # Stats
 col1, col2, col3 = st.columns(3)
@@ -204,6 +204,8 @@ else:
                     render_idea_card(idea)
     else:
         # Show flat list for single persona
-        st.markdown(f"### Ideas for {persona_name_map.get(selected_persona, selected_persona[:12])}")
+        st.markdown(
+            f"### Ideas for {persona_name_map.get(selected_persona, selected_persona[:12])}"
+        )
         for idea in all_ideas:
             render_idea_card(idea)

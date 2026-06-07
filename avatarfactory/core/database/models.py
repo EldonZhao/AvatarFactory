@@ -110,9 +110,7 @@ class PersonaVersionModel(Base):
     # Relationships
     persona: Mapped["PersonaModel"] = relationship(back_populates="versions")
 
-    __table_args__ = (
-        Index("idx_persona_versions_persona", "persona_id", "timestamp"),
-    )
+    __table_args__ = (Index("idx_persona_versions_persona", "persona_id", "timestamp"),)
 
 
 class ContentModel(Base):
@@ -201,9 +199,7 @@ class ReviewModel(Base):
     # Relationships
     content: Mapped["ContentModel"] = relationship(back_populates="review")
 
-    __table_args__ = (
-        Index("idx_reviews_overall_score", "overall_score"),
-    )
+    __table_args__ = (Index("idx_reviews_overall_score", "overall_score"),)
 
 
 class SimulationModel(Base):
@@ -294,9 +290,7 @@ class EvolutionSuggestionModel(Base):
     # Relationships
     persona: Mapped["PersonaModel"] = relationship(back_populates="evolution_suggestions")
 
-    __table_args__ = (
-        Index("idx_evolution_persona_status", "persona_id", "status", "created_at"),
-    )
+    __table_args__ = (Index("idx_evolution_persona_status", "persona_id", "status", "created_at"),)
 
 
 class TrendSnapshotModel(Base):
@@ -318,9 +312,7 @@ class TrendSnapshotModel(Base):
     key_themes: Mapped[Optional[List[str]]] = mapped_column(JSON)
     content_patterns: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
 
-    __table_args__ = (
-        Index("idx_trends_platform_time", "platform", "captured_at"),
-    )
+    __table_args__ = (Index("idx_trends_platform_time", "platform", "captured_at"),)
 
 
 class RecommendedPersonaModel(Base):
@@ -361,9 +353,7 @@ class RecommendedPersonaModel(Base):
         String(64), ForeignKey("personas.id", ondelete="SET NULL")
     )
 
-    __table_args__ = (
-        Index("idx_recommendations_status", "status", "created_at"),
-    )
+    __table_args__ = (Index("idx_recommendations_status", "status", "created_at"),)
 
 
 class ScheduledTaskModel(Base):
@@ -426,9 +416,7 @@ class PublishQueueModel(Base):
     error: Mapped[Optional[str]] = mapped_column(Text)
     post_url: Mapped[Optional[str]] = mapped_column(Text)
 
-    __table_args__ = (
-        Index("idx_queue_status", "status", "scheduled_time"),
-    )
+    __table_args__ = (Index("idx_queue_status", "status", "scheduled_time"),)
 
 
 class PlatformRuleModel(Base):
@@ -461,6 +449,4 @@ class RetrospectiveModel(Base):
     key_insights: Mapped[Optional[List[str]]] = mapped_column(JSON)
     next_week_plan: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
 
-    __table_args__ = (
-        Index("idx_retrospectives_persona_week", "persona_id", "week", unique=True),
-    )
+    __table_args__ = (Index("idx_retrospectives_persona_week", "persona_id", "week", unique=True),)

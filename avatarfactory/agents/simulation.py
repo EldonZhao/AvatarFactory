@@ -90,9 +90,7 @@ class SimulationAgent(BaseAgent):
         self.log("INFO", "Simulation complete")
         return report
 
-    async def _predict_metrics(
-        self, content: Content, persona: Persona
-    ) -> EngagementPrediction:
+    async def _predict_metrics(self, content: Content, persona: Persona) -> EngagementPrediction:
         """Predict engagement metrics using LLM"""
 
         system_prompt = """You are a social media analytics expert. Predict engagement metrics for content based on:

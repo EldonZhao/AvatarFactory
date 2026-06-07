@@ -6,7 +6,7 @@ Documentation: https://learn.microsoft.com/en-us/linkedin/
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from avatarfactory.connectors.base import (
     BasePlatformConnector,
@@ -71,9 +71,7 @@ class LinkedInConnector(BasePlatformConnector):
                     label="Client ID",
                     field_type="text",
                     required=False,
-                    description=(
-                        "LinkedIn App Client ID (for OAuth flow)"
-                    ),
+                    description=("LinkedIn App Client ID (for OAuth flow)"),
                     env_var="LINKEDIN_CLIENT_ID",
                 ),
                 ConnectorConfigField(
@@ -81,9 +79,7 @@ class LinkedInConnector(BasePlatformConnector):
                     label="Client Secret",
                     field_type="password",
                     required=False,
-                    description=(
-                        "LinkedIn App Client Secret (for OAuth flow)"
-                    ),
+                    description=("LinkedIn App Client Secret (for OAuth flow)"),
                     env_var="LINKEDIN_CLIENT_SECRET",
                 ),
                 ConnectorConfigField(
@@ -91,10 +87,7 @@ class LinkedInConnector(BasePlatformConnector):
                     label="Organization ID",
                     field_type="text",
                     required=False,
-                    description=(
-                        "LinkedIn Company Page ID"
-                        " (for posting as organization)"
-                    ),
+                    description=("LinkedIn Company Page ID" " (for posting as organization)"),
                 ),
             ],
             integration_type=IntegrationType.API,
@@ -119,10 +112,7 @@ class LinkedInConnector(BasePlatformConnector):
             )
 
         if not self.config.access_token:
-            raise ValueError(
-                "LinkedIn requires access_token. "
-                "Use OAuth 2.0 flow to obtain one."
-            )
+            raise ValueError("LinkedIn requires access_token. " "Use OAuth 2.0 flow to obtain one.")
 
         self.status = ConnectionStatus.CONNECTING
 
@@ -344,18 +334,18 @@ class LinkedInConnector(BasePlatformConnector):
                     results = []
                     for post in elements[:limit]:
                         specific = post.get("specificContent", {})
-                        share_content = specific.get(
-                            "com.linkedin.ugc.ShareContent", {}
-                        )
+                        share_content = specific.get("com.linkedin.ugc.ShareContent", {})
                         commentary = share_content.get("shareCommentary", {})
 
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": post.get("id", ""),
-                            "author": post.get("author", ""),
-                            "body": commentary.get("text", ""),
-                            "published_at": post.get("created", {}).get("time"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": post.get("id", ""),
+                                "author": post.get("author", ""),
+                                "body": commentary.get("text", ""),
+                                "published_at": post.get("created", {}).get("time"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,

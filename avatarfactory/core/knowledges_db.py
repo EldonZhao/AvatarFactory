@@ -20,14 +20,12 @@ from avatarfactory.core.database.models import (
     SimulationModel,
     DiscoveryResultModel,
     EvolutionSuggestionModel,
-    ScheduledTaskModel,
     TrendSnapshotModel,
     RecommendedPersonaModel,
 )
 from avatarfactory.core.database.repositories.persona import PersonaRepository
 from avatarfactory.core.database.repositories.content import ContentRepository, ReviewRepository
 from avatarfactory.core.database.repositories.scheduler import (
-    SchedulerRepository,
     TrendSnapshotRepository,
     RecommendedPersonaRepository,
 )
@@ -50,9 +48,10 @@ from avatarfactory.models.schemas import (
 def _run_async(coro):
     """Run async function in sync context."""
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # We're in an async context, create a task
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, coro)
             return future.result()
@@ -92,6 +91,7 @@ class KnowledgeBaseDB:
 
     def save_persona(self, persona: Persona) -> None:
         """Save or update a persona."""
+
         async def _save():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -108,12 +108,24 @@ class KnowledgeBaseDB:
                     existing.tagline = identity.get("tagline")
                     existing.expertise = identity.get("expertise")
                     existing.identity = identity
-                    existing.target_audience = persona.target_audience.model_dump() if persona.target_audience else {}
-                    existing.voice_style = persona.voice_style.model_dump() if persona.voice_style else {}
-                    existing.content_pillars = persona.content_pillars.model_dump() if persona.content_pillars else {}
-                    existing.boundaries = persona.boundaries.model_dump() if persona.boundaries else {}
-                    existing.notification = persona.notification.model_dump() if persona.notification else None
-                    existing.evolution = persona.evolution.model_dump() if persona.evolution else None
+                    existing.target_audience = (
+                        persona.target_audience.model_dump() if persona.target_audience else {}
+                    )
+                    existing.voice_style = (
+                        persona.voice_style.model_dump() if persona.voice_style else {}
+                    )
+                    existing.content_pillars = (
+                        persona.content_pillars.model_dump() if persona.content_pillars else {}
+                    )
+                    existing.boundaries = (
+                        persona.boundaries.model_dump() if persona.boundaries else {}
+                    )
+                    existing.notification = (
+                        persona.notification.model_dump() if persona.notification else None
+                    )
+                    existing.evolution = (
+                        persona.evolution.model_dump() if persona.evolution else None
+                    )
                     existing.agent_configs = persona.agent_configs
                     existing.metadata_ = persona.metadata
                     existing.updated_at = datetime.utcnow()
@@ -127,11 +139,17 @@ class KnowledgeBaseDB:
                         tagline=identity.get("tagline"),
                         expertise=identity.get("expertise"),
                         identity=identity,
-                        target_audience=persona.target_audience.model_dump() if persona.target_audience else {},
+                        target_audience=(
+                            persona.target_audience.model_dump() if persona.target_audience else {}
+                        ),
                         voice_style=persona.voice_style.model_dump() if persona.voice_style else {},
-                        content_pillars=persona.content_pillars.model_dump() if persona.content_pillars else {},
+                        content_pillars=(
+                            persona.content_pillars.model_dump() if persona.content_pillars else {}
+                        ),
                         boundaries=persona.boundaries.model_dump() if persona.boundaries else {},
-                        notification=persona.notification.model_dump() if persona.notification else None,
+                        notification=(
+                            persona.notification.model_dump() if persona.notification else None
+                        ),
                         evolution=persona.evolution.model_dump() if persona.evolution else None,
                         agent_configs=persona.agent_configs,
                         metadata_=persona.metadata,
@@ -142,6 +160,7 @@ class KnowledgeBaseDB:
 
     def load_persona(self, persona_id: str) -> Optional[Persona]:
         """Load a persona by ID."""
+
         async def _load():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -154,6 +173,7 @@ class KnowledgeBaseDB:
 
     def list_personas(self, sort_by_created: bool = True) -> List[str]:
         """List all persona IDs."""
+
         async def _list():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -164,6 +184,7 @@ class KnowledgeBaseDB:
 
     def save_persona_version(self, persona_id: str, version_info: PersonaVersion) -> None:
         """Save persona version history record."""
+
         async def _save():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -181,6 +202,7 @@ class KnowledgeBaseDB:
 
     def get_persona_history(self, persona_id: str) -> List[PersonaVersion]:
         """Get persona version history."""
+
         async def _get():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -203,6 +225,7 @@ class KnowledgeBaseDB:
 
     def delete_persona(self, persona_id: str, delete_content: bool = True) -> Dict[str, Any]:
         """Delete a persona (soft delete)."""
+
         async def _delete():
             result = {
                 "persona_deleted": False,
@@ -237,6 +260,7 @@ class KnowledgeBaseDB:
 
     def save_content(self, content: Content, status: str = "draft") -> None:
         """Save content."""
+
         async def _save():
             async with get_session() as session:
                 repo = ContentRepository(session)
@@ -248,11 +272,21 @@ class KnowledgeBaseDB:
                     existing.title = content.title or ""
                     existing.body = content.body
                     existing.pillar = content.pillar or ""
-                    existing.platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                    existing.content_type = content.content_type.value if hasattr(content.content_type, 'value') else str(content.content_type)
+                    existing.platform = (
+                        content.platform.value
+                        if hasattr(content.platform, "value")
+                        else str(content.platform)
+                    )
+                    existing.content_type = (
+                        content.content_type.value
+                        if hasattr(content.content_type, "value")
+                        else str(content.content_type)
+                    )
                     existing.status = status
                     existing.tags = content.tags
-                    existing.media = [m.model_dump() for m in content.media] if content.media else None
+                    existing.media = (
+                        [m.model_dump() for m in content.media] if content.media else None
+                    )
                     existing.image_prompts = content.image_prompts
                     existing.metadata_ = content.metadata
                     if status == "published":
@@ -267,8 +301,16 @@ class KnowledgeBaseDB:
                         title=content.title or "",
                         body=content.body,
                         pillar=content.pillar or "",
-                        platform=content.platform.value if hasattr(content.platform, 'value') else str(content.platform),
-                        content_type=content.content_type.value if hasattr(content.content_type, 'value') else str(content.content_type),
+                        platform=(
+                            content.platform.value
+                            if hasattr(content.platform, "value")
+                            else str(content.platform)
+                        ),
+                        content_type=(
+                            content.content_type.value
+                            if hasattr(content.content_type, "value")
+                            else str(content.content_type)
+                        ),
                         status=status,
                         published_at=datetime.utcnow() if status == "published" else None,
                         structure=content.structure.model_dump() if content.structure else None,
@@ -283,6 +325,7 @@ class KnowledgeBaseDB:
 
     def load_content(self, content_id: str, status: str = "draft") -> Optional[Content]:
         """Load content by ID."""
+
         async def _load():
             async with get_session() as session:
                 repo = ContentRepository(session)
@@ -295,7 +338,12 @@ class KnowledgeBaseDB:
 
     def _model_to_content(self, model: ContentModel) -> Content:
         """Convert ContentModel to Content schema."""
-        from avatarfactory.models.schemas import PlatformType, ContentType, ContentStructure, MediaAttachment
+        from avatarfactory.models.schemas import (
+            PlatformType,
+            ContentType,
+            ContentStructure,
+            MediaAttachment,
+        )
 
         platform = PlatformType(model.platform) if model.platform else PlatformType.BLUESKY
         content_type = ContentType(model.content_type) if model.content_type else ContentType.TEXT
@@ -320,6 +368,7 @@ class KnowledgeBaseDB:
         self, persona_id: Optional[str] = None, status: str = "draft"
     ) -> List[Content]:
         """List content, optionally filtered by persona_id."""
+
         async def _list():
             async with get_session() as session:
                 repo = ContentRepository(session)
@@ -335,6 +384,7 @@ class KnowledgeBaseDB:
 
     def move_to_published(self, content_id: str) -> bool:
         """Move content from draft to published."""
+
         async def _move():
             async with get_session() as session:
                 repo = ContentRepository(session)
@@ -344,6 +394,7 @@ class KnowledgeBaseDB:
 
     def delete_content(self, content_id: str, status: str = "draft") -> bool:
         """Delete content by ID."""
+
         async def _delete():
             async with get_session() as session:
                 repo = ContentRepository(session)
@@ -357,6 +408,7 @@ class KnowledgeBaseDB:
 
     def save_review_report(self, report: ReviewReport, persona_id: str) -> None:
         """Save review report."""
+
         async def _save():
             async with get_session() as session:
                 review_repo = ReviewRepository(session)
@@ -368,16 +420,30 @@ class KnowledgeBaseDB:
                 review_data = {
                     "content_id": report.content_id,
                     "reviewed_at": report.reviewed_at or datetime.utcnow(),
-                    "persona_consistency_score": report.persona_consistency.score if report.persona_consistency else 0,
+                    "persona_consistency_score": (
+                        report.persona_consistency.score if report.persona_consistency else 0
+                    ),
                     "platform_fit_score": report.platform_fit.score if report.platform_fit else 0,
                     "compliance_score": report.compliance.score if report.compliance else 0,
-                    "engagement_potential_score": report.engagement_potential.score if report.engagement_potential else 0,
+                    "engagement_potential_score": (
+                        report.engagement_potential.score if report.engagement_potential else 0
+                    ),
                     "overall_score": report.overall_score,
-                    "persona_consistency": report.persona_consistency.model_dump() if report.persona_consistency else {},
+                    "persona_consistency": (
+                        report.persona_consistency.model_dump()
+                        if report.persona_consistency
+                        else {}
+                    ),
                     "platform_fit": report.platform_fit.model_dump() if report.platform_fit else {},
                     "compliance": report.compliance.model_dump() if report.compliance else {},
-                    "engagement_potential": report.engagement_potential.model_dump() if report.engagement_potential else {},
-                    "suggestions": [s.model_dump() for s in report.suggestions] if report.suggestions else None,
+                    "engagement_potential": (
+                        report.engagement_potential.model_dump()
+                        if report.engagement_potential
+                        else {}
+                    ),
+                    "suggestions": (
+                        [s.model_dump() for s in report.suggestions] if report.suggestions else None
+                    ),
                 }
 
                 if existing:
@@ -394,15 +460,14 @@ class KnowledgeBaseDB:
                 await content_repo.update_review_score(
                     report.content_id,
                     report.overall_score,
-                    [s.suggestion for s in report.suggestions] if report.suggestions else None
+                    [s.suggestion for s in report.suggestions] if report.suggestions else None,
                 )
 
         _run_async(_save())
 
-    def load_review_report(
-        self, content_id: str, persona_id: str
-    ) -> Optional[ReviewReport]:
+    def load_review_report(self, content_id: str, persona_id: str) -> Optional[ReviewReport]:
         """Load review report."""
+
         async def _load():
             async with get_session() as session:
                 repo = ReviewRepository(session)
@@ -416,11 +481,25 @@ class KnowledgeBaseDB:
                     content_id=model.content_id,
                     reviewed_at=model.reviewed_at,
                     overall_score=model.overall_score,
-                    persona_consistency=ReviewDimension(**model.persona_consistency) if model.persona_consistency else None,
-                    platform_fit=ReviewDimension(**model.platform_fit) if model.platform_fit else None,
+                    persona_consistency=(
+                        ReviewDimension(**model.persona_consistency)
+                        if model.persona_consistency
+                        else None
+                    ),
+                    platform_fit=(
+                        ReviewDimension(**model.platform_fit) if model.platform_fit else None
+                    ),
                     compliance=ReviewDimension(**model.compliance) if model.compliance else None,
-                    engagement_potential=ReviewDimension(**model.engagement_potential) if model.engagement_potential else None,
-                    suggestions=[ReviewSuggestion(**s) for s in model.suggestions] if model.suggestions else None,
+                    engagement_potential=(
+                        ReviewDimension(**model.engagement_potential)
+                        if model.engagement_potential
+                        else None
+                    ),
+                    suggestions=(
+                        [ReviewSuggestion(**s) for s in model.suggestions]
+                        if model.suggestions
+                        else None
+                    ),
                 )
 
         return _run_async(_load())
@@ -436,6 +515,7 @@ class KnowledgeBaseDB:
         results: Dict[str, Any],
     ) -> str:
         """Save discovery/trending results for a persona."""
+
         async def _save():
             async with get_session() as session:
                 ideas = results.get("ideas", [])
@@ -462,6 +542,7 @@ class KnowledgeBaseDB:
         platform: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Get latest discovery results for a persona."""
+
         async def _get():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -501,6 +582,7 @@ class KnowledgeBaseDB:
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """List discovery history for a persona."""
+
         async def _list():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -542,6 +624,7 @@ class KnowledgeBaseDB:
         date: Optional[str] = None,
     ) -> str:
         """Save recommended personas."""
+
         async def _save():
             async with get_session() as session:
                 repo = RecommendedPersonaRepository(session)
@@ -564,7 +647,7 @@ class KnowledgeBaseDB:
                         relevance_score=p.relevance_score,
                         potential_score=p.potential_score,
                         rationale=p.rationale,
-                        status=p.status.value if hasattr(p.status, 'value') else str(p.status),
+                        status=p.status.value if hasattr(p.status, "value") else str(p.status),
                     )
                     await repo.save(model)
 
@@ -579,6 +662,7 @@ class KnowledgeBaseDB:
         status: Optional[str] = None,
     ) -> List[RecommendedPersona]:
         """Get recommended personas."""
+
         async def _get():
             async with get_session() as session:
                 repo = RecommendedPersonaRepository(session)
@@ -595,26 +679,32 @@ class KnowledgeBaseDB:
 
                     from avatarfactory.models.schemas import RecommendationStatus
 
-                    results.append(RecommendedPersona(
-                        id=m.id,
-                        created_at=m.created_at,
-                        source_platforms=m.source_platforms,
-                        source_trends=m.source_trends,
-                        name=m.name,
-                        tagline=m.tagline,
-                        domain=m.domain,
-                        expertise=m.expertise,
-                        target_audience=m.target_audience,
-                        audience_pain_points=m.audience_pain_points,
-                        suggested_tone=m.suggested_tone,
-                        content_types=m.content_types,
-                        content_pillars=m.content_pillars,
-                        relevance_score=m.relevance_score,
-                        potential_score=m.potential_score,
-                        rationale=m.rationale,
-                        status=RecommendationStatus(m.status) if m.status else RecommendationStatus.ACTIVE,
-                        adopted_persona_id=m.adopted_persona_id,
-                    ))
+                    results.append(
+                        RecommendedPersona(
+                            id=m.id,
+                            created_at=m.created_at,
+                            source_platforms=m.source_platforms,
+                            source_trends=m.source_trends,
+                            name=m.name,
+                            tagline=m.tagline,
+                            domain=m.domain,
+                            expertise=m.expertise,
+                            target_audience=m.target_audience,
+                            audience_pain_points=m.audience_pain_points,
+                            suggested_tone=m.suggested_tone,
+                            content_types=m.content_types,
+                            content_pillars=m.content_pillars,
+                            relevance_score=m.relevance_score,
+                            potential_score=m.potential_score,
+                            rationale=m.rationale,
+                            status=(
+                                RecommendationStatus(m.status)
+                                if m.status
+                                else RecommendationStatus.ACTIVE
+                            ),
+                            adopted_persona_id=m.adopted_persona_id,
+                        )
+                    )
 
                 return results[:limit]
 
@@ -622,6 +712,7 @@ class KnowledgeBaseDB:
 
     def get_recommendation(self, rec_id: str) -> Optional[RecommendedPersona]:
         """Get a specific recommendation by ID."""
+
         async def _get():
             async with get_session() as session:
                 repo = RecommendedPersonaRepository(session)
@@ -649,7 +740,11 @@ class KnowledgeBaseDB:
                     relevance_score=model.relevance_score,
                     potential_score=model.potential_score,
                     rationale=model.rationale,
-                    status=RecommendationStatus(model.status) if model.status else RecommendationStatus.ACTIVE,
+                    status=(
+                        RecommendationStatus(model.status)
+                        if model.status
+                        else RecommendationStatus.ACTIVE
+                    ),
                     adopted_persona_id=model.adopted_persona_id,
                 )
 
@@ -661,6 +756,7 @@ class KnowledgeBaseDB:
         persona_id: str,
     ) -> bool:
         """Mark a recommendation as adopted."""
+
         async def _mark():
             async with get_session() as session:
                 repo = RecommendedPersonaRepository(session)
@@ -674,6 +770,7 @@ class KnowledgeBaseDB:
 
     def save_trend_snapshot(self, snapshot: TrendSnapshot) -> str:
         """Save a trend snapshot."""
+
         async def _save():
             async with get_session() as session:
                 repo = TrendSnapshotRepository(session)
@@ -684,7 +781,14 @@ class KnowledgeBaseDB:
                     captured_at=snapshot.captured_at,
                     trending_topics=snapshot.trending_topics,
                     trending_hashtags=snapshot.trending_hashtags,
-                    top_posts=[p.model_dump() if hasattr(p, 'model_dump') else p for p in snapshot.top_posts] if snapshot.top_posts else None,
+                    top_posts=(
+                        [
+                            p.model_dump() if hasattr(p, "model_dump") else p
+                            for p in snapshot.top_posts
+                        ]
+                        if snapshot.top_posts
+                        else None
+                    ),
                     analysis_summary=snapshot.analysis_summary,
                     key_themes=snapshot.key_themes,
                     content_patterns=snapshot.content_patterns,
@@ -700,6 +804,7 @@ class KnowledgeBaseDB:
         limit: int = 5,
     ) -> List[TrendSnapshot]:
         """Get latest trend snapshots."""
+
         async def _get():
             async with get_session() as session:
                 repo = TrendSnapshotRepository(session)
@@ -732,6 +837,7 @@ class KnowledgeBaseDB:
 
     def list_personas_summary(self) -> List[Dict[str, Any]]:
         """Batch load all persona summaries."""
+
         async def _list():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -758,6 +864,7 @@ class KnowledgeBaseDB:
         persona_ids: Optional[List[str]] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """Batch calculate statistics for multiple personas efficiently."""
+
         async def _get():
             async with get_session() as session:
                 repo = PersonaRepository(session)
@@ -793,18 +900,25 @@ class KnowledgeBaseDB:
 
     def get_storage_stats(self) -> Dict[str, int]:
         """Get storage statistics."""
+
         async def _get():
             async with get_session() as session:
                 from sqlalchemy import select, func
 
                 persona_count = await session.execute(
-                    select(func.count()).select_from(PersonaModel).where(PersonaModel.is_deleted == False)
+                    select(func.count())
+                    .select_from(PersonaModel)
+                    .where(PersonaModel.is_deleted.is_(False))
                 )
                 draft_count = await session.execute(
-                    select(func.count()).select_from(ContentModel).where(ContentModel.status == "draft")
+                    select(func.count())
+                    .select_from(ContentModel)
+                    .where(ContentModel.status == "draft")
                 )
                 published_count = await session.execute(
-                    select(func.count()).select_from(ContentModel).where(ContentModel.status == "published")
+                    select(func.count())
+                    .select_from(ContentModel)
+                    .where(ContentModel.status == "published")
                 )
 
                 return {
@@ -820,10 +934,9 @@ class KnowledgeBaseDB:
     # Simulation Reports
     # ========================================================================
 
-    def save_simulation_report(
-        self, report: SimulationReport, persona_id: str
-    ) -> None:
+    def save_simulation_report(self, report: SimulationReport, persona_id: str) -> None:
         """Save simulation report."""
+
         async def _save():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -838,10 +951,24 @@ class KnowledgeBaseDB:
                 sim_data = {
                     "content_id": report.content_id,
                     "simulated_at": report.simulated_at or datetime.utcnow(),
-                    "predicted_engagement": report.predicted_engagement.model_dump() if report.predicted_engagement else {},
-                    "audience_reaction": report.audience_reaction.model_dump() if report.audience_reaction else {},
-                    "recommended_timing": report.recommended_timing.model_dump() if report.recommended_timing else None,
-                    "risk_factors": [r.model_dump() for r in report.risk_factors] if report.risk_factors else None,
+                    "predicted_engagement": (
+                        report.predicted_engagement.model_dump()
+                        if report.predicted_engagement
+                        else {}
+                    ),
+                    "audience_reaction": (
+                        report.audience_reaction.model_dump() if report.audience_reaction else {}
+                    ),
+                    "recommended_timing": (
+                        report.recommended_timing.model_dump()
+                        if report.recommended_timing
+                        else None
+                    ),
+                    "risk_factors": (
+                        [r.model_dump() for r in report.risk_factors]
+                        if report.risk_factors
+                        else None
+                    ),
                     "confidence_score": report.confidence_score,
                 }
 
@@ -861,6 +988,7 @@ class KnowledgeBaseDB:
         self, content_id: str, persona_id: str
     ) -> Optional[SimulationReport]:
         """Load simulation report."""
+
         async def _load():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -871,9 +999,7 @@ class KnowledgeBaseDB:
                     RiskFactor,
                 )
 
-                query = select(SimulationModel).where(
-                    SimulationModel.content_id == content_id
-                )
+                query = select(SimulationModel).where(SimulationModel.content_id == content_id)
                 result = await session.execute(query)
                 model = result.scalar_one_or_none()
 
@@ -883,10 +1009,26 @@ class KnowledgeBaseDB:
                 return SimulationReport(
                     content_id=model.content_id,
                     simulated_at=model.simulated_at,
-                    predicted_engagement=PredictedEngagement(**model.predicted_engagement) if model.predicted_engagement else None,
-                    audience_reaction=AudienceReaction(**model.audience_reaction) if model.audience_reaction else None,
-                    recommended_timing=RecommendedTiming(**model.recommended_timing) if model.recommended_timing else None,
-                    risk_factors=[RiskFactor(**r) for r in model.risk_factors] if model.risk_factors else None,
+                    predicted_engagement=(
+                        PredictedEngagement(**model.predicted_engagement)
+                        if model.predicted_engagement
+                        else None
+                    ),
+                    audience_reaction=(
+                        AudienceReaction(**model.audience_reaction)
+                        if model.audience_reaction
+                        else None
+                    ),
+                    recommended_timing=(
+                        RecommendedTiming(**model.recommended_timing)
+                        if model.recommended_timing
+                        else None
+                    ),
+                    risk_factors=(
+                        [RiskFactor(**r) for r in model.risk_factors]
+                        if model.risk_factors
+                        else None
+                    ),
                     confidence_score=model.confidence_score,
                 )
 
@@ -900,18 +1042,21 @@ class KnowledgeBaseDB:
         """Save experiment (falls back to file storage)."""
         # Experiments are not migrated to DB, use file-based storage
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         kb.save_experiment(experiment)
 
     def load_experiment(self, experiment_id: str) -> Optional["Experiment"]:
         """Load experiment (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         return kb.load_experiment(experiment_id)
 
     def list_experiments(self, persona_id: Optional[str] = None) -> List["Experiment"]:
         """List experiments (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         return kb.list_experiments(persona_id)
 
@@ -922,20 +1067,21 @@ class KnowledgeBaseDB:
     def save_retrospective(self, retro: "WeeklyRetrospective") -> None:
         """Save weekly retrospective (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         kb.save_retrospective(retro)
 
-    def load_retrospective(
-        self, week: str, persona_id: str
-    ) -> Optional["WeeklyRetrospective"]:
+    def load_retrospective(self, week: str, persona_id: str) -> Optional["WeeklyRetrospective"]:
         """Load retrospective by week (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         return kb.load_retrospective(week, persona_id)
 
     def list_retrospectives(self, persona_id: str) -> List["WeeklyRetrospective"]:
         """List all retrospectives for a persona (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         return kb.list_retrospectives(persona_id)
 
@@ -946,12 +1092,14 @@ class KnowledgeBaseDB:
     def save_platform_rules(self, platform: str, rules: Dict[str, Any]) -> None:
         """Save platform-specific rules (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         kb.save_platform_rules(platform, rules)
 
     def load_platform_rules(self, platform: str) -> Optional[Dict[str, Any]]:
         """Load platform-specific rules (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         return kb.load_platform_rules(platform)
 
@@ -959,10 +1107,9 @@ class KnowledgeBaseDB:
     # Evolution Management
     # ========================================================================
 
-    def save_evolution_suggestion(
-        self, persona_id: str, suggestion: EvolutionSuggestion
-    ) -> None:
+    def save_evolution_suggestion(self, persona_id: str, suggestion: EvolutionSuggestion) -> None:
         """Save an evolution suggestion."""
+
         async def _save():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -980,10 +1127,18 @@ class KnowledgeBaseDB:
                     "created_at": suggestion.created_at or datetime.utcnow(),
                     "trigger_type": suggestion.trigger_type,
                     "source_data": suggestion.source_data,
-                    "suggested_changes": [c.model_dump() for c in suggestion.suggested_changes] if suggestion.suggested_changes else [],
+                    "suggested_changes": (
+                        [c.model_dump() for c in suggestion.suggested_changes]
+                        if suggestion.suggested_changes
+                        else []
+                    ),
                     "rationale": suggestion.rationale,
                     "expected_impact": suggestion.expected_impact,
-                    "status": suggestion.status.value if hasattr(suggestion.status, 'value') else str(suggestion.status),
+                    "status": (
+                        suggestion.status.value
+                        if hasattr(suggestion.status, "value")
+                        else str(suggestion.status)
+                    ),
                     "applied_at": suggestion.applied_at,
                     "applied_version": suggestion.applied_version,
                 }
@@ -1004,6 +1159,7 @@ class KnowledgeBaseDB:
         self, persona_id: str, suggestion_id: str
     ) -> Optional[EvolutionSuggestion]:
         """Load a specific evolution suggestion."""
+
         async def _load():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -1023,10 +1179,16 @@ class KnowledgeBaseDB:
                     created_at=model.created_at,
                     trigger_type=model.trigger_type,
                     source_data=model.source_data,
-                    suggested_changes=[SuggestedChange(**c) for c in model.suggested_changes] if model.suggested_changes else [],
+                    suggested_changes=(
+                        [SuggestedChange(**c) for c in model.suggested_changes]
+                        if model.suggested_changes
+                        else []
+                    ),
                     rationale=model.rationale,
                     expected_impact=model.expected_impact,
-                    status=EvolutionStatus(model.status) if model.status else EvolutionStatus.PENDING,
+                    status=(
+                        EvolutionStatus(model.status) if model.status else EvolutionStatus.PENDING
+                    ),
                     applied_at=model.applied_at,
                     applied_version=model.applied_version,
                 )
@@ -1040,6 +1202,7 @@ class KnowledgeBaseDB:
         limit: int = 50,
     ) -> List[EvolutionSuggestion]:
         """List evolution suggestions for a persona."""
+
         async def _list():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -1064,7 +1227,11 @@ class KnowledgeBaseDB:
                         created_at=m.created_at,
                         trigger_type=m.trigger_type,
                         source_data=m.source_data,
-                        suggested_changes=[SuggestedChange(**c) for c in m.suggested_changes] if m.suggested_changes else [],
+                        suggested_changes=(
+                            [SuggestedChange(**c) for c in m.suggested_changes]
+                            if m.suggested_changes
+                            else []
+                        ),
                         rationale=m.rationale,
                         expected_impact=m.expected_impact,
                         status=EvolutionStatus(m.status) if m.status else EvolutionStatus.PENDING,
@@ -1081,20 +1248,18 @@ class KnowledgeBaseDB:
     ) -> None:
         """Save feedback analysis results (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         kb.save_feedback_analysis(persona_id, analysis)
 
-    def load_feedback_analysis(
-        self, persona_id: str
-    ) -> Optional["EvolutionFeedbackAnalysis"]:
+    def load_feedback_analysis(self, persona_id: str) -> Optional["EvolutionFeedbackAnalysis"]:
         """Load latest feedback analysis (falls back to file storage)."""
         from avatarfactory.core.knowledges import KnowledgeBase
+
         kb = KnowledgeBase(str(self.base_path))
         return kb.load_feedback_analysis(persona_id)
 
-    def save_agent_config(
-        self, persona_id: str, agent_type: str, config: "AgentConfig"
-    ) -> None:
+    def save_agent_config(self, persona_id: str, agent_type: str, config: "AgentConfig") -> None:
         """Save per-persona agent configuration."""
         persona = self.load_persona(persona_id)
         if not persona:
@@ -1106,9 +1271,7 @@ class KnowledgeBaseDB:
 
         self.save_persona(persona)
 
-    def load_agent_config(
-        self, persona_id: str, agent_type: str
-    ) -> Optional["AgentConfig"]:
+    def load_agent_config(self, persona_id: str, agent_type: str) -> Optional["AgentConfig"]:
         """Load per-persona agent configuration."""
         from avatarfactory.models.schemas import AgentConfig
 
@@ -1125,10 +1288,9 @@ class KnowledgeBaseDB:
 
         return AgentConfig(**config_data)
 
-    def get_persona_version(
-        self, persona_id: str, version: str
-    ) -> Optional[Persona]:
+    def get_persona_version(self, persona_id: str, version: str) -> Optional[Persona]:
         """Load a specific version of a persona."""
+
         async def _get():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -1149,6 +1311,7 @@ class KnowledgeBaseDB:
 
     def list_persona_versions(self, persona_id: str) -> List[str]:
         """List all available versions of a persona."""
+
         async def _list():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -1169,13 +1332,13 @@ class KnowledgeBaseDB:
 
     def list_discovery_platforms(self, persona_id: str) -> List[str]:
         """List platforms with discovery results for a persona."""
+
         async def _list():
             async with get_session() as session:
                 from sqlalchemy import select, distinct
 
-                query = (
-                    select(distinct(DiscoveryResultModel.platform))
-                    .where(DiscoveryResultModel.persona_id == persona_id)
+                query = select(distinct(DiscoveryResultModel.platform)).where(
+                    DiscoveryResultModel.persona_id == persona_id
                 )
                 result = await session.execute(query)
                 return [row[0] for row in result.all()]
@@ -1195,9 +1358,10 @@ class KnowledgeBaseDB:
 
     def get_today_trend_snapshots(self) -> List[TrendSnapshot]:
         """Get all trend snapshots from today."""
+
         async def _get():
             async with get_session() as session:
-                from sqlalchemy import select, func
+                from sqlalchemy import select
 
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -1237,6 +1401,7 @@ class KnowledgeBaseDB:
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """Batch load content with their reviews to avoid N+1 queries."""
+
         async def _list():
             async with get_session() as session:
                 from sqlalchemy import select
@@ -1274,7 +1439,9 @@ class KnowledgeBaseDB:
                     if m.review:
                         content_data["review"] = {
                             "overall_score": m.review.overall_score,
-                            "reviewed_at": m.review.reviewed_at.isoformat() if m.review.reviewed_at else None,
+                            "reviewed_at": (
+                                m.review.reviewed_at.isoformat() if m.review.reviewed_at else None
+                            ),
                             "persona_consistency": m.review.persona_consistency_score,
                             "platform_fit": m.review.platform_fit_score,
                             "compliance": m.review.compliance_score,
@@ -1294,18 +1461,15 @@ class KnowledgeBaseDB:
         persona_id: Optional[str] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """Batch load all reviews across personas."""
+
         async def _get():
             async with get_session() as session:
                 from sqlalchemy import select
-                from sqlalchemy.orm import joinedload
 
                 query = select(ReviewModel)
 
                 if persona_id:
-                    query = (
-                        query.join(ContentModel)
-                        .where(ContentModel.persona_id == persona_id)
-                    )
+                    query = query.join(ContentModel).where(ContentModel.persona_id == persona_id)
 
                 result = await session.execute(query)
                 models = result.scalars().all()
@@ -1392,4 +1556,5 @@ def get_knowledge_base(base_path: str = "./knowledges") -> Any:
         return KnowledgeBaseDB(base_path)
     else:
         from avatarfactory.core.knowledges import KnowledgeBase
+
         return KnowledgeBase(base_path)

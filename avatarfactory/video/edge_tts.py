@@ -5,9 +5,9 @@ Uses the edge-tts library which interfaces with Microsoft's Edge browser TTS ser
 No API key required.
 """
 
-import asyncio
 from pathlib import Path
 from typing import List, Optional
+from importlib.util import find_spec
 
 from .base import TTSProvider, TTSError, VoiceInfo
 
@@ -21,11 +21,7 @@ class EdgeTTSProvider(TTSProvider):
 
     def is_available(self) -> bool:
         """Check if edge-tts is installed."""
-        try:
-            import edge_tts
-            return True
-        except ImportError:
-            return False
+        return find_spec("edge_tts") is not None
 
     async def synthesize(
         self,
@@ -51,9 +47,7 @@ class EdgeTTSProvider(TTSProvider):
         try:
             import edge_tts
         except ImportError:
-            raise TTSError(
-                "edge-tts not installed. Install with: pip install edge-tts"
-            )
+            raise TTSError("edge-tts not installed. Install with: pip install edge-tts")
 
         try:
             output_path = Path(output_path)
@@ -93,9 +87,7 @@ class EdgeTTSProvider(TTSProvider):
         try:
             import edge_tts
         except ImportError:
-            raise TTSError(
-                "edge-tts not installed. Install with: pip install edge-tts"
-            )
+            raise TTSError("edge-tts not installed. Install with: pip install edge-tts")
 
         try:
             voices = await edge_tts.list_voices()
@@ -108,14 +100,16 @@ class EdgeTTSProvider(TTSProvider):
                 if locale and not voice_locale.startswith(locale):
                     continue
 
-                result.append(VoiceInfo(
-                    id=voice.get("ShortName", ""),
-                    name=voice.get("FriendlyName", voice.get("ShortName", "")),
-                    gender=voice.get("Gender", "Unknown"),
-                    locale=voice_locale,
-                    style=None,  # Edge TTS doesn't expose styles in the API
-                    provider=self.name,
-                ))
+                result.append(
+                    VoiceInfo(
+                        id=voice.get("ShortName", ""),
+                        name=voice.get("FriendlyName", voice.get("ShortName", "")),
+                        gender=voice.get("Gender", "Unknown"),
+                        locale=voice_locale,
+                        style=None,  # Edge TTS doesn't expose styles in the API
+                        provider=self.name,
+                    )
+                )
 
             return result
 

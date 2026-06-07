@@ -160,26 +160,30 @@ class BraveSearchConnector(BasePlatformConnector):
                 # Parse web results
                 web_results = data.get("web", {}).get("results", [])
                 for item in web_results[:limit]:
-                    results.append({
-                        "id": item.get("url", ""),
-                        "title": item.get("title", ""),
-                        "description": item.get("description", ""),
-                        "url": item.get("url", ""),
-                        "source": "brave_search",
-                        "created_at": None,
-                    })
+                    results.append(
+                        {
+                            "id": item.get("url", ""),
+                            "title": item.get("title", ""),
+                            "description": item.get("description", ""),
+                            "url": item.get("url", ""),
+                            "source": "brave_search",
+                            "created_at": None,
+                        }
+                    )
 
                 # Also check news results if available
                 news_results = data.get("news", {}).get("results", [])
                 for item in news_results[:limit]:
-                    results.append({
-                        "id": item.get("url", ""),
-                        "title": item.get("title", ""),
-                        "description": item.get("description", ""),
-                        "url": item.get("url", ""),
-                        "source": "brave_search_news",
-                        "created_at": item.get("age"),
-                    })
+                    results.append(
+                        {
+                            "id": item.get("url", ""),
+                            "title": item.get("title", ""),
+                            "description": item.get("description", ""),
+                            "url": item.get("url", ""),
+                            "source": "brave_search_news",
+                            "created_at": item.get("age"),
+                        }
+                    )
 
                 return FetchResult(
                     success=True,

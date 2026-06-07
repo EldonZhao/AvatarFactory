@@ -10,12 +10,9 @@ Tests cover:
 - Image resolution helper
 """
 
-import base64
 import os
 import tempfile
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import List, Optional
 
 import pytest
 
@@ -29,7 +26,6 @@ from avatarfactory.core.llm_provider import (
     BaseLLMProvider,
     _resolve_image_content,
 )
-
 
 # ============================================================================
 # ContentType Enum Tests
@@ -350,6 +346,7 @@ class TestLLMProviderMultimodal:
     def test_provider_signature_includes_images(self):
         """Test that BaseLLMProvider.generate has images parameter"""
         import inspect
+
         sig = inspect.signature(BaseLLMProvider.generate)
         assert "images" in sig.parameters
         param = sig.parameters["images"]

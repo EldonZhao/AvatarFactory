@@ -66,13 +66,8 @@ class WeComConnector(BasePlatformConnector):
                     label="Webhook URL",
                     field_type="url",
                     required=True,
-                    description=(
-                        "Full webhook URL from WeChat Work bot settings"
-                    ),
-                    placeholder=(
-                        "https://qyapi.weixin.qq.com/cgi-bin"
-                        "/webhook/send?key=..."
-                    ),
+                    description=("Full webhook URL from WeChat Work bot settings"),
+                    placeholder=("https://qyapi.weixin.qq.com/cgi-bin" "/webhook/send?key=..."),
                     env_var="AVATARFACTORY_WEBHOOK_URL",
                 ),
             ],
@@ -194,9 +189,7 @@ class WeComConnector(BasePlatformConnector):
 
             # Build message content
             if message_type == "markdown":
-                msg_content = self._build_markdown_message(
-                    content, title, tags
-                )
+                msg_content = self._build_markdown_message(content, title, tags)
                 payload = {
                     "msgtype": "markdown",
                     "markdown": {"content": msg_content},

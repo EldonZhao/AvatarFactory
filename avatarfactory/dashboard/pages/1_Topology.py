@@ -10,7 +10,9 @@ Displays a hierarchical view showing:
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 import streamlit as st
 
@@ -124,7 +126,7 @@ if not personas:
     st.info(
         "No personas found. Create one to see the system topology.\n\n"
         "```bash\n"
-        "avatarfactory create-persona \"your persona description\"\n"
+        'avatarfactory create-persona "your persona description"\n'
         "```"
     )
 else:
@@ -136,10 +138,14 @@ else:
             info_col1, info_col2, info_col3 = st.columns(3)
 
             with info_col1:
-                st.markdown(f"**Tagline:** {persona.tagline[:50] if persona.tagline else 'None'}...")
+                st.markdown(
+                    f"**Tagline:** {persona.tagline[:50] if persona.tagline else 'None'}..."
+                )
 
             with info_col2:
-                st.markdown(f"**Content:** {persona.draft_count} drafts, {persona.published_count} published")
+                st.markdown(
+                    f"**Content:** {persona.draft_count} drafts, {persona.published_count} published"
+                )
 
             with info_col3:
                 st.markdown(f"**Version:** {persona.version}")
@@ -147,10 +153,7 @@ else:
             st.markdown("---")
 
             # Get tasks for this persona
-            persona_tasks = [
-                t for t in tasks
-                if t.get("persona_id") == persona.id
-            ]
+            persona_tasks = [t for t in tasks if t.get("persona_id") == persona.id]
 
             if not show_disabled_tasks:
                 persona_tasks = [t for t in persona_tasks if t.get("enabled")]
@@ -283,7 +286,8 @@ for i, conn in enumerate(sorted_connectors):
         status_color = "#4CAF50" if conn.configured else "#ff9800"
         status_text = "Ready" if conn.configured else "Not configured"
 
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="
             text-align: center;
             padding: 16px;
@@ -295,7 +299,9 @@ for i, conn in enumerate(sorted_connectors):
             <div style="font-weight: 600; margin: 8px 0;">{conn.platform.capitalize()}</div>
             <div style="color: {status_color}; font-size: 12px;">{status_text}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 # ============================================================================
 # Interactive Graph (Optional)

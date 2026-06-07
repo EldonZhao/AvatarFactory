@@ -16,7 +16,9 @@ __all__ = [
 
 # Only export TenantAuthMiddleware if FastAPI is available
 try:
-    from avatarfactory.middleware.auth import TenantAuthMiddleware
+    from avatarfactory.middleware.auth import TenantAuthMiddleware as _TenantAuthMiddleware
+
+    TenantAuthMiddleware = _TenantAuthMiddleware
     __all__.append("TenantAuthMiddleware")
 except ImportError:
     pass

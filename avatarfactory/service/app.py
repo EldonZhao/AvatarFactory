@@ -7,12 +7,12 @@ and scheduler control.
 
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # dotenv not installed, rely on system environment variables
@@ -43,12 +43,14 @@ except ImportError:
 
 class ChatRequest(BaseModel):
     """Chat request model."""
+
     message: str = Field(..., description="User message")
     persona_id: Optional[str] = Field(None, description="Active persona ID")
 
 
 class ChatResponse(BaseModel):
     """Chat response model."""
+
     response: str
     metadata: Dict[str, Any] = {}
 
@@ -60,6 +62,7 @@ class ChatResponse(BaseModel):
 
 class IdentityRequest(BaseModel):
     """Persona identity configuration."""
+
     name: str = Field(..., description="Persona name/title")
     tagline: str = Field(..., description="One-line positioning statement")
     expertise: List[str] = Field(default_factory=list, description="Areas of expertise")
@@ -67,6 +70,7 @@ class IdentityRequest(BaseModel):
 
 class TargetAudienceRequest(BaseModel):
     """Target audience definition."""
+
     primary: str = Field(..., description="Primary audience description")
     pain_points: List[str] = Field(default_factory=list, description="Audience pain points")
     goals: List[str] = Field(default_factory=list, description="Audience goals")
@@ -74,13 +78,17 @@ class TargetAudienceRequest(BaseModel):
 
 class VoiceStyleRequest(BaseModel):
     """Voice and tone configuration."""
+
     tone: str = Field(..., description="Overall tone (e.g., professional, casual)")
     language_patterns: List[str] = Field(default_factory=list, description="Language patterns")
-    emoji_usage: str = Field(default="moderate", description="Emoji usage: none, minimal, moderate, heavy")
+    emoji_usage: str = Field(
+        default="moderate", description="Emoji usage: none, minimal, moderate, heavy"
+    )
 
 
 class ContentPillarRequest(BaseModel):
     """Content pillar definition."""
+
     name: str = Field(..., description="Pillar name")
     description: str = Field(default="", description="Pillar description")
     frequency: str = Field(default="weekly", description="Posting frequency")
@@ -89,14 +97,18 @@ class ContentPillarRequest(BaseModel):
 
 class BoundariesRequest(BaseModel):
     """Content boundaries and compliance rules."""
+
     avoid: List[str] = Field(default_factory=list, description="Topics/patterns to avoid")
     compliance: List[str] = Field(default_factory=list, description="Compliance requirements")
 
 
 class NotificationConfigRequest(BaseModel):
     """Notification configuration."""
+
     enabled: bool = Field(default=False, description="Enable notifications")
-    connector_type: str = Field(default="wecom", description="Connector type: wecom, slack, discord")
+    connector_type: str = Field(
+        default="wecom", description="Connector type: wecom, slack, discord"
+    )
     # Note: webhook_url is configured at system level via AVATARFACTORY_WEBHOOK_URL env var
     notify_on_content: bool = Field(default=True, description="Notify on content generation")
     notify_on_review: bool = Field(default=True, description="Notify on review completion")
@@ -105,22 +117,30 @@ class NotificationConfigRequest(BaseModel):
 
 class PersonaRequest(BaseModel):
     """Persona creation request - full schema."""
+
     # Simple mode: just description, LLM generates the rest
-    description: Optional[str] = Field(None, description="Natural language persona description (simple mode)")
+    description: Optional[str] = Field(
+        None, description="Natural language persona description (simple mode)"
+    )
 
     # Structured mode: provide full details
     identity: Optional[IdentityRequest] = Field(None, description="Persona identity")
     target_audience: Optional[TargetAudienceRequest] = Field(None, description="Target audience")
     voice_style: Optional[VoiceStyleRequest] = Field(None, description="Voice and tone style")
-    content_pillars: Optional[List[ContentPillarRequest]] = Field(None, description="Content pillars")
+    content_pillars: Optional[List[ContentPillarRequest]] = Field(
+        None, description="Content pillars"
+    )
     boundaries: Optional[BoundariesRequest] = Field(None, description="Content boundaries")
 
     # Common fields
-    notification: Optional[NotificationConfigRequest] = Field(None, description="Notification settings")
+    notification: Optional[NotificationConfigRequest] = Field(
+        None, description="Notification settings"
+    )
 
 
 class PersonaResponse(BaseModel):
     """Persona response model - full details."""
+
     id: str
     version: str
     name: str
@@ -138,6 +158,7 @@ class PersonaResponse(BaseModel):
 
 class ContentRequest(BaseModel):
     """Content generation request."""
+
     persona_id: str = Field(..., description="Persona ID")
     topic: str = Field(..., description="Content topic")
     pillar: Optional[str] = Field(None, description="Content pillar")
@@ -148,6 +169,7 @@ class ContentRequest(BaseModel):
 
 class ContentResponse(BaseModel):
     """Content response model."""
+
     id: str
     title: str
     body: str
@@ -158,6 +180,7 @@ class ContentResponse(BaseModel):
 
 class SchedulerStatusResponse(BaseModel):
     """Scheduler status response."""
+
     running: bool
     task_count: int
     next_run: Optional[str] = None
@@ -165,21 +188,35 @@ class SchedulerStatusResponse(BaseModel):
 
 class SetupTasksRequest(BaseModel):
     """Request to set up proactive tasks."""
-    platforms: List[str] = Field(default=["bluesky"], description="Platforms to monitor (deprecated, use discovery_platforms)")
-    discovery_platforms: Optional[List[str]] = Field(default=None, description="Platforms for discovery/trending scan")
-    content_platforms: Optional[List[str]] = Field(default=None, description="Platforms for content generation")
-    discovery_schedule: Optional[str] = Field(default=None, description="Cron schedule for discovery (default: 0 */6 * * *)")
-    content_schedule: Optional[str] = Field(default=None, description="Cron schedule for content generation (default: 0 9 * * *)")
+
+    platforms: List[str] = Field(
+        default=["bluesky"],
+        description="Platforms to monitor (deprecated, use discovery_platforms)",
+    )
+    discovery_platforms: Optional[List[str]] = Field(
+        default=None, description="Platforms for discovery/trending scan"
+    )
+    content_platforms: Optional[List[str]] = Field(
+        default=None, description="Platforms for content generation"
+    )
+    discovery_schedule: Optional[str] = Field(
+        default=None, description="Cron schedule for discovery (default: 0 */6 * * *)"
+    )
+    content_schedule: Optional[str] = Field(
+        default=None, description="Cron schedule for content generation (default: 0 9 * * *)"
+    )
 
 
 class SetupTasksResponse(BaseModel):
     """Response from setting up tasks."""
+
     tasks_created: int
     task_ids: List[str]
 
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str
     version: str
 
@@ -313,7 +350,7 @@ async def _send_content_notification(
             description_parts.append(f"❌ 评分: {review_score:.0f}/100")
 
     # Content preview
-    body_preview = content_body[:300] if content_body else ''
+    body_preview = content_body[:300] if content_body else ""
     if len(content_body) > 300:
         body_preview += "..."
 
@@ -338,12 +375,7 @@ async def _send_content_notification(
 
     # Build payload - use news card format if URL available
     if not url:
-        payload = {
-            "msgtype": "markdown",
-            "markdown": {
-                "content": f"### {title}\n\n{description}"
-            }
-        }
+        payload = {"msgtype": "markdown", "markdown": {"content": f"### {title}\n\n{description}"}}
     else:
         payload = {
             "msgtype": "news",
@@ -356,7 +388,7 @@ async def _send_content_notification(
                         "picurl": "",
                     }
                 ]
-            }
+            },
         }
 
     # Send notification
@@ -414,7 +446,7 @@ def create_app(
         # Note: allow_credentials=True requires specific origins, not "*"
         cors_origins = os.environ.get(
             "AVATARFACTORY_CORS_ORIGINS",
-            "http://localhost:3000,http://localhost:4321,http://127.0.0.1:3000,http://127.0.0.1:4321,http://localhost:8000,http://127.0.0.1:8000"
+            "http://localhost:3000,http://localhost:4321,http://127.0.0.1:3000,http://127.0.0.1:4321,http://localhost:8000,http://127.0.0.1:8000",
         ).split(",")
         application.add_middleware(
             CORSMiddleware,
@@ -432,9 +464,7 @@ def create_app(
     class CacheControlMiddleware(BaseHTTPMiddleware):
         """Add Cache-Control headers to read-only API endpoints."""
 
-        async def dispatch(
-            self, request: Request, call_next: RequestResponseEndpoint
-        ) -> Response:
+        async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
             response = await call_next(request)
 
             # Only cache GET requests
@@ -480,18 +510,22 @@ def create_app(
 
     # Register Chronicle routes (for SSR website)
     from avatarfactory.service.chronicle_routes import router as chronicle_router
+
     application.include_router(chronicle_router)
 
     # Register Journal routes (for Avatar养成记 blog)
     from avatarfactory.service.journal_routes import router as journal_router
+
     application.include_router(journal_router)
 
     # Register Admin routes (for Admin dashboard)
     from avatarfactory.service.admin_routes import router as admin_router
+
     application.include_router(admin_router)
 
     # Register Admin auth routes (for Admin dashboard authentication)
     from avatarfactory.service.auth_routes import router as auth_router
+
     application.include_router(auth_router)
 
     # Register routes
@@ -521,12 +555,14 @@ def register_routes(app: FastAPI):
         for pid in persona_ids:
             p = orchestrator.kb.load_persona(pid)
             if p:
-                personas.append({
-                    "id": p.id,
-                    "name": p.identity.name,
-                    "tagline": p.identity.tagline,
-                    "version": p.version,
-                })
+                personas.append(
+                    {
+                        "id": p.id,
+                        "name": p.identity.name,
+                        "tagline": p.identity.tagline,
+                        "version": p.version,
+                    }
+                )
         return {
             "count": len(personas),
             "personas": personas,
@@ -604,12 +640,14 @@ def register_routes(app: FastAPI):
         for pid in persona_ids:
             p = orchestrator.kb.load_persona(pid)
             if p:
-                personas.append({
-                    "id": p.id,
-                    "name": p.identity.name,
-                    "tagline": p.identity.tagline,
-                    "version": p.version,
-                })
+                personas.append(
+                    {
+                        "id": p.id,
+                        "name": p.identity.name,
+                        "tagline": p.identity.tagline,
+                        "version": p.version,
+                    }
+                )
         return {
             "count": len(personas),
             "personas": personas,
@@ -657,9 +695,7 @@ def register_routes(app: FastAPI):
                 if request.content_pillars
                 else None
             )
-            payload["boundaries"] = (
-                request.boundaries.model_dump() if request.boundaries else None
-            )
+            payload["boundaries"] = request.boundaries.model_dump() if request.boundaries else None
             payload["notification"] = (
                 request.notification.model_dump() if request.notification else None
             )
@@ -696,9 +732,9 @@ def register_routes(app: FastAPI):
             # Convert datetime to string if needed
             created_at = persona_data.get("created_at")
             updated_at = persona_data.get("updated_at")
-            if hasattr(created_at, 'isoformat'):
+            if hasattr(created_at, "isoformat"):
                 created_at = created_at.isoformat()
-            if hasattr(updated_at, 'isoformat'):
+            if hasattr(updated_at, "isoformat"):
                 updated_at = updated_at.isoformat()
 
             # Invalidate persona caches after successful creation
@@ -747,6 +783,7 @@ def register_routes(app: FastAPI):
 
         # Delete scheduled tasks
         from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
+
         scheduler = Scheduler(SchedulerConfig())
         tasks_removed = scheduler.remove_tasks_for_persona(persona_id)
 
@@ -875,7 +912,6 @@ def register_routes(app: FastAPI):
         content_status = "draft"
         if not content:
             content = orchestrator.kb.load_content(content_id, status="published")
-            content_status = "published"
 
         if not content:
             raise HTTPException(
@@ -910,10 +946,8 @@ def register_routes(app: FastAPI):
 
         # Try loading from draft first, then published
         content = orchestrator.kb.load_content(content_id, status="draft")
-        content_status = "draft"
         if not content:
             content = orchestrator.kb.load_content(content_id, status="published")
-            content_status = "published"
 
         if not content:
             raise HTTPException(
@@ -928,17 +962,17 @@ def register_routes(app: FastAPI):
         # Normalize content for better Markdown rendering
         body_content = content.body
         # Convert Chinese horizontal lines to Markdown horizontal rule
-        body_content = body_content.replace('———', '\n\n---\n\n')
-        body_content = body_content.replace('——', '\n\n---\n\n')
+        body_content = body_content.replace("———", "\n\n---\n\n")
+        body_content = body_content.replace("——", "\n\n---\n\n")
         # Convert Chinese quotes to standard quotes for better display
-        body_content = body_content.replace('「', '"').replace('」', '"')
-        body_content = body_content.replace('『', '"').replace('』', '"')
+        body_content = body_content.replace("「", '"').replace("」", '"')
+        body_content = body_content.replace("『", '"').replace("』", '"')
 
         # Escape content body for safe embedding in JavaScript
-        body_escaped = html_lib.escape(body_content).replace('`', '\\`').replace('$', '\\$')
+        body_escaped = html_lib.escape(body_content).replace("`", "\\`").replace("$", "\\$")
 
         # Build tags HTML
-        tags_html = ' '.join(f'<span class="tag">#{tag}</span>' for tag in content.tags[:10])
+        tags_html = " ".join(f'<span class="tag">#{tag}</span>' for tag in content.tags[:10])
 
         # Review score badge
         score_html = ""
@@ -1204,6 +1238,7 @@ def register_routes(app: FastAPI):
         # Get the view URL
         # Use internal URL for self-request
         import os
+
         service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
         view_url = f"{service_url}/content/{content_id}/view"
 
@@ -1234,9 +1269,7 @@ def register_routes(app: FastAPI):
             return StreamingResponse(
                 io.BytesIO(screenshot),
                 media_type="image/png",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{content_id}.png"'
-                },
+                headers={"Content-Disposition": f'attachment; filename="{content_id}.png"'},
             )
 
         except Exception as e:
@@ -1273,15 +1306,14 @@ def register_routes(app: FastAPI):
             ZIP file with PNG images or JSON with base64-encoded images
         """
         import base64
-        import io
         import zipfile
         from fastapi.responses import StreamingResponse
 
         # Page format presets (content area in pixels at 96 DPI)
         formats = {
-            "a4": (750, 1050),        # A4 with margins
-            "letter": (765, 990),     # US Letter with margins
-            "mobile": (375, 667),     # iPhone SE viewport
+            "a4": (750, 1050),  # A4 with margins
+            "letter": (765, 990),  # US Letter with margins
+            "mobile": (375, 667),  # iPhone SE viewport
             "xiaohongshu": (750, 1000),  # 小红书推荐比例
         }
 
@@ -1311,6 +1343,7 @@ def register_routes(app: FastAPI):
 
         # Get the view URL
         import os
+
         service_url = os.getenv("AVATARFACTORY_SERVICE_URL", "http://localhost:8000")
         view_url = f"{service_url}/content/{content_id}/view"
 
@@ -1339,6 +1372,7 @@ def register_routes(app: FastAPI):
 
             # Split the full screenshot into pages using PIL
             from io import BytesIO
+
             try:
                 from PIL import Image
             except ImportError:
@@ -1350,10 +1384,12 @@ def register_routes(app: FastAPI):
                     "width": width,
                     "height": full_height,
                     "scale": scale,
-                    "images": [{
-                        "page": 1,
-                        "data": base64.b64encode(full_screenshot).decode("utf-8"),
-                    }],
+                    "images": [
+                        {
+                            "page": 1,
+                            "data": base64.b64encode(full_screenshot).decode("utf-8"),
+                        }
+                    ],
                 }
 
             # Open the full screenshot
@@ -1380,11 +1416,13 @@ def register_routes(app: FastAPI):
                 buffer.seek(0)
                 page_data = buffer.read()
 
-                images.append({
-                    "page": i + 1,
-                    "data": page_data,
-                    "data_b64": base64.b64encode(page_data).decode("utf-8"),
-                })
+                images.append(
+                    {
+                        "page": i + 1,
+                        "data": page_data,
+                        "data_b64": base64.b64encode(page_data).decode("utf-8"),
+                    }
+                )
 
             # Return as ZIP file or JSON based on output parameter
             if output == "zip":
@@ -1576,21 +1614,25 @@ def register_routes(app: FastAPI):
             ("review_agent", "Review Agent"),
         ]
         for agent_id, agent_name in agents:
-            nodes.append({
-                "id": agent_id,
-                "label": agent_name,
-                "type": "agent",
-                "size": 30,
-                "color": colors["agent"],
-            })
+            nodes.append(
+                {
+                    "id": agent_id,
+                    "label": agent_name,
+                    "type": "agent",
+                    "size": 30,
+                    "color": colors["agent"],
+                }
+            )
 
         # Orchestrator connects to all agents
         for agent_id, _ in agents[1:]:
-            edges.append({
-                "source": "orchestrator",
-                "target": agent_id,
-                "label": "manages",
-            })
+            edges.append(
+                {
+                    "source": "orchestrator",
+                    "target": agent_id,
+                    "label": "manages",
+                }
+            )
 
         # Add persona nodes
         for persona_id in kb.list_personas():
@@ -1599,25 +1641,28 @@ def register_routes(app: FastAPI):
                 draft_count = len(kb.list_content(persona_id, status="draft"))
                 published_count = len(kb.list_content(persona_id, status="published"))
 
-                nodes.append({
-                    "id": f"persona_{persona_id}",
-                    "label": persona.identity.name,
-                    "type": "persona",
-                    "size": 35,
-                    "color": colors["persona"],
-                    "metadata": {
-                        "draft": draft_count,
-                        "published": published_count,
-                    },
-                })
-                edges.append({
-                    "source": "persona_agent",
-                    "target": f"persona_{persona_id}",
-                    "label": "manages",
-                })
+                nodes.append(
+                    {
+                        "id": f"persona_{persona_id}",
+                        "label": persona.identity.name,
+                        "type": "persona",
+                        "size": 35,
+                        "color": colors["persona"],
+                        "metadata": {
+                            "draft": draft_count,
+                            "published": published_count,
+                        },
+                    }
+                )
+                edges.append(
+                    {
+                        "source": "persona_agent",
+                        "target": f"persona_{persona_id}",
+                        "label": "manages",
+                    }
+                )
 
         # Add connector nodes
-        from avatarfactory.connectors.registry import ConnectorRegistry
 
         connector_configs = {
             "bluesky": ["BLUESKY_USERNAME", "BLUESKY_PASSWORD"],
@@ -1635,39 +1680,47 @@ def register_routes(app: FastAPI):
             configured = all(os.getenv(k) for k in env_keys)
             node_color = colors["connector"] if configured else "#CCCCCC"
 
-            nodes.append({
-                "id": f"connector_{platform}",
-                "label": platform.capitalize(),
-                "type": "connector",
-                "size": 25,
-                "color": node_color,
-                "configured": configured,
-            })
-            edges.append({
-                "source": "topic_agent",
-                "target": f"connector_{platform}",
-                "label": "fetches from",
-            })
+            nodes.append(
+                {
+                    "id": f"connector_{platform}",
+                    "label": platform.capitalize(),
+                    "type": "connector",
+                    "size": 25,
+                    "color": node_color,
+                    "configured": configured,
+                }
+            )
+            edges.append(
+                {
+                    "source": "topic_agent",
+                    "target": f"connector_{platform}",
+                    "label": "fetches from",
+                }
+            )
 
         # Add task nodes
         scheduler = get_scheduler()
         if scheduler:
             for task in scheduler.list_tasks()[:10]:
                 task_color = colors["task"] if task.enabled else "#CCCCCC"
-                nodes.append({
-                    "id": f"task_{task.id}",
-                    "label": task.name[:20],
-                    "type": "task",
-                    "size": 20,
-                    "color": task_color,
-                    "enabled": task.enabled,
-                })
+                nodes.append(
+                    {
+                        "id": f"task_{task.id}",
+                        "label": task.name[:20],
+                        "type": "task",
+                        "size": 20,
+                        "color": task_color,
+                        "enabled": task.enabled,
+                    }
+                )
                 if task.persona_id:
-                    edges.append({
-                        "source": f"task_{task.id}",
-                        "target": f"persona_{task.persona_id}",
-                        "label": "targets",
-                    })
+                    edges.append(
+                        {
+                            "source": f"task_{task.id}",
+                            "target": f"persona_{task.persona_id}",
+                            "label": "targets",
+                        }
+                    )
 
         return {
             "nodes": nodes,
@@ -1691,27 +1744,27 @@ def register_routes(app: FastAPI):
 
         statuses = []
         for platform, caps in all_capabilities.items():
-            env_keys = [
-                f.env_var for f in caps.config_fields if f.env_var
-            ]
+            env_keys = [f.env_var for f in caps.config_fields if f.env_var]
             configured = all(os.getenv(k) is not None for k in env_keys) if env_keys else False
             missing_keys = [k for k in env_keys if not os.getenv(k)]
 
-            statuses.append({
-                "platform": caps.platform,
-                "display_name": caps.display_name,
-                "description": caps.description,
-                "registered": True,
-                "configured": configured,
-                "missing_keys": missing_keys,
-                "supports_topic_discovery": caps.supports_topic_discovery,
-                "supports_persona_discovery": caps.supports_persona_discovery,
-                "supports_publishing": caps.supports_publishing,
-                "supports_fetching": caps.supports_fetching,
-                "config_fields": [f.model_dump() for f in caps.config_fields],
-                "integration_type": caps.integration_type.value,
-                "usage_guide": caps.usage_guide,
-            })
+            statuses.append(
+                {
+                    "platform": caps.platform,
+                    "display_name": caps.display_name,
+                    "description": caps.description,
+                    "registered": True,
+                    "configured": configured,
+                    "missing_keys": missing_keys,
+                    "supports_topic_discovery": caps.supports_topic_discovery,
+                    "supports_persona_discovery": caps.supports_persona_discovery,
+                    "supports_publishing": caps.supports_publishing,
+                    "supports_fetching": caps.supports_fetching,
+                    "config_fields": [f.model_dump() for f in caps.config_fields],
+                    "integration_type": caps.integration_type.value,
+                    "usage_guide": caps.usage_guide,
+                }
+            )
 
         return {
             "connectors": statuses,
@@ -1737,6 +1790,7 @@ def register_routes(app: FastAPI):
         saved_configs = {}
         if os.path.exists(config_file):
             import yaml
+
             with open(config_file, "r", encoding="utf-8") as f:
                 saved_configs = yaml.safe_load(f) or {}
 
@@ -1769,19 +1823,23 @@ def register_routes(app: FastAPI):
                 else:
                     current_values[field.name] = ""
 
-            connectors.append({
-                "platform": caps.platform,
-                "display_name": caps.display_name,
-                "description": caps.description,
-                "configured": env_configured or local_configured,
-                "config_source": "env" if env_configured else ("local" if local_configured else None),
-                "supports_topic_discovery": caps.supports_topic_discovery,
-                "supports_persona_discovery": caps.supports_persona_discovery,
-                "supports_publishing": caps.supports_publishing,
-                "supports_fetching": caps.supports_fetching,
-                "config_fields": [f.model_dump() for f in caps.config_fields],
-                "current_values": current_values,
-            })
+            connectors.append(
+                {
+                    "platform": caps.platform,
+                    "display_name": caps.display_name,
+                    "description": caps.description,
+                    "configured": env_configured or local_configured,
+                    "config_source": (
+                        "env" if env_configured else ("local" if local_configured else None)
+                    ),
+                    "supports_topic_discovery": caps.supports_topic_discovery,
+                    "supports_persona_discovery": caps.supports_persona_discovery,
+                    "supports_publishing": caps.supports_publishing,
+                    "supports_fetching": caps.supports_fetching,
+                    "config_fields": [f.model_dump() for f in caps.config_fields],
+                    "current_values": current_values,
+                }
+            )
 
         return {"connectors": connectors}
 
@@ -1804,6 +1862,7 @@ def register_routes(app: FastAPI):
         saved_config = {}
         if os.path.exists(config_file):
             import yaml
+
             with open(config_file, "r", encoding="utf-8") as f:
                 all_configs = yaml.safe_load(f) or {}
                 saved_config = all_configs.get(platform, {})
@@ -1864,6 +1923,7 @@ def register_routes(app: FastAPI):
 
         # Load existing config
         import yaml
+
         all_configs = {}
         if os.path.exists(config_file):
             with open(config_file, "r", encoding="utf-8") as f:
@@ -1913,6 +1973,7 @@ def register_routes(app: FastAPI):
             return {"status": "not_configured", "platform": platform}
 
         import yaml
+
         with open(config_file, "r", encoding="utf-8") as f:
             all_configs = yaml.safe_load(f) or {}
 
@@ -1950,6 +2011,7 @@ def register_routes(app: FastAPI):
         # First check saved config
         if os.path.exists(config_file):
             import yaml
+
             with open(config_file, "r", encoding="utf-8") as f:
                 all_configs = yaml.safe_load(f) or {}
                 credentials = all_configs.get(platform, {})
@@ -2059,6 +2121,7 @@ def register_routes(app: FastAPI):
 
         # Run analysis
         from avatarfactory.agents.evolution import EvolutionAgent
+
         evolution_agent = EvolutionAgent(
             knowledge_base=orchestrator.kb,
             llm_provider=orchestrator.llm_provider,
@@ -2098,6 +2161,7 @@ def register_routes(app: FastAPI):
 
         # Generate suggestions
         from avatarfactory.agents.evolution import EvolutionAgent
+
         evolution_agent = EvolutionAgent(
             knowledge_base=orchestrator.kb,
             llm_provider=orchestrator.llm_provider,
@@ -2114,6 +2178,7 @@ def register_routes(app: FastAPI):
 
     class SuggestionReviewRequest(BaseModel):
         """Request to review a suggestion."""
+
         approved: bool = Field(..., description="Whether to approve the suggestion")
         rejection_reason: Optional[str] = Field(None, description="Reason for rejection")
 
@@ -2143,6 +2208,7 @@ def register_routes(app: FastAPI):
 
         # Review suggestion
         from avatarfactory.agents.evolution import EvolutionAgent
+
         evolution_agent = EvolutionAgent(
             knowledge_base=orchestrator.kb,
             llm_provider=orchestrator.llm_provider,
@@ -2167,6 +2233,7 @@ def register_routes(app: FastAPI):
 
     class RollbackRequest(BaseModel):
         """Request to rollback persona."""
+
         version: str = Field(..., description="Version to rollback to (e.g., 'v1.0')")
 
     @app.post("/personas/{persona_id}/evolution/rollback", tags=["Evolution"])
@@ -2186,6 +2253,7 @@ def register_routes(app: FastAPI):
 
         # Perform rollback
         from avatarfactory.agents.evolution import EvolutionAgent
+
         evolution_agent = EvolutionAgent(
             knowledge_base=orchestrator.kb,
             llm_provider=orchestrator.llm_provider,
@@ -2226,8 +2294,7 @@ def register_routes(app: FastAPI):
         # Get applied suggestions
         all_suggestions = orchestrator.kb.list_evolution_suggestions(persona_id)
         applied_suggestions = [
-            s for s in all_suggestions
-            if s.status.value in ("approved", "auto_applied")
+            s for s in all_suggestions if s.status.value in ("approved", "auto_applied")
         ]
 
         return {
@@ -2256,6 +2323,7 @@ def register_routes(app: FastAPI):
             )
 
         from avatarfactory.core.agent_config import AgentConfigManager
+
         config_manager = AgentConfigManager(orchestrator.kb)
 
         config = config_manager.get_config(persona_id, agent_type)
@@ -2267,6 +2335,7 @@ def register_routes(app: FastAPI):
 
     class AgentConfigUpdateRequest(BaseModel):
         """Request to update agent configuration."""
+
         temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
         max_tokens: Optional[int] = Field(None, ge=100, le=8192)
         creativity_level: Optional[str] = Field(None)
@@ -2293,6 +2362,7 @@ def register_routes(app: FastAPI):
             )
 
         from avatarfactory.core.agent_config import AgentConfigManager
+
         config_manager = AgentConfigManager(orchestrator.kb)
 
         # Build updates from non-None fields

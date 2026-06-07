@@ -110,6 +110,33 @@ Bluesky, Twitter, Xiaohongshu, LinkedIn, Instagram, Threads, Weibo, Mastodon, To
 
 ## Getting Started
 
+### Codex Workflow (Recommended)
+
+For Codex-based development, local runtime is Docker-only. Use the root `Makefile`:
+
+```bash
+git clone https://github.com/EldonZhao/AvatarFactory.git
+cd AvatarFactory
+make setup
+make up
+```
+
+Service endpoints:
+
+```bash
+API:     http://127.0.0.1:8000
+Admin:   http://127.0.0.1:4323
+Journal: http://127.0.0.1:4328
+```
+
+Quality checks:
+
+```bash
+make check
+```
+
+For more Codex-specific conventions, see `CODEX.md`.
+
 ### Installation
 
 **Recommended: Using Virtual Environment (venv)**
@@ -355,9 +382,13 @@ avatarfactory serve --mode scheduler
 ### Docker Deployment
 
 ```bash
-docker-compose up -d
-docker-compose logs -f
-docker-compose down
+# Development (Docker-only local runtime)
+docker compose -f docker-compose.dev.yml up -d
+
+# Production-like deployment
+docker compose up -d
+docker compose logs -f
+docker compose down
 ```
 
 ---

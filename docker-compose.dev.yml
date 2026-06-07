@@ -1,0 +1,59 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/dev.backend.Dockerfile
+    container_name: avatarfactory-api-dev
+    command: avatarfactory serve --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/workspace
+      - avatarfactory-pip-cache:/root/.cache/pip
+    env_file:
+      - .env
+    environment:
+      - AVATARFACTORY_KB_PATH=/workspace/knowledges
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+
+  admin:
+    image: node:20-alpine
+    pull_policy: never
+    container_name: avatarfactory-admin-dev
+    working_dir: /workspace/web-admin
+    command: sh -lc "npm ci && npx astro dev --host 0.0.0.0 --port 4323"
+    ports:
+      - "4323:4323"
+    volumes:
+      - ./:/workspace
+      - avatarfactory-admin-node-modules:/workspace/web-admin/node_modules
+    environment:
+      - ADMIN_API_BASE=http://api:8000
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - api
+
+  journal:
+    image: node:20-alpine
+    pull_policy: never
+    container_name: avatarfactory-journal-dev
+    working_dir: /workspace/web-journal
+    command: sh -lc "npm ci && npx astro dev --host 0.0.0.0 --port 4328"
+    ports:
+      - "4328:4328"
+    volumes:
+      - ./:/workspace
+      - avatarfactory-journal-node-modules:/workspace/web-journal/node_modules
+    environment:
+      - API_BASE_URL=http://api:8000
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - api
+
+volumes:
+  avatarfactory-pip-cache:
+  avatarfactory-admin-node-modules:
+  avatarfactory-journal-node-modules:

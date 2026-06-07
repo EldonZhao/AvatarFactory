@@ -31,11 +31,13 @@ from avatarfactory.connectors.registry import ConnectorRegistry
 
 class CookieExpiredError(Exception):
     """Raised when the Xiaohongshu cookie has expired."""
+
     pass
 
 
 class CookieExpiringWarning(Warning):
     """Warning when the cookie is about to expire."""
+
     pass
 
 
@@ -104,9 +106,7 @@ class XiaohongshuConnector(BasePlatformConnector):
                     label="User ID",
                     field_type="text",
                     required=False,
-                    description=(
-                        "Xiaohongshu user ID for fetching own posts"
-                    ),
+                    description=("Xiaohongshu user ID for fetching own posts"),
                     env_var="XIAOHONGSHU_USER_ID",
                 ),
             ],
@@ -134,7 +134,8 @@ class XiaohongshuConnector(BasePlatformConnector):
 
             if self._cookie:
                 import re
-                a1_match = re.search(r'a1=([^;]+)', self._cookie)
+
+                a1_match = re.search(r"a1=([^;]+)", self._cookie)
                 a1_value = a1_match.group(1) if a1_match else ""
 
             # b1 can be passed in extra config
@@ -142,8 +143,8 @@ class XiaohongshuConnector(BasePlatformConnector):
 
             # Wrapper to match expected signature (accepts any kwargs)
             def sign_wrapper(uri, data=None, **kwargs):
-                a1 = kwargs.get('a1', a1_value)
-                b1 = kwargs.get('b1', b1_value)
+                a1 = kwargs.get("a1", a1_value)
+                b1 = kwargs.get("b1", b1_value)
                 return xhs_sign(uri, data, a1=a1, b1=b1)
 
             return sign_wrapper
@@ -156,8 +157,7 @@ class XiaohongshuConnector(BasePlatformConnector):
             from xhs import XhsClient
         except ImportError:
             raise ImportError(
-                "xhs library required for Xiaohongshu connector.\n"
-                "Install with: pip install xhs"
+                "xhs library required for Xiaohongshu connector.\n" "Install with: pip install xhs"
             )
 
         self._cookie = self.config.extra.get("cookie") or self.config.extra.get("cookies")
@@ -259,6 +259,7 @@ class XiaohongshuConnector(BasePlatformConnector):
             )
         if message:
             import warnings
+
             warnings.warn(message, CookieExpiringWarning)
 
     def get_cookie_refresh_instructions(self) -> str:
@@ -390,6 +391,7 @@ class XiaohongshuConnector(BasePlatformConnector):
             else:
                 # Get home feed (recommend feed)
                 from xhs import FeedType
+
                 data = self._xhs_client.get_home_feed(feed_type=FeedType.RECOMMEND)
                 notes = data.get("items", data.get("notes", []))
 
@@ -406,21 +408,23 @@ class XiaohongshuConnector(BasePlatformConnector):
                     if img_url:
                         images.append(img_url)
 
-                results.append({
-                    "platform": self.platform_name,
-                    "post_id": note_card.get("note_id", note.get("id", "")),
-                    "author": user.get("nickname", ""),
-                    "author_id": user.get("user_id", ""),
-                    "title": note_card.get("display_title", note_card.get("title", "")),
-                    "body": note_card.get("desc", ""),
-                    "likes": interact_info.get("liked_count", 0),
-                    "comments": interact_info.get("comment_count", 0),
-                    "shares": interact_info.get("share_count", 0),
-                    "url": f"https://www.xiaohongshu.com/explore/{note_card.get('note_id', '')}",
-                    "images": images,
-                    "image_count": len(images),
-                    "has_media": len(images) > 0,
-                })
+                results.append(
+                    {
+                        "platform": self.platform_name,
+                        "post_id": note_card.get("note_id", note.get("id", "")),
+                        "author": user.get("nickname", ""),
+                        "author_id": user.get("user_id", ""),
+                        "title": note_card.get("display_title", note_card.get("title", "")),
+                        "body": note_card.get("desc", ""),
+                        "likes": interact_info.get("liked_count", 0),
+                        "comments": interact_info.get("comment_count", 0),
+                        "shares": interact_info.get("share_count", 0),
+                        "url": f"https://www.xiaohongshu.com/explore/{note_card.get('note_id', '')}",
+                        "images": images,
+                        "image_count": len(images),
+                        "has_media": len(images) > 0,
+                    }
+                )
 
             self._cookie_valid = True
             self._last_cookie_check = datetime.now()
@@ -523,20 +527,22 @@ class XiaohongshuConnector(BasePlatformConnector):
                     if img_url:
                         images.append(img_url)
 
-                results.append({
-                    "platform": self.platform_name,
-                    "post_id": note.get("note_id", ""),
-                    "author": note.get("user", {}).get("nickname", ""),
-                    "author_id": target_user,
-                    "title": note.get("display_title", ""),
-                    "body": note.get("desc", ""),
-                    "likes": interact_info.get("liked_count", 0),
-                    "comments": interact_info.get("comment_count", 0),
-                    "shares": interact_info.get("share_count", 0),
-                    "images": images,
-                    "image_count": len(images),
-                    "has_media": len(images) > 0,
-                })
+                results.append(
+                    {
+                        "platform": self.platform_name,
+                        "post_id": note.get("note_id", ""),
+                        "author": note.get("user", {}).get("nickname", ""),
+                        "author_id": target_user,
+                        "title": note.get("display_title", ""),
+                        "body": note.get("desc", ""),
+                        "likes": interact_info.get("liked_count", 0),
+                        "comments": interact_info.get("comment_count", 0),
+                        "shares": interact_info.get("share_count", 0),
+                        "images": images,
+                        "image_count": len(images),
+                        "has_media": len(images) > 0,
+                    }
+                )
 
             return FetchResult(
                 success=True,

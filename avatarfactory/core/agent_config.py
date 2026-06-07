@@ -55,9 +55,7 @@ class AgentConfigManager:
         """
         self.kb = knowledge_base
 
-    def get_config(
-        self, persona_id: str, agent_type: str
-    ) -> AgentConfig:
+    def get_config(self, persona_id: str, agent_type: str) -> AgentConfig:
         """
         Get agent configuration for a persona.
 
@@ -99,9 +97,7 @@ class AgentConfigManager:
         )
         return AgentConfig(**default)
 
-    def save_config(
-        self, persona_id: str, agent_type: str, config: AgentConfig
-    ) -> None:
+    def save_config(self, persona_id: str, agent_type: str, config: AgentConfig) -> None:
         """
         Save agent configuration for a persona.
 
@@ -230,9 +226,7 @@ class AgentConfigManager:
         # Save updated config
         self.save_config(persona_id, agent_type, config)
 
-    def get_performance_summary(
-        self, persona_id: str, agent_type: str
-    ) -> Dict[str, Any]:
+    def get_performance_summary(self, persona_id: str, agent_type: str) -> Dict[str, Any]:
         """
         Get performance summary for an agent.
 

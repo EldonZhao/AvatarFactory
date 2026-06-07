@@ -53,8 +53,7 @@ class AzureTTSProvider(TTSProvider):
 
         if not self.api_key:
             raise TTSError(
-                "Azure Speech API key not configured. "
-                "Set AZURE_SPEECH_KEY environment variable."
+                "Azure Speech API key not configured. " "Set AZURE_SPEECH_KEY environment variable."
             )
 
         speech_config = speechsdk.SpeechConfig(
@@ -113,10 +112,7 @@ class AzureTTSProvider(TTSProvider):
 
         # Run synthesis in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: synthesizer.speak_ssml_async(ssml).get()
-        )
+        result = await loop.run_in_executor(None, lambda: synthesizer.speak_ssml_async(ssml).get())
 
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
             return output_path
@@ -190,10 +186,7 @@ class AzureTTSProvider(TTSProvider):
         )
 
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: synthesizer.get_voices_async().get()
-        )
+        result = await loop.run_in_executor(None, lambda: synthesizer.get_voices_async().get())
 
         if result.reason == speechsdk.ResultReason.VoicesListRetrieved:
             voices = []
@@ -202,14 +195,20 @@ class AzureTTSProvider(TTSProvider):
                 if locale and not voice.locale.startswith(locale):
                     continue
 
-                voices.append(VoiceInfo(
-                    id=voice.short_name,
-                    name=voice.local_name,
-                    gender=voice.gender.name if hasattr(voice.gender, 'name') else str(voice.gender),
-                    locale=voice.locale,
-                    style=None,  # Could extract from voice.style_list
-                    provider=self.name,
-                ))
+                voices.append(
+                    VoiceInfo(
+                        id=voice.short_name,
+                        name=voice.local_name,
+                        gender=(
+                            voice.gender.name
+                            if hasattr(voice.gender, "name")
+                            else str(voice.gender)
+                        ),
+                        locale=voice.locale,
+                        style=None,  # Could extract from voice.style_list
+                        provider=self.name,
+                    )
+                )
             return voices
         else:
             raise TTSError(f"Failed to list Azure voices: {result.reason}")
@@ -270,10 +269,7 @@ class AzureTTSProvider(TTSProvider):
         )
 
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: synthesizer.speak_ssml_async(ssml).get()
-        )
+        result = await loop.run_in_executor(None, lambda: synthesizer.speak_ssml_async(ssml).get())
 
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
             return output_path

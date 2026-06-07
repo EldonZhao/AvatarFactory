@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 
 from avatarfactory.dashboard.data import DashboardDataProvider
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -34,19 +36,9 @@ provider = DashboardDataProvider(kb_path)
 with st.sidebar:
     st.markdown("### Actions")
 
-    st.info(
-        "**Test connection:**\n"
-        "```bash\n"
-        "avatarfactory connect bluesky\n"
-        "```"
-    )
+    st.info("**Test connection:**\n" "```bash\n" "avatarfactory connect bluesky\n" "```")
 
-    st.info(
-        "**Fetch trending:**\n"
-        "```bash\n"
-        "avatarfactory fetch bluesky -q \"AI tools\"\n"
-        "```"
-    )
+    st.info("**Fetch trending:**\n" "```bash\n" 'avatarfactory fetch bluesky -q "AI tools"\n' "```")
 
     if st.button("🔄 Refresh"):
         st.rerun()
@@ -185,7 +177,8 @@ for connector in connectors:
             status_color = "#4CAF50" if connector.configured else "#ff9800"
             status_icon = "✅" if connector.configured else "⚠️"
 
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="
                 text-align: center;
                 padding: 20px;
@@ -196,7 +189,9 @@ for connector in connectors:
                 <div style="font-size: 48px;">{icon}</div>
                 <div style="font-size: 24px; margin-top: 8px;">{status_icon}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
         with col2:
             st.markdown(f"### {info.get('name', platform.capitalize())}")

@@ -120,8 +120,9 @@ class PersonaRepository(BaseRepository[PersonaModel]):
 
         # Sum ideas from discoveries
         ideas_sum = await self.session.execute(
-            select(func.sum(DiscoveryResultModel.ideas_count))
-            .where(DiscoveryResultModel.persona_id == id)
+            select(func.sum(DiscoveryResultModel.ideas_count)).where(
+                DiscoveryResultModel.persona_id == id
+            )
         )
 
         return {

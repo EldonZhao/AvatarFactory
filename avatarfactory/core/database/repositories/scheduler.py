@@ -28,10 +28,7 @@ class SchedulerRepository(BaseRepository[ScheduledTaskModel]):
         Returns:
             List of all ScheduledTaskModel instances
         """
-        query = (
-            select(ScheduledTaskModel)
-            .order_by(ScheduledTaskModel.created_at.desc())
-        )
+        query = select(ScheduledTaskModel).order_by(ScheduledTaskModel.created_at.desc())
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -210,10 +207,7 @@ class SchedulerRepository(BaseRepository[ScheduledTaskModel]):
         Returns:
             Number of tasks deleted
         """
-        query = (
-            delete(ScheduledTaskModel)
-            .where(ScheduledTaskModel.persona_id == persona_id)
-        )
+        query = delete(ScheduledTaskModel).where(ScheduledTaskModel.persona_id == persona_id)
         result = await self.session.execute(query)
         await self.session.flush()
         return result.rowcount or 0
@@ -335,8 +329,8 @@ class PublishQueueRepository(BaseRepository[PublishQueueModel]):
         conditions = [PublishQueueModel.status == "pending"]
         if scheduled_before:
             conditions.append(
-                (PublishQueueModel.scheduled_time.is_(None)) |
-                (PublishQueueModel.scheduled_time <= scheduled_before)
+                (PublishQueueModel.scheduled_time.is_(None))
+                | (PublishQueueModel.scheduled_time <= scheduled_before)
             )
 
         query = (

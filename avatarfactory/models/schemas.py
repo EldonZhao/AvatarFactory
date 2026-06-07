@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-
 # ============================================================================
 # Enums
 # ============================================================================
@@ -116,9 +115,7 @@ class Boundaries(BaseModel):
     """Content boundaries and compliance rules"""
 
     avoid: List[str] = Field(default_factory=list, description="Topics/patterns to avoid")
-    compliance: List[str] = Field(
-        default_factory=list, description="Compliance requirements"
-    )
+    compliance: List[str] = Field(default_factory=list, description="Compliance requirements")
 
 
 class NotificationConfig(BaseModel):
@@ -126,13 +123,10 @@ class NotificationConfig(BaseModel):
 
     enabled: bool = Field(default=False, description="Whether notifications are enabled")
     connector_type: str = Field(
-        default="wecom",
-        description="Connector type: wecom, slack, telegram, etc."
+        default="wecom", description="Connector type: wecom, slack, telegram, etc."
     )
     # Note: webhook_url is configured at system level via AVATARFACTORY_WEBHOOK_URL env var
-    notify_on_content: bool = Field(
-        default=True, description="Notify when content is generated"
-    )
+    notify_on_content: bool = Field(default=True, description="Notify when content is generated")
     notify_on_review: bool = Field(
         default=True, description="Include review results in notification"
     )
@@ -164,9 +158,7 @@ class Persona(BaseModel):
     )
 
     # Evolution settings
-    evolution: Optional["EvolutionConfig"] = Field(
-        None, description="Evolution configuration"
-    )
+    evolution: Optional["EvolutionConfig"] = Field(None, description="Evolution configuration")
 
     # Per-persona agent configurations
     agent_configs: Dict[str, "AgentConfig"] = Field(
@@ -174,9 +166,7 @@ class Persona(BaseModel):
         description="Per-agent configurations keyed by agent_type",
     )
 
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class PersonaVersion(BaseModel):
@@ -212,9 +202,7 @@ class ContentStructure(BaseModel):
     """Content structure definition"""
 
     sections: List[str] = Field(..., description="Content sections in order")
-    style_constraints: Dict[str, Any] = Field(
-        default_factory=dict, description="Style constraints"
-    )
+    style_constraints: Dict[str, Any] = Field(default_factory=dict, description="Style constraints")
 
 
 class Content(BaseModel):
@@ -239,7 +227,9 @@ class Content(BaseModel):
 
     # Media attachments
     media: List[MediaAttachment] = Field(default_factory=list, description="Images/videos")
-    image_prompts: List[str] = Field(default_factory=list, description="AI image generation prompts")
+    image_prompts: List[str] = Field(
+        default_factory=list, description="AI image generation prompts"
+    )
 
     # Review results (populated after review)
     review_score: Optional[float] = None
@@ -353,9 +343,7 @@ class ExperimentVariant(BaseModel):
     id: str
     type: str = Field(..., description="Variant type/name")
     content_ids: List[str] = Field(default_factory=list)
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="Collected metrics"
-    )
+    metrics: Dict[str, float] = Field(default_factory=dict, description="Collected metrics")
 
 
 class Experiment(BaseModel):
@@ -401,9 +389,7 @@ class AgentMessage(BaseModel):
     task_type: TaskType = Field(..., description="Task type")
 
     payload: Dict[str, Any] = Field(default_factory=dict, description="Task data")
-    context: Dict[str, Any] = Field(
-        default_factory=dict, description="Context (persona_id, etc.)"
-    )
+    context: Dict[str, Any] = Field(default_factory=dict, description="Context (persona_id, etc.)")
 
     priority: int = Field(default=5, ge=1, le=10, description="Priority 1-10")
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -513,9 +499,7 @@ class ContentIdea(BaseModel):
         default_factory=list, description="IDs of inspiring trending content"
     )
 
-    estimated_engagement: str = Field(
-        default="medium", description="low/medium/high"
-    )
+    estimated_engagement: str = Field(default="medium", description="low/medium/high")
     reasoning: str = Field(default="", description="Why this idea could work")
 
     # Image/visual suggestions
@@ -576,9 +560,7 @@ class RecommendedPersona(BaseModel):
     source_platforms: List[str] = Field(
         default_factory=list, description="Platforms where trends were discovered"
     )
-    source_trends: List[str] = Field(
-        default_factory=list, description="Related trending topics"
-    )
+    source_trends: List[str] = Field(default_factory=list, description="Related trending topics")
 
     # Core persona info
     name: str = Field(..., description="Recommended persona name")
@@ -594,9 +576,7 @@ class RecommendedPersona(BaseModel):
 
     # Style suggestions
     suggested_tone: str = Field(default="professional", description="Suggested tone")
-    content_types: List[str] = Field(
-        default_factory=list, description="Recommended content types"
-    )
+    content_types: List[str] = Field(default_factory=list, description="Recommended content types")
     content_pillars: List[str] = Field(
         default_factory=list, description="Suggested content pillars"
     )
@@ -614,9 +594,7 @@ class RecommendedPersona(BaseModel):
     status: RecommendationStatus = Field(
         default=RecommendationStatus.ACTIVE, description="Recommendation status"
     )
-    adopted_persona_id: Optional[str] = Field(
-        None, description="Created persona ID if adopted"
-    )
+    adopted_persona_id: Optional[str] = Field(None, description="Created persona ID if adopted")
 
 
 class TrendSnapshot(BaseModel):
@@ -627,21 +605,13 @@ class TrendSnapshot(BaseModel):
     captured_at: datetime = Field(default_factory=datetime.now)
 
     # Trending data
-    trending_topics: List[str] = Field(
-        default_factory=list, description="Top trending topics"
-    )
-    trending_hashtags: List[str] = Field(
-        default_factory=list, description="Trending hashtags"
-    )
-    top_posts: List[Dict[str, Any]] = Field(
-        default_factory=list, description="Sample top posts"
-    )
+    trending_topics: List[str] = Field(default_factory=list, description="Top trending topics")
+    trending_hashtags: List[str] = Field(default_factory=list, description="Trending hashtags")
+    top_posts: List[Dict[str, Any]] = Field(default_factory=list, description="Sample top posts")
 
     # Analysis
     analysis_summary: str = Field(default="", description="AI analysis summary")
-    key_themes: List[str] = Field(
-        default_factory=list, description="Identified key themes"
-    )
+    key_themes: List[str] = Field(default_factory=list, description="Identified key themes")
     content_patterns: List[str] = Field(
         default_factory=list, description="Observed content patterns"
     )
@@ -709,27 +679,19 @@ class EvolutionSuggestion(BaseModel):
 
     # Suggestion content
     suggestion: str = Field(..., description="Human-readable suggestion")
-    current_value: Optional[Dict[str, Any]] = Field(
-        None, description="Current value before change"
-    )
-    proposed_value: Optional[Dict[str, Any]] = Field(
-        None, description="Proposed new value"
-    )
+    current_value: Optional[Dict[str, Any]] = Field(None, description="Current value before change")
+    proposed_value: Optional[Dict[str, Any]] = Field(None, description="Proposed new value")
 
     # Analysis
     rationale: str = Field(..., description="Why this change is recommended")
     expected_impact: str = Field(..., description="Expected effect of the change")
-    confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Confidence score 0-1"
-    )
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Confidence score 0-1")
     severity: EvolutionSeverity = Field(
         default=EvolutionSeverity.MODERATE, description="Change severity"
     )
 
     # Evidence
-    evidence: List[str] = Field(
-        default_factory=list, description="Supporting data points"
-    )
+    evidence: List[str] = Field(default_factory=list, description="Supporting data points")
     source: EvolutionSource = Field(
         default=EvolutionSource.AUTOMATED, description="Source of suggestion"
     )
@@ -740,9 +702,7 @@ class EvolutionSuggestion(BaseModel):
     )
     reviewed_at: Optional[datetime] = None
     rejection_reason: Optional[str] = None
-    applied_version: Optional[str] = Field(
-        None, description="Persona version after applying"
-    )
+    applied_version: Optional[str] = Field(None, description="Persona version after applying")
 
 
 class AgentConfig(BaseModel):
@@ -758,12 +718,8 @@ class AgentConfig(BaseModel):
     system_prompt_additions: Optional[str] = Field(
         None, description="Additional system prompt text"
     )
-    style_emphasis: List[str] = Field(
-        default_factory=list, description="Styles to emphasize"
-    )
-    avoid_patterns: List[str] = Field(
-        default_factory=list, description="Patterns to avoid"
-    )
+    style_emphasis: List[str] = Field(default_factory=list, description="Styles to emphasize")
+    avoid_patterns: List[str] = Field(default_factory=list, description="Patterns to avoid")
 
     # Behavior tuning
     creativity_level: str = Field(
@@ -787,9 +743,7 @@ class EvolutionConfig(BaseModel):
     enabled: bool = Field(default=True, description="Whether evolution is enabled")
 
     # Auto-apply settings
-    auto_apply_minor: bool = Field(
-        default=True, description="Auto-apply minor changes"
-    )
+    auto_apply_minor: bool = Field(default=True, description="Auto-apply minor changes")
     auto_apply_threshold: float = Field(
         default=0.9,
         ge=0.0,
@@ -839,15 +793,11 @@ class EvolutionFeedbackAnalysis(BaseModel):
     )
 
     # Overall insights
-    key_insights: List[str] = Field(
-        default_factory=list, description="Key findings from analysis"
-    )
+    key_insights: List[str] = Field(default_factory=list, description="Key findings from analysis")
     improvement_areas: List[str] = Field(
         default_factory=list, description="Areas needing improvement"
     )
-    strengths: List[str] = Field(
-        default_factory=list, description="Current strengths"
-    )
+    strengths: List[str] = Field(default_factory=list, description="Current strengths")
 
 
 # Rebuild Persona model to resolve forward references

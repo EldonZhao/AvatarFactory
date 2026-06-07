@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 
 from avatarfactory.service.cache import persona_cache, stats_cache
 
-
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 
@@ -51,6 +50,7 @@ async def require_admin_auth(admin_token: Optional[str] = Cookie(None)) -> dict:
 
 class DashboardStatsResponse(BaseModel):
     """Dashboard statistics response."""
+
     personas_count: int
     contents_count: int
     draft_count: int
@@ -63,6 +63,7 @@ class DashboardStatsResponse(BaseModel):
 
 class PersonaSummary(BaseModel):
     """Persona summary for dashboard."""
+
     id: str
     name: str
     tagline: str
@@ -73,6 +74,7 @@ class PersonaSummary(BaseModel):
 
 class ConnectorStatusResponse(BaseModel):
     """Connector status for dashboard."""
+
     platform: str
     registered: bool
     configured: bool
@@ -81,6 +83,7 @@ class ConnectorStatusResponse(BaseModel):
 
 class DashboardResponse(BaseModel):
     """Full dashboard data response."""
+
     stats: DashboardStatsResponse
     recent_personas: List[PersonaSummary]
     connectors: List[ConnectorStatusResponse]
@@ -97,6 +100,7 @@ class DashboardResponse(BaseModel):
 def get_orchestrator():
     """Get the orchestrator instance."""
     from avatarfactory.service.app import _orchestrator
+
     if _orchestrator is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -108,6 +112,7 @@ def get_orchestrator():
 def get_scheduler():
     """Get the scheduler instance."""
     from avatarfactory.service.app import _scheduler
+
     return _scheduler
 
 
@@ -116,7 +121,9 @@ def get_scheduler():
 # =============================================================================
 
 
-@router.get("/dashboard", response_model=DashboardResponse, dependencies=[Depends(require_admin_auth)])
+@router.get(
+    "/dashboard", response_model=DashboardResponse, dependencies=[Depends(require_admin_auth)]
+)
 async def get_dashboard():
     """
     Get dashboard overview data.
@@ -155,14 +162,16 @@ async def get_dashboard():
         if persona:
             p_draft = len(kb.list_content(persona_id=pid, status="draft"))
             p_published = len(kb.list_content(persona_id=pid, status="published"))
-            recent_personas.append(PersonaSummary(
-                id=persona.id,
-                name=persona.identity.name,
-                tagline=persona.identity.tagline,
-                content_count=p_draft + p_published,
-                draft_count=p_draft,
-                version=persona.version,
-            ))
+            recent_personas.append(
+                PersonaSummary(
+                    id=persona.id,
+                    name=persona.identity.name,
+                    tagline=persona.identity.tagline,
+                    content_count=p_draft + p_published,
+                    draft_count=p_draft,
+                    version=persona.version,
+                )
+            )
 
     # Get connector status
     all_capabilities = ConnectorRegistry.get_all_capabilities()
@@ -174,12 +183,14 @@ async def get_dashboard():
         configured = all(os.getenv(k) is not None for k in env_keys) if env_keys else False
         if configured:
             connectors_configured += 1
-        connectors.append(ConnectorStatusResponse(
-            platform=caps.platform,
-            registered=True,
-            configured=configured,
-            description=caps.description,
-        ))
+        connectors.append(
+            ConnectorStatusResponse(
+                platform=caps.platform,
+                registered=True,
+                configured=configured,
+                description=caps.description,
+            )
+        )
 
     # Scheduler status
     scheduler_running = scheduler.is_running() if scheduler else False
@@ -217,6 +228,7 @@ async def get_dashboard():
 
 class CreatePersonaRequest(BaseModel):
     """Request to create a new persona."""
+
     name: str = Field(..., description="Persona name")
     tagline: Optional[str] = Field(None, description="Short tagline")
     description: str = Field(..., description="Persona description")
@@ -330,20 +342,22 @@ async def list_personas_admin():
             persona.notification.enabled if persona and persona.notification else False
         )
 
-        personas.append({
-            "id": pid,
-            "name": summary.get("name", ""),
-            "tagline": summary.get("tagline", ""),
-            "expertise": summary.get("expertise", []),
-            "version": summary.get("version", "v1.0"),
-            "content_count": stats.get("total_content", 0),
-            "draft_count": stats.get("draft_content", 0),
-            "published_count": stats.get("published_content", 0),
-            "tasks_count": task_counts.get(pid, 0),
-            "notification_enabled": notification_enabled,
-            "created_at": summary.get("created_at"),
-            "updated_at": summary.get("updated_at"),
-        })
+        personas.append(
+            {
+                "id": pid,
+                "name": summary.get("name", ""),
+                "tagline": summary.get("tagline", ""),
+                "expertise": summary.get("expertise", []),
+                "version": summary.get("version", "v1.0"),
+                "content_count": stats.get("total_content", 0),
+                "draft_count": stats.get("draft_content", 0),
+                "published_count": stats.get("published_content", 0),
+                "tasks_count": task_counts.get(pid, 0),
+                "notification_enabled": notification_enabled,
+                "created_at": summary.get("created_at"),
+                "updated_at": summary.get("updated_at"),
+            }
+        )
 
     result = {
         "count": len(personas),
@@ -374,8 +388,9 @@ async def get_persona_admin(persona_id: str):
     published_count = len(kb.list_content(persona_id=persona_id, status="published"))
 
     # Get tasks
-    persona_tasks = [t for t in (scheduler.list_tasks() if scheduler else [])
-                    if t.persona_id == persona_id]
+    persona_tasks = [
+        t for t in (scheduler.list_tasks() if scheduler else []) if t.persona_id == persona_id
+    ]
 
     # Get version history
     versions = kb.list_persona_versions(persona_id)
@@ -385,21 +400,25 @@ async def get_persona_admin(persona_id: str):
         "content_count": draft_count + published_count,
         "draft_count": draft_count,
         "published_count": published_count,
-        "tasks": [{
-            "id": t.id,
-            "name": t.name,
-            "task_type": t.task_type,
-            "schedule": t.schedule,
-            "enabled": t.enabled,
-            "last_run": t.last_run.isoformat() if t.last_run else None,
-            "last_status": t.last_status,
-        } for t in persona_tasks],
+        "tasks": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "task_type": t.task_type,
+                "schedule": t.schedule,
+                "enabled": t.enabled,
+                "last_run": t.last_run.isoformat() if t.last_run else None,
+                "last_status": t.last_status,
+            }
+            for t in persona_tasks
+        ],
         "versions": versions,
     }
 
 
 class UpdateNotificationRequest(BaseModel):
     """Request to update persona notification settings."""
+
     enabled: bool = Field(..., description="Enable notifications")
     notify_on_content: bool = Field(default=True, description="Notify on content generation")
     notify_on_discovery: bool = Field(default=True, description="Notify on discovery completion")
@@ -457,7 +476,9 @@ async def list_content_admin(
     List content items with filtering for admin.
     """
     # Try to get from cache first (using filter params as key)
-    cache_key = f"admin:content:{persona_id or 'all'}:{content_status or 'all'}:{platform or 'all'}:{limit}"
+    cache_key = (
+        f"admin:content:{persona_id or 'all'}:{content_status or 'all'}:{platform or 'all'}:{limit}"
+    )
     cached = stats_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -477,16 +498,18 @@ async def list_content_admin(
             if platform and c.platform.value != platform:
                 continue
 
-            all_contents.append({
-                "id": c.id,
-                "title": c.title,
-                "persona_id": c.persona_id,
-                "platform": c.platform.value,
-                "pillar": c.pillar,
-                "status": s,
-                "review_score": c.review_score,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-            })
+            all_contents.append(
+                {
+                    "id": c.id,
+                    "title": c.title,
+                    "persona_id": c.persona_id,
+                    "platform": c.platform.value,
+                    "pillar": c.pillar,
+                    "status": s,
+                    "review_score": c.review_score,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+            )
 
     # Sort by created_at descending
     all_contents.sort(key=lambda x: x.get("created_at") or "", reverse=True)
@@ -590,6 +613,7 @@ async def delete_content_admin(content_id: str):
 
 class GenerateContentAdminRequest(BaseModel):
     """Content generation request for admin dashboard."""
+
     persona_id: str = Field(..., description="Persona ID")
     topic: Optional[str] = Field(None, description="Content topic")
     platform: Optional[str] = Field(None, description="Target platform")
@@ -721,7 +745,7 @@ async def _send_admin_content_notification(
             description_parts.append(f"❌ 评分: {review_score}/100")
 
     # Content preview
-    body_preview = content_body[:300] if content_body else ''
+    body_preview = content_body[:300] if content_body else ""
     if len(content_body) > 300:
         body_preview += "..."
 
@@ -747,12 +771,7 @@ async def _send_admin_content_notification(
 
     # Build payload
     if not url:
-        payload = {
-            "msgtype": "markdown",
-            "markdown": {
-                "content": f"### {title}\n\n{description}"
-            }
-        }
+        payload = {"msgtype": "markdown", "markdown": {"content": f"### {title}\n\n{description}"}}
     else:
         payload = {
             "msgtype": "news",
@@ -765,7 +784,7 @@ async def _send_admin_content_notification(
                         "picurl": "",
                     }
                 ]
-            }
+            },
         }
 
     # Send notification
@@ -853,6 +872,7 @@ async def list_scheduler_tasks_admin():
 
 class CreateSchedulerTaskRequest(BaseModel):
     """Request to create a new scheduler task."""
+
     name: Optional[str] = Field(None, description="Task name (auto-generated if not provided)")
     task_type: str = Field(..., description="Task type (discovery, content, publish)")
     persona_id: str = Field(..., description="Persona ID")
@@ -902,15 +922,17 @@ async def create_scheduler_task_admin(request: CreateSchedulerTaskRequest):
     task_id = f"{request.task_type}_{uuid.uuid4().hex[:8]}"
 
     # Create task via scheduler
-    task = await scheduler.add_task_from_dict({
-        "id": task_id,
-        "name": task_name,
-        "task_type": request.task_type,
-        "schedule": request.schedule,
-        "persona_id": request.persona_id,
-        "platform": request.platform,
-        "enabled": request.enabled,
-    })
+    task = await scheduler.add_task_from_dict(
+        {
+            "id": task_id,
+            "name": task_name,
+            "task_type": request.task_type,
+            "schedule": request.schedule,
+            "persona_id": request.persona_id,
+            "platform": request.platform,
+            "enabled": request.enabled,
+        }
+    )
 
     return {
         "id": task.id,
@@ -989,6 +1011,7 @@ async def delete_scheduler_task_admin(task_id: str):
 
 class UpdateSchedulerTaskRequest(BaseModel):
     """Request to update an existing scheduler task."""
+
     name: Optional[str] = Field(None, description="Task name")
     schedule: Optional[str] = Field(None, description="Cron schedule expression")
     platform: Optional[str] = Field(None, description="Target platform")
@@ -1161,24 +1184,29 @@ async def list_connectors_admin():
         configured_keys = [(k, os.getenv(k) is not None) for k in env_keys]
         all_configured = all(v for _, v in configured_keys) if configured_keys else False
 
-        connectors.append({
-            "platform": caps.platform,
-            "display_name": caps.display_name,
-            "description": caps.description,
-            "registered": True,
-            "configured": all_configured,
-            "env_keys": [{
-                "key": k,
-                "configured": v,
-            } for k, v in configured_keys],
-            "supports_topic_discovery": caps.supports_topic_discovery,
-            "supports_persona_discovery": caps.supports_persona_discovery,
-            "supports_publishing": caps.supports_publishing,
-            "supports_fetching": caps.supports_fetching,
-            "config_fields": [f.model_dump() for f in caps.config_fields],
-            "integration_type": caps.integration_type.value,
-            "usage_guide": caps.usage_guide,
-        })
+        connectors.append(
+            {
+                "platform": caps.platform,
+                "display_name": caps.display_name,
+                "description": caps.description,
+                "registered": True,
+                "configured": all_configured,
+                "env_keys": [
+                    {
+                        "key": k,
+                        "configured": v,
+                    }
+                    for k, v in configured_keys
+                ],
+                "supports_topic_discovery": caps.supports_topic_discovery,
+                "supports_persona_discovery": caps.supports_persona_discovery,
+                "supports_publishing": caps.supports_publishing,
+                "supports_fetching": caps.supports_fetching,
+                "config_fields": [f.model_dump() for f in caps.config_fields],
+                "integration_type": caps.integration_type.value,
+                "usage_guide": caps.usage_guide,
+            }
+        )
 
     return {
         "connectors": connectors,
@@ -1234,7 +1262,7 @@ async def list_recommended_personas(
                     "rationale": rec.rationale,
                     "source_platforms": rec.source_platforms,
                     "source_trends": rec.source_trends[:3] if rec.source_trends else [],
-                    "status": rec.status.value if hasattr(rec.status, 'value') else rec.status,
+                    "status": rec.status.value if hasattr(rec.status, "value") else rec.status,
                     "created_at": rec.created_at.isoformat() if rec.created_at else None,
                 }
                 for rec in recommendations
@@ -1265,15 +1293,17 @@ async def get_system_tasks_status():
 
     result = []
     for t in system_tasks:
-        result.append({
-            "id": t.id,
-            "task_type": t.task_type,
-            "schedule": t.schedule,
-            "enabled": t.enabled,
-            "last_run": t.last_run.isoformat() if t.last_run else None,
-            "run_count": t.run_count,
-            "next_run": next_run_map.get(t.id),
-        })
+        result.append(
+            {
+                "id": t.id,
+                "task_type": t.task_type,
+                "schedule": t.schedule,
+                "enabled": t.enabled,
+                "last_run": t.last_run.isoformat() if t.last_run else None,
+                "run_count": t.run_count,
+                "next_run": next_run_map.get(t.id),
+            }
+        )
 
     return {
         "tasks": result,
@@ -1320,6 +1350,7 @@ async def get_trends_by_platform(platform: str, limit: int = 10):
 
 class CreateTrendScanTaskRequest(BaseModel):
     """Request to create a trend scan task for a platform."""
+
     schedule: str = Field(default="0 8 * * *", description="Cron schedule expression")
     limit: int = Field(default=30, description="Number of posts to fetch per scan")
     enabled: bool = Field(default=True, description="Whether task is enabled")
@@ -1417,18 +1448,20 @@ async def create_connector_trend_task(platform: str, request: CreateTrendScanTas
         await scheduler.remove_task(task_id)
 
     # Create task
-    task = await scheduler.add_task_from_dict({
-        "id": task_id,
-        "name": task_name,
-        "task_type": "trend_scan",
-        "schedule": request.schedule,
-        "platform": platform,
-        "persona_id": None,  # System task
-        "enabled": request.enabled,
-        "config": {
-            "limit": request.limit,
-        },
-    })
+    task = await scheduler.add_task_from_dict(
+        {
+            "id": task_id,
+            "name": task_name,
+            "task_type": "trend_scan",
+            "schedule": request.schedule,
+            "platform": platform,
+            "persona_id": None,  # System task
+            "enabled": request.enabled,
+            "config": {
+                "limit": request.limit,
+            },
+        }
+    )
 
     return {
         "status": "created" if not existing_task else "updated",

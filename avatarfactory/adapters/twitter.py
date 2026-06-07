@@ -57,9 +57,7 @@ class TwitterAdapter(BasePlatformAdapter):
         if total_length > guidelines["max_length_per_tweet"]:
             tweet_count = (total_length // guidelines["max_length_per_tweet"]) + 1
             if tweet_count > guidelines["thread_length"]["max"]:
-                warnings.append(
-                    f"Content very long ({tweet_count} tweets), consider condensing"
-                )
+                warnings.append(f"Content very long ({tweet_count} tweets), consider condensing")
 
         # Check hashtag count
         hashtag_count = len(content.tags)

@@ -19,6 +19,7 @@ from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
 @dataclass
 class TopologyNode:
     """Node in the system topology graph."""
+
     id: str
     label: str
     node_type: str  # persona, agent, connector, task, content
@@ -30,6 +31,7 @@ class TopologyNode:
 @dataclass
 class TopologyEdge:
     """Edge connecting two nodes in the topology."""
+
     source: str
     target: str
     label: str = ""
@@ -39,6 +41,7 @@ class TopologyEdge:
 @dataclass
 class PersonaSummary:
     """Summary of a persona for dashboard display."""
+
     id: str
     name: str
     tagline: str
@@ -53,6 +56,7 @@ class PersonaSummary:
 @dataclass
 class ConnectorStatus:
     """Status of a platform connector."""
+
     platform: str
     registered: bool
     configured: bool
@@ -89,19 +93,23 @@ class DashboardDataProvider:
                 notification_type = ""
                 if persona.notification:
                     notification_enabled = persona.notification.enabled
-                    notification_type = persona.notification.connector_type if notification_enabled else ""
+                    notification_type = (
+                        persona.notification.connector_type if notification_enabled else ""
+                    )
 
-                personas.append(PersonaSummary(
-                    id=persona.id,
-                    name=persona.identity.name,
-                    tagline=persona.identity.tagline,
-                    version=persona.version,
-                    created_at=persona.created_at,
-                    draft_count=draft_count,
-                    published_count=published_count,
-                    notification_enabled=notification_enabled,
-                    notification_type=notification_type,
-                ))
+                personas.append(
+                    PersonaSummary(
+                        id=persona.id,
+                        name=persona.identity.name,
+                        tagline=persona.identity.tagline,
+                        version=persona.version,
+                        created_at=persona.created_at,
+                        draft_count=draft_count,
+                        published_count=published_count,
+                        notification_enabled=notification_enabled,
+                        notification_type=notification_type,
+                    )
+                )
         return personas
 
     def get_persona_details(self, persona_id: str) -> Optional[Dict[str, Any]]:
@@ -208,18 +216,17 @@ class DashboardDataProvider:
         statuses = []
         for platform, config in platform_configs.items():
             registered = ConnectorRegistry.is_registered(platform)
-            configured = all(
-                os.getenv(key) is not None
-                for key in config["env_keys"]
-            )
+            configured = all(os.getenv(key) is not None for key in config["env_keys"])
             missing = [k for k in config["env_keys"] if not os.getenv(k)]
 
-            statuses.append(ConnectorStatus(
-                platform=platform,
-                registered=registered,
-                configured=configured,
-                config_keys=missing if not configured else [],
-            ))
+            statuses.append(
+                ConnectorStatus(
+                    platform=platform,
+                    registered=registered,
+                    configured=configured,
+                    config_keys=missing if not configured else [],
+                )
+            )
 
         return statuses
 
@@ -241,11 +248,11 @@ class DashboardDataProvider:
 
         # Color scheme
         colors = {
-            "persona": "#4A90D9",      # Blue
-            "agent": "#7B68EE",        # Purple
-            "connector": "#50C878",    # Green
-            "task": "#FFB347",         # Orange
-            "content": "#87CEEB",      # Light blue
+            "persona": "#4A90D9",  # Blue
+            "agent": "#7B68EE",  # Purple
+            "connector": "#50C878",  # Green
+            "task": "#FFB347",  # Orange
+            "content": "#87CEEB",  # Light blue
         }
 
         # Add agent nodes (central system)
@@ -257,76 +264,92 @@ class DashboardDataProvider:
             ("review_agent", "Review Agent"),
         ]
         for agent_id, agent_name in agents:
-            nodes.append(TopologyNode(
-                id=agent_id,
-                label=agent_name,
-                node_type="agent",
-                size=30,
-                color=colors["agent"],
-            ))
+            nodes.append(
+                TopologyNode(
+                    id=agent_id,
+                    label=agent_name,
+                    node_type="agent",
+                    size=30,
+                    color=colors["agent"],
+                )
+            )
 
         # Orchestrator connects to all agents
         for agent_id, _ in agents[1:]:
-            edges.append(TopologyEdge(
-                source="orchestrator",
-                target=agent_id,
-                label="manages",
-            ))
+            edges.append(
+                TopologyEdge(
+                    source="orchestrator",
+                    target=agent_id,
+                    label="manages",
+                )
+            )
 
         # Add persona nodes
         personas = self.get_personas()
         for p in personas:
-            nodes.append(TopologyNode(
-                id=f"persona_{p.id}",
-                label=p.name,
-                node_type="persona",
-                size=35,
-                color=colors["persona"],
-                metadata={"draft": p.draft_count, "published": p.published_count},
-            ))
+            nodes.append(
+                TopologyNode(
+                    id=f"persona_{p.id}",
+                    label=p.name,
+                    node_type="persona",
+                    size=35,
+                    color=colors["persona"],
+                    metadata={"draft": p.draft_count, "published": p.published_count},
+                )
+            )
             # Personas connect to persona agent
-            edges.append(TopologyEdge(
-                source="persona_agent",
-                target=f"persona_{p.id}",
-                label="manages",
-            ))
+            edges.append(
+                TopologyEdge(
+                    source="persona_agent",
+                    target=f"persona_{p.id}",
+                    label="manages",
+                )
+            )
 
         # Add connector nodes
         connector_statuses = self.get_connector_statuses()
         for status in connector_statuses:
             node_color = colors["connector"] if status.configured else "#CCCCCC"
-            nodes.append(TopologyNode(
-                id=f"connector_{status.platform}",
-                label=status.platform.capitalize(),
-                node_type="connector",
-                size=25,
-                color=node_color,
-            ))
+            nodes.append(
+                TopologyNode(
+                    id=f"connector_{status.platform}",
+                    label=status.platform.capitalize(),
+                    node_type="connector",
+                    size=25,
+                    color=node_color,
+                )
+            )
             # Topic agent connects to connectors
-            edges.append(TopologyEdge(
-                source="topic_agent",
-                target=f"connector_{status.platform}",
-                label="fetches from",
-            ))
+            edges.append(
+                TopologyEdge(
+                    source="topic_agent",
+                    target=f"connector_{status.platform}",
+                    label="fetches from",
+                )
+            )
 
         # Add task nodes
         tasks = self.get_scheduled_tasks()
         for t in tasks[:10]:  # Limit to 10 tasks for clarity
             task_color = colors["task"] if t["enabled"] else "#CCCCCC"
-            nodes.append(TopologyNode(
-                id=f"task_{t['id']}",
-                label=t["name"][:20],
-                node_type="task",
-                size=20,
-                color=task_color,
-            ))
+            nodes.append(
+                TopologyNode(
+                    id=f"task_{t['id']}",
+                    label=t["name"][:20],
+                    node_type="task",
+                    size=20,
+                    color=task_color,
+                )
+            )
             # Tasks connect to personas
             if t.get("persona_id"):
-                edges.append(TopologyEdge(
-                    source=f"task_{t['id']}",
-                    target=f"persona_{t['persona_id']}",
-                    label="targets",
-                ))
+                edges.append(
+                    TopologyEdge(
+                        source=f"task_{t['id']}",
+                        target=f"persona_{t['persona_id']}",
+                        label="targets",
+                    )
+                )
 
         return {
             "nodes": [
@@ -393,6 +416,7 @@ class DashboardDataProvider:
             return None
 
         import json
+
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         data["_filepath"] = str(file_path)

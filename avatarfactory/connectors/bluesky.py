@@ -62,10 +62,7 @@ class BlueskyConnector(BasePlatformConnector):
                     label="App Password",
                     field_type="password",
                     required=True,
-                    description=(
-                        "App password from Bluesky settings"
-                        " (not your login password)"
-                    ),
+                    description=("App password from Bluesky settings" " (not your login password)"),
                     placeholder="xxxx-xxxx-xxxx-xxxx",
                     env_var="BLUESKY_PASSWORD",
                 ),
@@ -87,7 +84,9 @@ class BlueskyConnector(BasePlatformConnector):
         try:
             import httpx
         except ImportError:
-            raise ImportError("httpx required for Bluesky connector. Install with: pip install httpx")
+            raise ImportError(
+                "httpx required for Bluesky connector. Install with: pip install httpx"
+            )
 
         if not self.config.username or not self.config.password:
             raise ValueError("Bluesky requires username (handle) and password (app password)")
@@ -256,10 +255,12 @@ class BlueskyConnector(BasePlatformConnector):
                         alt_text = ""
                         if alt_texts and i < len(alt_texts):
                             alt_text = alt_texts[i]
-                        uploaded_images.append({
-                            "alt": alt_text,
-                            "image": blob,
-                        })
+                        uploaded_images.append(
+                            {
+                                "alt": alt_text,
+                                "image": blob,
+                            }
+                        )
 
                 if uploaded_images:
                     record["embed"] = {
@@ -327,11 +328,13 @@ class BlueskyConnector(BasePlatformConnector):
             List of PublishResult for each post in thread
         """
         if not self.is_connected():
-            return [PublishResult(
-                success=False,
-                error="Not connected to Bluesky",
-                platform=self.platform_name,
-            )]
+            return [
+                PublishResult(
+                    success=False,
+                    error="Not connected to Bluesky",
+                    platform=self.platform_name,
+                )
+            ]
 
         results = []
         root_ref = None  # Reference to first post (thread root)
@@ -447,22 +450,24 @@ class BlueskyConnector(BasePlatformConnector):
                         images = self._extract_images_from_embed(embed)
                         has_media = len(images) > 0 or "$type" in embed
 
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": post.get("uri", "").split("/")[-1],
-                            "author": author.get("handle", ""),
-                            "author_id": author.get("did", ""),
-                            "body": record.get("text", ""),
-                            "likes": post.get("likeCount", 0),
-                            "comments": post.get("replyCount", 0),
-                            "shares": post.get("repostCount", 0),
-                            "published_at": record.get("createdAt"),
-                            "url": f"https://bsky.app/profile/{author.get('handle')}/post/{post.get('uri', '').split('/')[-1]}",
-                            # Image information
-                            "images": images,
-                            "image_count": len(images),
-                            "has_media": has_media,
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": post.get("uri", "").split("/")[-1],
+                                "author": author.get("handle", ""),
+                                "author_id": author.get("did", ""),
+                                "body": record.get("text", ""),
+                                "likes": post.get("likeCount", 0),
+                                "comments": post.get("replyCount", 0),
+                                "shares": post.get("repostCount", 0),
+                                "published_at": record.get("createdAt"),
+                                "url": f"https://bsky.app/profile/{author.get('handle')}/post/{post.get('uri', '').split('/')[-1]}",
+                                # Image information
+                                "images": images,
+                                "image_count": len(images),
+                                "has_media": has_media,
+                            }
+                        )
 
                     return FetchResult(
                         success=True,
@@ -525,20 +530,22 @@ class BlueskyConnector(BasePlatformConnector):
 
                         images = self._extract_images_from_embed(embed)
 
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": post.get("uri", "").split("/")[-1],
-                            "author": author.get("handle", ""),
-                            "author_id": author.get("did", ""),
-                            "body": record.get("text", ""),
-                            "likes": post.get("likeCount", 0),
-                            "comments": post.get("replyCount", 0),
-                            "shares": post.get("repostCount", 0),
-                            "published_at": record.get("createdAt"),
-                            "images": images,
-                            "image_count": len(images),
-                            "has_media": len(images) > 0,
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": post.get("uri", "").split("/")[-1],
+                                "author": author.get("handle", ""),
+                                "author_id": author.get("did", ""),
+                                "body": record.get("text", ""),
+                                "likes": post.get("likeCount", 0),
+                                "comments": post.get("replyCount", 0),
+                                "shares": post.get("repostCount", 0),
+                                "published_at": record.get("createdAt"),
+                                "images": images,
+                                "image_count": len(images),
+                                "has_media": len(images) > 0,
+                            }
+                        )
 
                     return FetchResult(
                         success=True,

@@ -71,9 +71,7 @@ class ToutiaoConnector(BasePlatformConnector):
                     label="Client Key",
                     field_type="text",
                     required=False,
-                    description=(
-                        "Toutiao app client key (for token refresh)"
-                    ),
+                    description=("Toutiao app client key (for token refresh)"),
                     env_var="TOUTIAO_CLIENT_KEY",
                 ),
                 ConnectorConfigField(
@@ -81,9 +79,7 @@ class ToutiaoConnector(BasePlatformConnector):
                     label="Client Secret",
                     field_type="password",
                     required=False,
-                    description=(
-                        "Toutiao app client secret (for token refresh)"
-                    ),
+                    description=("Toutiao app client secret (for token refresh)"),
                     env_var="TOUTIAO_CLIENT_SECRET",
                 ),
             ],
@@ -129,7 +125,9 @@ class ToutiaoConnector(BasePlatformConnector):
                     if data.get("error_code", 0) == 0:
                         user_data = data.get("data", {})
                         self._user_id = str(user_data.get("uid", user_data.get("open_id", "")))
-                        self._screen_name = user_data.get("screen_name", user_data.get("nickname", ""))
+                        self._screen_name = user_data.get(
+                            "screen_name", user_data.get("nickname", "")
+                        )
                         self._avatar_url = user_data.get("avatar_url", "")
 
                         self.status = ConnectionStatus.CONNECTED
@@ -214,9 +212,7 @@ class ToutiaoConnector(BasePlatformConnector):
                     )
                 else:
                     # Publish as microblog (微头条)
-                    result = await self._publish_micro(
-                        client, content, images, tags
-                    )
+                    result = await self._publish_micro(client, content, images, tags)
 
                 return result
 
@@ -420,20 +416,24 @@ class ToutiaoConnector(BasePlatformConnector):
 
                         results = []
                         for item in items[:limit]:
-                            results.append({
-                                "platform": self.platform_name,
-                                "post_id": str(item.get("item_id", item.get("id", ""))),
-                                "title": item.get("title", ""),
-                                "author": item.get("source", item.get("author", "")),
-                                "author_id": str(item.get("user_id", "")),
-                                "body": item.get("abstract", item.get("content", "")),
-                                "likes": item.get("like_count", item.get("digg_count", 0)),
-                                "comments": item.get("comment_count", 0),
-                                "shares": item.get("share_count", item.get("forward_count", 0)),
-                                "views": item.get("read_count", item.get("play_count", 0)),
-                                "url": item.get("share_url", item.get("article_url", "")),
-                                "published_at": item.get("publish_time", item.get("create_time")),
-                            })
+                            results.append(
+                                {
+                                    "platform": self.platform_name,
+                                    "post_id": str(item.get("item_id", item.get("id", ""))),
+                                    "title": item.get("title", ""),
+                                    "author": item.get("source", item.get("author", "")),
+                                    "author_id": str(item.get("user_id", "")),
+                                    "body": item.get("abstract", item.get("content", "")),
+                                    "likes": item.get("like_count", item.get("digg_count", 0)),
+                                    "comments": item.get("comment_count", 0),
+                                    "shares": item.get("share_count", item.get("forward_count", 0)),
+                                    "views": item.get("read_count", item.get("play_count", 0)),
+                                    "url": item.get("share_url", item.get("article_url", "")),
+                                    "published_at": item.get(
+                                        "publish_time", item.get("create_time")
+                                    ),
+                                }
+                            )
 
                         return FetchResult(
                             success=True,
@@ -498,21 +498,25 @@ class ToutiaoConnector(BasePlatformConnector):
 
                         results = []
                         for item in items[:limit]:
-                            results.append({
-                                "platform": self.platform_name,
-                                "post_id": str(item.get("item_id", item.get("article_id", ""))),
-                                "title": item.get("title", ""),
-                                "author": self._screen_name or "",
-                                "author_id": self._user_id or "",
-                                "body": item.get("abstract", item.get("content", "")),
-                                "likes": item.get("like_count", item.get("digg_count", 0)),
-                                "comments": item.get("comment_count", 0),
-                                "shares": item.get("share_count", item.get("forward_count", 0)),
-                                "views": item.get("read_count", 0),
-                                "url": item.get("share_url", item.get("article_url", "")),
-                                "published_at": item.get("publish_time", item.get("create_time")),
-                                "status": item.get("status", ""),  # published, reviewing, etc.
-                            })
+                            results.append(
+                                {
+                                    "platform": self.platform_name,
+                                    "post_id": str(item.get("item_id", item.get("article_id", ""))),
+                                    "title": item.get("title", ""),
+                                    "author": self._screen_name or "",
+                                    "author_id": self._user_id or "",
+                                    "body": item.get("abstract", item.get("content", "")),
+                                    "likes": item.get("like_count", item.get("digg_count", 0)),
+                                    "comments": item.get("comment_count", 0),
+                                    "shares": item.get("share_count", item.get("forward_count", 0)),
+                                    "views": item.get("read_count", 0),
+                                    "url": item.get("share_url", item.get("article_url", "")),
+                                    "published_at": item.get(
+                                        "publish_time", item.get("create_time")
+                                    ),
+                                    "status": item.get("status", ""),  # published, reviewing, etc.
+                                }
+                            )
 
                         return FetchResult(
                             success=True,

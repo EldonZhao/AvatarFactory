@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 class ConnectionStatus(str, Enum):
     """Connection status"""
+
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
     CONNECTED = "connected"
@@ -23,6 +24,7 @@ class ConnectionStatus(str, Enum):
 
 class IntegrationType(str, Enum):
     """How sub-agents integrate with this connector"""
+
     API = "api"
     AGENT_SKILL = "agent_skill"
     MCP_TOOL = "mcp_tool"
@@ -30,6 +32,7 @@ class IntegrationType(str, Enum):
 
 class ConnectorConfigField(BaseModel):
     """Schema for a single connector configuration field (for frontend rendering)."""
+
     name: str = Field(..., description="Field name used as the key in credentials dict")
     label: str = Field(..., description="Human-readable label for UI display")
     field_type: str = Field(
@@ -47,6 +50,7 @@ class ConnectorConfigField(BaseModel):
 
 class ConnectorCapabilities(BaseModel):
     """Describes the capabilities and metadata of a connector."""
+
     platform: str = Field(..., description="Platform identifier")
     display_name: str = Field(..., description="Human-readable platform name")
     description: str = Field(default="", description="Short description of the connector")
@@ -90,6 +94,7 @@ class ConnectorCapabilities(BaseModel):
 
 class ConnectorConfig(BaseModel):
     """Configuration for platform connector"""
+
     # Common fields
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
@@ -118,6 +123,7 @@ class ConnectorConfig(BaseModel):
 
 class PublishResult(BaseModel):
     """Result of publishing content"""
+
     success: bool
     post_id: Optional[str] = None
     post_url: Optional[str] = None
@@ -129,6 +135,7 @@ class PublishResult(BaseModel):
 
 class FetchResult(BaseModel):
     """Result of fetching content"""
+
     success: bool
     data: List[Dict[str, Any]] = field(default_factory=list)
     error: Optional[str] = None
@@ -142,6 +149,7 @@ class FetchResult(BaseModel):
 
 class TrendingContent(BaseModel):
     """Trending/popular content from platform"""
+
     platform: str
     post_id: str
     author: str

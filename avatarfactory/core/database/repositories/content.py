@@ -354,9 +354,9 @@ class ReviewRepository(BaseRepository[ReviewModel]):
         """
         query = select(
             func.count().filter(ReviewModel.overall_score >= 80).label("high"),
-            func.count().filter(
-                and_(ReviewModel.overall_score >= 60, ReviewModel.overall_score < 80)
-            ).label("medium"),
+            func.count()
+            .filter(and_(ReviewModel.overall_score >= 60, ReviewModel.overall_score < 80))
+            .label("medium"),
             func.count().filter(ReviewModel.overall_score < 60).label("low"),
         )
 

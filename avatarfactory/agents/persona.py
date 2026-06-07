@@ -45,9 +45,7 @@ class PersonaAgent(BaseAgent):
 
         return await handler(message.payload, message.context)
 
-    async def _create_persona(
-        self, payload: Dict[str, Any], context: Dict[str, Any]
-    ) -> Persona:
+    async def _create_persona(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Persona:
         """
         Create a new persona from user description.
 
@@ -130,9 +128,7 @@ Provide a complete persona configuration in JSON format."""
             identity=Identity(**persona_data["identity"]),
             target_audience=TargetAudience(**persona_data["target_audience"]),
             voice_style=VoiceStyle(**persona_data["voice_style"]),
-            content_pillars=[
-                ContentPillar(**pillar) for pillar in persona_data["content_pillars"]
-            ],
+            content_pillars=[ContentPillar(**pillar) for pillar in persona_data["content_pillars"]],
             boundaries=Boundaries(**persona_data["boundaries"]),
             # Enable notifications by default for new personas
             notification=NotificationConfig(enabled=True),
@@ -156,9 +152,7 @@ Provide a complete persona configuration in JSON format."""
         self.log("INFO", f"Created persona: {persona.id} - {persona.identity.name}")
         return persona
 
-    async def _update_persona(
-        self, payload: Dict[str, Any], context: Dict[str, Any]
-    ) -> Persona:
+    async def _update_persona(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Persona:
         """
         Update an existing persona.
 
@@ -222,9 +216,7 @@ Provide a complete persona configuration in JSON format."""
         self.log("INFO", f"Updated persona to {new_version}")
         return updated_persona
 
-    async def _analyze_impact(
-        self, old_persona: Persona, new_persona: Persona, reason: str
-    ) -> str:
+    async def _analyze_impact(self, old_persona: Persona, new_persona: Persona, reason: str) -> str:
         """Analyze expected impact of persona changes using LLM"""
         prompt = f"""Analyze the impact of these persona changes:
 

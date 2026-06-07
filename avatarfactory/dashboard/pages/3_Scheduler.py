@@ -7,7 +7,9 @@ Displays scheduled tasks, their status, and execution history.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 
 import streamlit as st
 import httpx
@@ -48,9 +50,7 @@ with st.sidebar:
                 persona_opts[f"{p.name} ({p.id[:12]}...)"] = p.id
 
             task_persona_label = st.selectbox(
-                "Persona",
-                list(persona_opts.keys()),
-                key="task_persona_select"
+                "Persona", list(persona_opts.keys()), key="task_persona_select"
             )
             task_persona_id = persona_opts[task_persona_label]
 
@@ -61,7 +61,7 @@ with st.sidebar:
                 ["bluesky", "xiaohongshu", "twitter"],
                 default=["bluesky"],
                 key="discovery_platforms_select",
-                help="Platforms to scan for trending topics"
+                help="Platforms to scan for trending topics",
             )
 
             # Shared schedule options for discovery and content generation
@@ -84,7 +84,7 @@ with st.sidebar:
                 list(schedule_options.keys()),
                 index=4,  # Default to "Every 6 hours"
                 key="discovery_schedule_select",
-                help="How often to scan for trending topics"
+                help="How often to scan for trending topics",
             )
             discovery_schedule = schedule_options[discovery_schedule_label]
 
@@ -95,7 +95,7 @@ with st.sidebar:
                 ["bluesky", "xiaohongshu", "twitter"],
                 default=["xiaohongshu"],
                 key="content_platforms_select",
-                help="Platforms to generate content for"
+                help="Platforms to generate content for",
             )
 
             content_schedule_label = st.selectbox(
@@ -103,11 +103,13 @@ with st.sidebar:
                 list(schedule_options.keys()),
                 index=4,  # Default to "Every 6 hours"
                 key="content_schedule_select",
-                help="When to generate content suggestions"
+                help="When to generate content suggestions",
             )
             content_schedule = schedule_options[content_schedule_label]
 
-            st.caption("This will create discovery and content generation tasks with the selected settings.")
+            st.caption(
+                "This will create discovery and content generation tasks with the selected settings."
+            )
 
             if st.button("Setup Tasks", key="create_task_btn", type="primary"):
                 if discovery_platforms or content_platforms:
@@ -121,7 +123,7 @@ with st.sidebar:
                                         "content_platforms": content_platforms,
                                         "discovery_schedule": discovery_schedule,
                                         "content_schedule": content_schedule,
-                                    }
+                                    },
                                 )
                                 if response.status_code == 200:
                                     data = response.json()

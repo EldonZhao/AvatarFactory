@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     from streamlit_agraph import agraph, Node, Edge, Config
+
     AGRAPH_AVAILABLE = True
 except ImportError:
     AGRAPH_AVAILABLE = False
@@ -48,24 +49,28 @@ def build_topology_graph(
         elif node.get("type") == "task":
             shape = "star"
 
-        agraph_nodes.append(Node(
-            id=node["id"],
-            label=node["label"],
-            size=node.get("size", 25),
-            color=node.get("color", "#4A90D9"),
-            shape=shape,
-            title=f"{node.get('type', 'unknown').capitalize()}: {node['label']}",
-        ))
+        agraph_nodes.append(
+            Node(
+                id=node["id"],
+                label=node["label"],
+                size=node.get("size", 25),
+                color=node.get("color", "#4A90D9"),
+                shape=shape,
+                title=f"{node.get('type', 'unknown').capitalize()}: {node['label']}",
+            )
+        )
 
     # Build agraph edges
     agraph_edges = []
     for edge in edges:
-        agraph_edges.append(Edge(
-            source=edge["source"],
-            target=edge["target"],
-            label=edge.get("label", ""),
-            color=edge.get("color", "#888888"),
-        ))
+        agraph_edges.append(
+            Edge(
+                source=edge["source"],
+                target=edge["target"],
+                label=edge.get("label", ""),
+                color=edge.get("color", "#888888"),
+            )
+        )
 
     # Configuration
     config = Config(

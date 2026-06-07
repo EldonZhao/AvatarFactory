@@ -46,7 +46,11 @@ class TopicAgent(BaseAgent):
 
     async def process(self, message: AgentMessage) -> Dict[str, Any]:
         """Process discovery-related messages."""
-        task_type = message.task_type.value if hasattr(message.task_type, 'value') else str(message.task_type)
+        task_type = (
+            message.task_type.value
+            if hasattr(message.task_type, "value")
+            else str(message.task_type)
+        )
         payload = message.payload
 
         if task_type == "discover_trending":
@@ -95,6 +99,7 @@ class TopicAgent(BaseAgent):
         if not config:
             # Try to create from environment
             import os
+
             config = ConnectorConfig()
             if platform.lower() == "bluesky":
                 config.username = os.getenv("BLUESKY_USERNAME")
@@ -147,7 +152,7 @@ class TopicAgent(BaseAgent):
                     "platform": platform,
                     "query": query,
                     "count": len(trending_contents),
-                    "contents": [c.model_dump(mode='json') for c in trending_contents],
+                    "contents": [c.model_dump(mode="json") for c in trending_contents],
                 },
             }
 
@@ -263,8 +268,8 @@ Return ONLY valid JSON, no other text."""
             # Parse JSON response
             try:
                 # Clean response - find JSON object
-                json_start = response.find('{')
-                json_end = response.rfind('}') + 1
+                json_start = response.find("{")
+                json_end = response.rfind("}") + 1
                 if json_start >= 0 and json_end > json_start:
                     analysis_data = json.loads(response[json_start:json_end])
                 else:
@@ -329,7 +334,7 @@ Return ONLY valid JSON, no other text."""
             return {
                 "status": "success",
                 "data": {
-                    "analysis": analysis.model_dump(mode='json'),
+                    "analysis": analysis.model_dump(mode="json"),
                     "content_count": len(contents),
                 },
             }
@@ -423,7 +428,7 @@ Visual Themes: {', '.join(media_recs.get('visual_themes', []))}
 === HIGH-PERFORMING CONTENT EXAMPLES ===
 """
             for i, c in enumerate(samples):
-                img_info = f" | Images: {c.get('image_count', 0)}" if c.get('has_media') else ""
+                img_info = f" | Images: {c.get('image_count', 0)}" if c.get("has_media") else ""
                 trending_context += f"""
 Example {i+1} (Likes: {c.get('likes', 0)}{img_info}):
 {c.get('body', '')[:200]}...
@@ -472,8 +477,8 @@ Return ONLY valid JSON array, no other text."""
 
             # Parse JSON response
             try:
-                json_start = response.find('[')
-                json_end = response.rfind(']') + 1
+                json_start = response.find("[")
+                json_end = response.rfind("]") + 1
                 if json_start >= 0 and json_end > json_start:
                     ideas_data = json.loads(response[json_start:json_end])
                 else:
@@ -510,7 +515,9 @@ Return ONLY valid JSON array, no other text."""
                 persona_id=persona_id,
                 platforms_searched=[c.get("platform", "unknown") for c in trending_contents[:1]],
                 trending_content_count=len(trending_contents),
-                patterns_found=len(pattern_analysis.get("hook_patterns", [])) if pattern_analysis else 0,
+                patterns_found=(
+                    len(pattern_analysis.get("hook_patterns", [])) if pattern_analysis else 0
+                ),
                 ideas_generated=len(content_ideas),
                 content_ideas=content_ideas,
                 persona_suggestions=suggestions,
@@ -519,8 +526,8 @@ Return ONLY valid JSON array, no other text."""
             return {
                 "status": "success",
                 "data": {
-                    "report": report.model_dump(mode='json'),
-                    "ideas": [idea.model_dump(mode='json') for idea in content_ideas],
+                    "report": report.model_dump(mode="json"),
+                    "ideas": [idea.model_dump(mode="json") for idea in content_ideas],
                     "persona_suggestions": suggestions,
                 },
             }
@@ -551,7 +558,9 @@ Return ONLY valid JSON array, no other text."""
 
         if trending_contents:
             avg_likes = sum(c.get("likes", 0) for c in trending_contents) / len(trending_contents)
-            context_parts.append(f"Analyzed {len(trending_contents)} posts, avg likes: {avg_likes:.0f}")
+            context_parts.append(
+                f"Analyzed {len(trending_contents)} posts, avg likes: {avg_likes:.0f}"
+            )
 
         prompt = f"""Based on the following market analysis, suggest 2-4 optimizations for this persona:
 
@@ -576,8 +585,8 @@ Return ONLY a JSON array of suggestion strings:
                 max_tokens=500,
             )
 
-            json_start = response.find('[')
-            json_end = response.rfind(']') + 1
+            json_start = response.find("[")
+            json_end = response.rfind("]") + 1
             if json_start >= 0 and json_end > json_start:
                 return json.loads(response[json_start:json_end])
             return []
@@ -601,12 +610,14 @@ Return ONLY a JSON array of suggestion strings:
         This is the main entry point for discovery functionality.
         """
         # Step 1: Fetch trending content
-        trending_result = await self._discover_trending({
-            "persona_id": persona_id,
-            "platform": platform,
-            "query": query,
-            "limit": limit,
-        })
+        trending_result = await self._discover_trending(
+            {
+                "persona_id": persona_id,
+                "platform": platform,
+                "query": query,
+                "limit": limit,
+            }
+        )
 
         if trending_result.get("status") != "success":
             return trending_result
@@ -614,22 +625,26 @@ Return ONLY a JSON array of suggestion strings:
         contents = trending_result["data"]["contents"]
 
         # Step 2: Analyze patterns
-        analysis_result = await self._analyze_patterns({
-            "contents": contents,
-            "persona_id": persona_id,
-        })
+        analysis_result = await self._analyze_patterns(
+            {
+                "contents": contents,
+                "persona_id": persona_id,
+            }
+        )
 
         pattern_analysis = None
         if analysis_result.get("status") == "success":
             pattern_analysis = analysis_result["data"]["analysis"]
 
         # Step 3: Generate inspiration
-        inspiration_result = await self._get_inspiration({
-            "persona_id": persona_id,
-            "pattern_analysis": pattern_analysis,
-            "trending_contents": contents,
-            "idea_count": 5,
-        })
+        inspiration_result = await self._get_inspiration(
+            {
+                "persona_id": persona_id,
+                "pattern_analysis": pattern_analysis,
+                "trending_contents": contents,
+                "idea_count": 5,
+            }
+        )
 
         if inspiration_result.get("status") != "success":
             return inspiration_result

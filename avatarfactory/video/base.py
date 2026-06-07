@@ -11,12 +11,14 @@ from typing import Any, Dict, List, Optional
 
 class VideoType(str, Enum):
     """Type of video to generate."""
+
     SLIDESHOW = "slideshow"
     AVATAR = "avatar"
 
 
 class TTSProviderType(str, Enum):
     """Supported TTS providers."""
+
     AZURE = "azure"
     EDGE = "edge"
     AUTO = "auto"
@@ -25,6 +27,7 @@ class TTSProviderType(str, Enum):
 @dataclass
 class VoiceInfo:
     """Information about an available voice."""
+
     id: str
     name: str
     gender: str
@@ -39,6 +42,7 @@ class VoiceInfo:
 @dataclass
 class VideoConfig:
     """Configuration for video generation."""
+
     video_type: VideoType = VideoType.SLIDESHOW
     voice: str = "zh-CN-XiaoxuanNeural"
     avatar_character: Optional[str] = None  # For avatar type: lisa, grace, etc.
@@ -62,6 +66,7 @@ class VideoConfig:
 @dataclass
 class VideoResult:
     """Result of video generation."""
+
     success: bool
     video_path: Optional[Path] = None
     audio_path: Optional[Path] = None
@@ -170,9 +175,11 @@ class AvatarProvider(ABC):
 
 class TTSError(Exception):
     """Exception raised for TTS-related errors."""
+
     pass
 
 
 class VideoError(Exception):
     """Exception raised for video generation errors."""
+
     pass

@@ -59,9 +59,11 @@ class ConnectorRegistry:
         Returns:
             Decorator function
         """
+
         def decorator(connector_class: Type[BasePlatformConnector]):
             cls.register(platform, connector_class)
             return connector_class
+
         return decorator
 
     @classmethod
@@ -103,10 +105,7 @@ class ConnectorRegistry:
 
         if not connector_class:
             available = ", ".join(cls._connectors.keys())
-            raise ValueError(
-                f"Unknown platform: {platform}. "
-                f"Available platforms: {available}"
-            )
+            raise ValueError(f"Unknown platform: {platform}. " f"Available platforms: {available}")
 
         if use_cache:
             cache_key = f"{platform_key}:{id(config)}"
@@ -253,10 +252,7 @@ class ConnectorRegistry:
 
         if not connector_class:
             available = ", ".join(cls._connectors.keys())
-            raise ValueError(
-                f"Unknown platform: {platform}. "
-                f"Available platforms: {available}"
-            )
+            raise ValueError(f"Unknown platform: {platform}. " f"Available platforms: {available}")
 
         # Get credentials for this tenant
         tenant_manager = TenantManager(kb_path)
@@ -264,8 +260,7 @@ class ConnectorRegistry:
 
         if not credentials:
             raise ValueError(
-                f"No credentials configured for platform '{platform}' "
-                f"in tenant '{tenant_id}'"
+                f"No credentials configured for platform '{platform}' " f"in tenant '{tenant_id}'"
             )
 
         # Create config from credentials

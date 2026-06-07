@@ -27,7 +27,8 @@ st.set_page_config(
 )
 
 # Custom CSS
-st.markdown("""
+st.markdown(
+    """
 <style>
     .stApp {
         background-color: #f8f9fa;
@@ -68,7 +69,9 @@ st.markdown("""
         color: #c62828;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 def main() -> None:
@@ -85,7 +88,7 @@ def main() -> None:
     st.markdown('<h1 class="main-header">🎭 AvatarFactory Dashboard</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="sub-header">AI-Powered Persona Management for Social Platforms</p>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # Quick stats
@@ -121,7 +124,8 @@ def main() -> None:
                 tagline_str = p.tagline if p.tagline else "No tagline"
                 content_count = p.draft_count + p.published_count
 
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                 <div style="
                     background: white;
                     padding: 16px;
@@ -146,7 +150,9 @@ def main() -> None:
                         </div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
             if len(personas) > 3:
                 st.caption(f"+ {len(personas) - 3} more personas. See Personas page for all.")
@@ -160,7 +166,8 @@ def main() -> None:
             status_color = "#4CAF50" if c.configured else "#ff9800"
             status_text = "Configured" if c.configured else "Not configured"
 
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="
                 display: flex;
                 justify-content: space-between;
@@ -173,7 +180,9 @@ def main() -> None:
                 <span style="font-weight: 500;">{c.platform.capitalize()}</span>
                 <span style="color: {status_color};">{status_icon} {status_text}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 
@@ -196,10 +205,10 @@ def main() -> None:
     st.markdown("---")
     st.markdown(
         '<p style="text-align: center; color: #999; font-size: 12px;">'
-        'AvatarFactory Dashboard v1.0 | '
+        "AvatarFactory Dashboard v1.0 | "
         '<a href="https://github.com/your-repo/avatarfactory">GitHub</a>'
-        '</p>',
-        unsafe_allow_html=True
+        "</p>",
+        unsafe_allow_html=True,
     )
 
 

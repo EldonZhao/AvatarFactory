@@ -122,9 +122,7 @@ class EvolutionAgent(BaseAgent):
 
         return analysis
 
-    async def _analyze_review_patterns(
-        self, persona_id: str, days: int
-    ) -> Dict[str, Any]:
+    async def _analyze_review_patterns(self, persona_id: str, days: int) -> Dict[str, Any]:
         """Analyze review score patterns."""
         cutoff = datetime.now() - timedelta(days=days)
 
@@ -133,10 +131,7 @@ class EvolutionAgent(BaseAgent):
         contents += self.kb.list_content(persona_id=persona_id, status="published")
 
         # Filter by date
-        recent_contents = [
-            c for c in contents
-            if c.created_at and c.created_at >= cutoff
-        ]
+        recent_contents = [c for c in contents if c.created_at and c.created_at >= cutoff]
 
         if not recent_contents:
             return {"sample_size": 0}
@@ -163,9 +158,7 @@ class EvolutionAgent(BaseAgent):
             issue_counts[key] = issue_counts.get(key, 0) + 1
 
         # Get top issues
-        top_issues = sorted(
-            issue_counts.items(), key=lambda x: x[1], reverse=True
-        )[:5]
+        top_issues = sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
         return {
             "sample_size": len(recent_contents),
@@ -179,9 +172,7 @@ class EvolutionAgent(BaseAgent):
             "top_issues": [{"issue": k, "count": v} for k, v in top_issues],
         }
 
-    async def _analyze_content_performance(
-        self, persona_id: str, days: int
-    ) -> Dict[str, Any]:
+    async def _analyze_content_performance(self, persona_id: str, days: int) -> Dict[str, Any]:
         """Analyze content performance patterns."""
         cutoff = datetime.now() - timedelta(days=days)
 
@@ -214,9 +205,7 @@ class EvolutionAgent(BaseAgent):
             "publishing_rate": len(recent) / max(days, 1),
         }
 
-    async def _analyze_discovery_alignment(
-        self, persona_id: str
-    ) -> Dict[str, Any]:
+    async def _analyze_discovery_alignment(self, persona_id: str) -> Dict[str, Any]:
         """Analyze how well persona aligns with discovered trends."""
         # Get latest discovery
         discovery = self.kb.get_latest_discovery(persona_id)
@@ -548,7 +537,7 @@ Generate optimization suggestions."""
         """
         self.log(
             "INFO",
-            f"Reviewing suggestion {suggestion_id}: {'approved' if approved else 'rejected'}"
+            f"Reviewing suggestion {suggestion_id}: {'approved' if approved else 'rejected'}",
         )
 
         suggestion = self.kb.load_evolution_suggestion(persona_id, suggestion_id)
@@ -606,14 +595,10 @@ Generate optimization suggestions."""
 
         # Apply based on target
         if suggestion.target == EvolutionTarget.PERSONA:
-            result.update(
-                await self._apply_persona_change(persona, suggestion)
-            )
+            result.update(await self._apply_persona_change(persona, suggestion))
         else:
             # Agent config change
-            result.update(
-                await self._apply_agent_config_change(persona_id, suggestion)
-            )
+            result.update(await self._apply_agent_config_change(persona_id, suggestion))
 
         # Update suggestion status
         if auto_applied:
@@ -659,12 +644,12 @@ Generate optimization suggestions."""
             # Handle pillar changes (more complex)
             if "add_pillar" in proposed:
                 from avatarfactory.models.schemas import ContentPillar
+
                 new_pillar = ContentPillar(**proposed["add_pillar"])
                 persona.content_pillars.append(new_pillar)
             if "remove_pillar" in proposed:
                 persona.content_pillars = [
-                    p for p in persona.content_pillars
-                    if p.name != proposed["remove_pillar"]
+                    p for p in persona.content_pillars if p.name != proposed["remove_pillar"]
                 ]
             if "update_pillar" in proposed:
                 for p in persona.content_pillars:
@@ -718,9 +703,7 @@ Generate optimization suggestions."""
 
         # Apply proposed changes
         proposed = suggestion.proposed_value or {}
-        new_config = self.config_manager.update_config(
-            persona_id, agent_type, proposed
-        )
+        new_config = self.config_manager.update_config(persona_id, agent_type, proposed)
 
         return {
             "agent_type": agent_type,
@@ -782,9 +765,7 @@ Generate optimization suggestions."""
     # Auto Evolution
     # =========================================================================
 
-    async def check_auto_evolution_triggers(
-        self, persona_id: str
-    ) -> bool:
+    async def check_auto_evolution_triggers(self, persona_id: str) -> bool:
         """
         Check if auto-evolution should be triggered.
 
@@ -815,9 +796,7 @@ Generate optimization suggestions."""
             "biweekly": 14,
             "monthly": 30,
         }
-        max_age_days = schedule_days.get(
-            evolution_config.analysis_schedule, 7
-        )
+        max_age_days = schedule_days.get(evolution_config.analysis_schedule, 7)
         age = datetime.now() - analysis.analyzed_at
         if age.days >= max_age_days:
             return True
@@ -830,9 +809,7 @@ Generate optimization suggestions."""
 
         return False
 
-    async def run_scheduled_evolution(
-        self, persona_id: str
-    ) -> Dict[str, Any]:
+    async def run_scheduled_evolution(self, persona_id: str) -> Dict[str, Any]:
         """
         Run scheduled evolution analysis and suggestion generation.
 
@@ -870,8 +847,7 @@ Generate optimization suggestions."""
             "auto_applied_count": len(auto_applied),
             "auto_applied_ids": auto_applied,
             "pending_approval": [
-                s.id for s in suggestions
-                if s.status == EvolutionSuggestionStatus.PENDING
+                s.id for s in suggestions if s.status == EvolutionSuggestionStatus.PENDING
             ],
         }
 
@@ -905,14 +881,14 @@ Generate optimization suggestions."""
         # Get persona history
         history = self.kb.get_persona_history(persona_id)
         recent_versions = [
-            v for v in history
-            if v.timestamp >= datetime.now() - timedelta(days=period_days)
+            v for v in history if v.timestamp >= datetime.now() - timedelta(days=period_days)
         ]
 
         # Get evolution suggestions history
         all_suggestions = self.kb.list_evolution_suggestions(persona_id)
         recent_suggestions = [
-            s for s in all_suggestions
+            s
+            for s in all_suggestions
             if s.created_at >= datetime.now() - timedelta(days=period_days)
         ]
 
@@ -925,6 +901,7 @@ Generate optimization suggestions."""
         week = datetime.now().strftime("%Y-W%W")
 
         from avatarfactory.models.schemas import WeeklyRetrospective
+
         retrospective = WeeklyRetrospective(
             week=week,
             persona_id=persona_id,
@@ -1021,9 +998,7 @@ Output MUST be valid JSON:
         user_feedback = payload.get("user_feedback")
 
         if user_feedback:
-            suggestions = await self.generate_suggestions_from_user_input(
-                persona_id, user_feedback
-            )
+            suggestions = await self.generate_suggestions_from_user_input(persona_id, user_feedback)
         else:
             suggestions = await self.generate_suggestions(persona_id)
 
@@ -1120,9 +1095,7 @@ Output MUST be valid JSON:
         else:
             return 7  # Default to 7 days
 
-    def _calculate_trend(
-        self, data_points: List[Tuple[datetime, float]]
-    ) -> str:
+    def _calculate_trend(self, data_points: List[Tuple[datetime, float]]) -> str:
         """Calculate trend from time series data."""
         if len(data_points) < 2:
             return "stable"
@@ -1149,9 +1122,7 @@ Output MUST be valid JSON:
         else:
             return "stable"
 
-    def _increment_version(
-        self, current_version: str, severity: EvolutionSeverity
-    ) -> str:
+    def _increment_version(self, current_version: str, severity: EvolutionSeverity) -> str:
         """Increment version based on change severity."""
         parts = current_version.lstrip("v").split(".")
         major = int(parts[0])

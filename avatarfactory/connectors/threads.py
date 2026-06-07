@@ -97,9 +97,7 @@ class ThreadsConnector(BasePlatformConnector):
             raise ValueError("Threads requires access_token from Meta Graph API")
 
         if not self._user_id:
-            raise ValueError(
-                "Threads requires user_id. Obtain this during OAuth flow."
-            )
+            raise ValueError("Threads requires user_id. Obtain this during OAuth flow.")
 
         self.status = ConnectionStatus.CONNECTING
 
@@ -208,8 +206,10 @@ class ThreadsConnector(BasePlatformConnector):
                 )
 
                 if container_response.status_code != 200:
-                    error = container_response.json().get("error", {}).get(
-                        "message", container_response.text
+                    error = (
+                        container_response.json()
+                        .get("error", {})
+                        .get("message", container_response.text)
                     )
                     return PublishResult(
                         success=False,
@@ -241,8 +241,10 @@ class ThreadsConnector(BasePlatformConnector):
                         raw_response=data,
                     )
                 else:
-                    error = publish_response.json().get("error", {}).get(
-                        "message", publish_response.text
+                    error = (
+                        publish_response.json()
+                        .get("error", {})
+                        .get("message", publish_response.text)
                     )
                     return PublishResult(
                         success=False,
@@ -320,17 +322,19 @@ class ThreadsConnector(BasePlatformConnector):
 
                     results = []
                     for post in posts[:limit]:
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": post.get("id", ""),
-                            "author": target_user,
-                            "body": post.get("text", ""),
-                            "likes": post.get("like_count", 0),
-                            "comments": post.get("reply_count", 0),
-                            "url": post.get("permalink"),
-                            "published_at": post.get("timestamp"),
-                            "media_type": post.get("media_type"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": post.get("id", ""),
+                                "author": target_user,
+                                "body": post.get("text", ""),
+                                "likes": post.get("like_count", 0),
+                                "comments": post.get("reply_count", 0),
+                                "url": post.get("permalink"),
+                                "published_at": post.get("timestamp"),
+                                "media_type": post.get("media_type"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,
@@ -340,9 +344,7 @@ class ThreadsConnector(BasePlatformConnector):
                         cursor=data.get("paging", {}).get("cursors", {}).get("after"),
                     )
                 else:
-                    error = response.json().get("error", {}).get(
-                        "message", response.text
-                    )
+                    error = response.json().get("error", {}).get("message", response.text)
                     return FetchResult(
                         success=False,
                         error=error,

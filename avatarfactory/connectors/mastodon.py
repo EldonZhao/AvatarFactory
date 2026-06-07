@@ -36,9 +36,7 @@ class MastodonConnector(BasePlatformConnector):
 
     def __init__(self, config: ConnectorConfig):
         super().__init__(config)
-        self._instance_url = (
-            config.extra.get("instance_url", "https://mastodon.social").rstrip("/")
-        )
+        self._instance_url = config.extra.get("instance_url", "https://mastodon.social").rstrip("/")
         self._account_id: Optional[str] = None
         self._username: Optional[str] = None
 
@@ -70,10 +68,7 @@ class MastodonConnector(BasePlatformConnector):
                     label="Instance URL",
                     field_type="url",
                     required=False,
-                    description=(
-                        "Mastodon instance URL"
-                        " (default: mastodon.social)"
-                    ),
+                    description=("Mastodon instance URL" " (default: mastodon.social)"),
                     placeholder="https://mastodon.social",
                     env_var="MASTODON_INSTANCE_URL",
                 ),
@@ -347,19 +342,21 @@ class MastodonConnector(BasePlatformConnector):
                 results = []
                 for status in statuses[:limit]:
                     account = status.get("account", {})
-                    results.append({
-                        "platform": self.platform_name,
-                        "post_id": status.get("id", ""),
-                        "author": account.get("username", ""),
-                        "author_id": account.get("id", ""),
-                        "body": status.get("content", ""),  # HTML content
-                        "likes": status.get("favourites_count", 0),
-                        "comments": status.get("replies_count", 0),
-                        "shares": status.get("reblogs_count", 0),
-                        "url": status.get("url"),
-                        "published_at": status.get("created_at"),
-                        "visibility": status.get("visibility"),
-                    })
+                    results.append(
+                        {
+                            "platform": self.platform_name,
+                            "post_id": status.get("id", ""),
+                            "author": account.get("username", ""),
+                            "author_id": account.get("id", ""),
+                            "body": status.get("content", ""),  # HTML content
+                            "likes": status.get("favourites_count", 0),
+                            "comments": status.get("replies_count", 0),
+                            "shares": status.get("reblogs_count", 0),
+                            "url": status.get("url"),
+                            "published_at": status.get("created_at"),
+                            "visibility": status.get("visibility"),
+                        }
+                    )
 
                 return FetchResult(
                     success=True,
@@ -415,18 +412,20 @@ class MastodonConnector(BasePlatformConnector):
                     results = []
                     for status in statuses[:limit]:
                         account = status.get("account", {})
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": status.get("id", ""),
-                            "author": account.get("username", ""),
-                            "author_id": account.get("id", ""),
-                            "body": status.get("content", ""),
-                            "likes": status.get("favourites_count", 0),
-                            "comments": status.get("replies_count", 0),
-                            "shares": status.get("reblogs_count", 0),
-                            "url": status.get("url"),
-                            "published_at": status.get("created_at"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": status.get("id", ""),
+                                "author": account.get("username", ""),
+                                "author_id": account.get("id", ""),
+                                "body": status.get("content", ""),
+                                "likes": status.get("favourites_count", 0),
+                                "comments": status.get("replies_count", 0),
+                                "shares": status.get("reblogs_count", 0),
+                                "url": status.get("url"),
+                                "published_at": status.get("created_at"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,

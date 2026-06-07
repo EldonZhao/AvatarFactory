@@ -193,17 +193,15 @@ class TestConnectorGetCapabilities:
         """Test that all connectors define config fields."""
         all_caps = ConnectorRegistry.get_all_capabilities()
         for platform, caps in all_caps.items():
-            assert len(caps.config_fields) > 0, (
-                f"Connector '{platform}' has no config_fields defined"
-            )
+            assert (
+                len(caps.config_fields) > 0
+            ), f"Connector '{platform}' has no config_fields defined"
 
     def test_all_connectors_have_usage_guide(self):
         """Test that all connectors define a usage guide."""
         all_caps = ConnectorRegistry.get_all_capabilities()
         for platform, caps in all_caps.items():
-            assert caps.usage_guide != "", (
-                f"Connector '{platform}' has no usage_guide defined"
-            )
+            assert caps.usage_guide != "", f"Connector '{platform}' has no usage_guide defined"
 
     def test_required_fields_have_env_var(self):
         """Test that required config fields have env_var fallback."""
@@ -212,8 +210,7 @@ class TestConnectorGetCapabilities:
             for field in caps.config_fields:
                 if field.required:
                     assert field.env_var is not None, (
-                        f"Required field '{field.name}' in '{platform}' "
-                        f"has no env_var fallback"
+                        f"Required field '{field.name}' in '{platform}' " f"has no env_var fallback"
                     )
 
 
@@ -281,18 +278,18 @@ class TestRegistryCapabilityQueries:
         topic_connectors = ConnectorRegistry.list_topic_discovery_connectors()
         all_caps = ConnectorRegistry.get_all_capabilities()
         for platform in topic_connectors:
-            assert all_caps[platform].supports_fetching is True, (
-                f"Topic discovery connector '{platform}' does not support fetching"
-            )
+            assert (
+                all_caps[platform].supports_fetching is True
+            ), f"Topic discovery connector '{platform}' does not support fetching"
 
     def test_persona_discovery_is_subset_of_fetching(self):
         """Test that persona discovery connectors all support fetching."""
         persona_connectors = ConnectorRegistry.list_persona_discovery_connectors()
         all_caps = ConnectorRegistry.get_all_capabilities()
         for platform in persona_connectors:
-            assert all_caps[platform].supports_fetching is True, (
-                f"Persona discovery connector '{platform}' does not support fetching"
-            )
+            assert (
+                all_caps[platform].supports_fetching is True
+            ), f"Persona discovery connector '{platform}' does not support fetching"
 
 
 if __name__ == "__main__":

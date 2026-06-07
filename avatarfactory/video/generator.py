@@ -48,9 +48,9 @@ class VideoGenerator:
             tts_provider: TTS provider to use ("auto", "azure", "edge")
             output_dir: Base output directory for videos
         """
-        self.output_dir = Path(
-            output_dir or os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
-        ) / "videos"
+        self.output_dir = (
+            Path(output_dir or os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")) / "videos"
+        )
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize providers
@@ -60,9 +60,7 @@ class VideoGenerator:
 
         # Determine TTS provider
         provider_type = (
-            TTSProviderType(tts_provider)
-            if isinstance(tts_provider, str)
-            else tts_provider
+            TTSProviderType(tts_provider) if isinstance(tts_provider, str) else tts_provider
         )
         self._init_providers(provider_type)
 
@@ -236,8 +234,7 @@ class VideoGenerator:
 
         if not config.avatar_character:
             raise VideoError(
-                "Avatar character not specified. "
-                "Use --avatar option (e.g., lisa, grace, harry)"
+                "Avatar character not specified. " "Use --avatar option (e.g., lisa, grace, harry)"
             )
 
         video_path = config.output_path or (output_dir / "video_avatar.mp4")
@@ -311,7 +308,8 @@ class VideoGenerator:
         return {
             "tts_provider": self._tts_provider.name if self._tts_provider else None,
             "tts_available": self._tts_provider is not None,
-            "avatar_available": self._avatar_provider is not None and self._avatar_provider.is_available(),
+            "avatar_available": self._avatar_provider is not None
+            and self._avatar_provider.is_available(),
             "edge_available": EdgeTTSProvider().is_available(),
             "azure_available": AzureTTSProvider().is_available(),
         }

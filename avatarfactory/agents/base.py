@@ -17,6 +17,7 @@ KnowledgeBaseType = Any  # Duck typing for KnowledgeBase or KnowledgeBaseDB
 @dataclass
 class PublishResult:
     """Result of a multi-platform publish operation."""
+
     platform: str
     success: bool
     post_id: Optional[str] = None
@@ -59,6 +60,7 @@ class BaseAgent(ABC):
         """Lazily initialize agent config manager."""
         if self._config_manager is None:
             from avatarfactory.core.agent_config import AgentConfigManager
+
             self._config_manager = AgentConfigManager(self.kb)
         return self._config_manager
 

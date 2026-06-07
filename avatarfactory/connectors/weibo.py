@@ -91,9 +91,7 @@ class WeiboConnector(BasePlatformConnector):
         try:
             import httpx
         except ImportError:
-            raise ImportError(
-                "httpx required for Weibo connector. Install with: pip install httpx"
-            )
+            raise ImportError("httpx required for Weibo connector. Install with: pip install httpx")
 
         if not self.config.access_token:
             raise ValueError("Weibo requires access_token from OAuth 2.0 flow")
@@ -197,9 +195,7 @@ class WeiboConnector(BasePlatformConnector):
             async with httpx.AsyncClient() as client:
                 if images and len(images) > 0:
                     # Post with images
-                    result = await self._publish_with_images(
-                        client, post_text, images
-                    )
+                    result = await self._publish_with_images(client, post_text, images)
                 else:
                     # Text-only post
                     response = await client.post(
@@ -349,17 +345,19 @@ class WeiboConnector(BasePlatformConnector):
                     results = []
                     for status in statuses[:limit]:
                         user = status.get("user", {})
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": str(status.get("id", "")),
-                            "author": user.get("screen_name", ""),
-                            "author_id": str(user.get("id", "")),
-                            "body": status.get("text", ""),
-                            "likes": status.get("attitudes_count", 0),
-                            "comments": status.get("comments_count", 0),
-                            "shares": status.get("reposts_count", 0),
-                            "published_at": status.get("created_at"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": str(status.get("id", "")),
+                                "author": user.get("screen_name", ""),
+                                "author_id": str(user.get("id", "")),
+                                "body": status.get("text", ""),
+                                "likes": status.get("attitudes_count", 0),
+                                "comments": status.get("comments_count", 0),
+                                "shares": status.get("reposts_count", 0),
+                                "published_at": status.get("created_at"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,
@@ -420,17 +418,19 @@ class WeiboConnector(BasePlatformConnector):
                     results = []
                     for status in statuses[:limit]:
                         user = status.get("user", {})
-                        results.append({
-                            "platform": self.platform_name,
-                            "post_id": str(status.get("id", "")),
-                            "author": user.get("screen_name", ""),
-                            "author_id": str(user.get("id", "")),
-                            "body": status.get("text", ""),
-                            "likes": status.get("attitudes_count", 0),
-                            "comments": status.get("comments_count", 0),
-                            "shares": status.get("reposts_count", 0),
-                            "published_at": status.get("created_at"),
-                        })
+                        results.append(
+                            {
+                                "platform": self.platform_name,
+                                "post_id": str(status.get("id", "")),
+                                "author": user.get("screen_name", ""),
+                                "author_id": str(user.get("id", "")),
+                                "body": status.get("text", ""),
+                                "likes": status.get("attitudes_count", 0),
+                                "comments": status.get("comments_count", 0),
+                                "shares": status.get("reposts_count", 0),
+                                "published_at": status.get("created_at"),
+                            }
+                        )
 
                     return FetchResult(
                         success=True,

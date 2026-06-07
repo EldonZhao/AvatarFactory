@@ -62,10 +62,7 @@ class ZhihuConnector(BasePlatformConnector):
                     label="Cookie",
                     field_type="textarea",
                     required=True,
-                    description=(
-                        "Browser cookie string"
-                        " (extract from browser DevTools)"
-                    ),
+                    description=("Browser cookie string" " (extract from browser DevTools)"),
                     placeholder="Paste cookie string from browser",
                     env_var="ZHIHU_COOKIE",
                 ),
@@ -74,9 +71,7 @@ class ZhihuConnector(BasePlatformConnector):
                     label="User URL Token",
                     field_type="text",
                     required=False,
-                    description=(
-                        "Zhihu user URL token for fetching user content"
-                    ),
+                    description=("Zhihu user URL token for fetching user content"),
                     env_var="ZHIHU_USER_ID",
                 ),
             ],
@@ -165,9 +160,7 @@ class ZhihuConnector(BasePlatformConnector):
         try:
             import httpx
         except ImportError:
-            raise ImportError(
-                "httpx required for Zhihu connector. Install with: pip install httpx"
-            )
+            raise ImportError("httpx required for Zhihu connector. Install with: pip install httpx")
 
         if not self._cookie:
             return FetchResult(success=False, error="Not connected")
@@ -221,43 +214,49 @@ class ZhihuConnector(BasePlatformConnector):
                     item_type = target.get("type", "question")
 
                     if item_type == "question":
-                        results.append({
-                            "id": str(target.get("id", "")),
-                            "title": target.get("title", ""),
-                            "description": target.get("excerpt", ""),
-                            "url": f"{self.WEB_BASE}/question/{target.get('id', '')}",
-                            "source": "zhihu_question",
-                            "answer_count": target.get("answer_count", 0),
-                            "follower_count": target.get("follower_count", 0),
-                            "created_at": target.get("created"),
-                        })
+                        results.append(
+                            {
+                                "id": str(target.get("id", "")),
+                                "title": target.get("title", ""),
+                                "description": target.get("excerpt", ""),
+                                "url": f"{self.WEB_BASE}/question/{target.get('id', '')}",
+                                "source": "zhihu_question",
+                                "answer_count": target.get("answer_count", 0),
+                                "follower_count": target.get("follower_count", 0),
+                                "created_at": target.get("created"),
+                            }
+                        )
                     elif item_type == "answer":
                         question = target.get("question", {})
                         author = target.get("author", {})
-                        results.append({
-                            "id": str(target.get("id", "")),
-                            "title": question.get("title", ""),
-                            "description": target.get("excerpt", ""),
-                            "url": f"{self.WEB_BASE}/answer/{target.get('id', '')}",
-                            "source": "zhihu_answer",
-                            "author": author.get("name", ""),
-                            "voteup_count": target.get("voteup_count", 0),
-                            "comment_count": target.get("comment_count", 0),
-                            "created_at": target.get("created_time"),
-                        })
+                        results.append(
+                            {
+                                "id": str(target.get("id", "")),
+                                "title": question.get("title", ""),
+                                "description": target.get("excerpt", ""),
+                                "url": f"{self.WEB_BASE}/answer/{target.get('id', '')}",
+                                "source": "zhihu_answer",
+                                "author": author.get("name", ""),
+                                "voteup_count": target.get("voteup_count", 0),
+                                "comment_count": target.get("comment_count", 0),
+                                "created_at": target.get("created_time"),
+                            }
+                        )
                     elif item_type == "article":
                         author = target.get("author", {})
-                        results.append({
-                            "id": str(target.get("id", "")),
-                            "title": target.get("title", ""),
-                            "description": target.get("excerpt", ""),
-                            "url": f"{self.WEB_BASE}/p/{target.get('id', '')}",
-                            "source": "zhihu_article",
-                            "author": author.get("name", ""),
-                            "voteup_count": target.get("voteup_count", 0),
-                            "comment_count": target.get("comment_count", 0),
-                            "created_at": target.get("created"),
-                        })
+                        results.append(
+                            {
+                                "id": str(target.get("id", "")),
+                                "title": target.get("title", ""),
+                                "description": target.get("excerpt", ""),
+                                "url": f"{self.WEB_BASE}/p/{target.get('id', '')}",
+                                "source": "zhihu_article",
+                                "author": author.get("name", ""),
+                                "voteup_count": target.get("voteup_count", 0),
+                                "comment_count": target.get("comment_count", 0),
+                                "created_at": target.get("created"),
+                            }
+                        )
 
                 return FetchResult(
                     success=True,
@@ -279,7 +278,7 @@ class ZhihuConnector(BasePlatformConnector):
         return PublishResult(
             success=False,
             error="Zhihu publishing requires complex authentication flows. "
-                  "Use the web interface for now.",
+            "Use the web interface for now.",
         )
 
     async def search(self, query: str, limit: int = 20, **kwargs) -> List[Dict[str, Any]]:
@@ -307,9 +306,7 @@ class ZhihuConnector(BasePlatformConnector):
         try:
             import httpx
         except ImportError:
-            raise ImportError(
-                "httpx required for Zhihu connector. Install with: pip install httpx"
-            )
+            raise ImportError("httpx required for Zhihu connector. Install with: pip install httpx")
 
         if not self._cookie:
             return FetchResult(success=False, error="Not connected")
@@ -334,15 +331,17 @@ class ZhihuConnector(BasePlatformConnector):
 
                 for item in data.get("data", [])[:limit]:
                     target = item.get("target", {})
-                    results.append({
-                        "id": str(target.get("id", "")),
-                        "title": target.get("title", ""),
-                        "description": target.get("excerpt", ""),
-                        "url": f"{self.WEB_BASE}/question/{target.get('id', '')}",
-                        "source": "zhihu_hot",
-                        "heat": item.get("detail_text", ""),
-                        "answer_count": target.get("answer_count", 0),
-                    })
+                    results.append(
+                        {
+                            "id": str(target.get("id", "")),
+                            "title": target.get("title", ""),
+                            "description": target.get("excerpt", ""),
+                            "url": f"{self.WEB_BASE}/question/{target.get('id', '')}",
+                            "source": "zhihu_hot",
+                            "heat": item.get("detail_text", ""),
+                            "answer_count": target.get("answer_count", 0),
+                        }
+                    )
 
                 return FetchResult(
                     success=True,

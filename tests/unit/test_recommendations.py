@@ -176,9 +176,7 @@ class TestKnowledgeBaseRecommendations:
         temp_kb.save_recommended_personas(personas)
 
         # Mark as adopted
-        result = temp_kb.mark_recommendation_adopted(
-            "rec_persona_to_adopt", "persona_new_123"
-        )
+        result = temp_kb.mark_recommendation_adopted("rec_persona_to_adopt", "persona_new_123")
         assert result is True
 
         # Verify status changed

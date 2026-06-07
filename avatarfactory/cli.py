@@ -27,8 +27,8 @@ load_dotenv()
 
 # Fix Windows console encoding for Unicode/Chinese characters
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 app = typer.Typer(
     name="avatarfactory",
@@ -47,9 +47,7 @@ def get_orchestrator() -> OrchestratorAgent:
         provider = LLMProviderFactory.from_env()
         if not provider.validate_config():
             provider_type = os.getenv("AVATARFACTORY_LLM_PROVIDER", "anthropic")
-            console.print(
-                f"[red]Error: {provider_type} provider not configured correctly[/red]"
-            )
+            console.print(f"[red]Error: {provider_type} provider not configured correctly[/red]")
             console.print("Please check your .env file and set the required API keys.")
             raise typer.Exit(1)
     except ImportError as e:
@@ -134,15 +132,11 @@ def chat(
                 # Show additional data if available
                 if "persona" in data:
                     persona_data = data["persona"]
-                    console.print(
-                        f"\n[dim]Persona ID: {persona_data.get('id')}[/dim]"
-                    )
+                    console.print(f"\n[dim]Persona ID: {persona_data.get('id')}[/dim]")
 
                 if "content" in data:
                     content_data = data["content"]
-                    console.print(
-                        f"\n[dim]Content ID: {content_data.get('id')}[/dim]"
-                    )
+                    console.print(f"\n[dim]Content ID: {content_data.get('id')}[/dim]")
 
         except KeyboardInterrupt:
             console.print("\n\n[cyan]Goodbye![/cyan]")
@@ -170,9 +164,7 @@ def create_persona(
             sender="user",
             receiver="orchestrator",
             task_type="chat",  # type: ignore
-            payload={
-                "user_input": f"Create a persona: {description}"
-            },
+            payload={"user_input": f"Create a persona: {description}"},
             context={},
         )
 
@@ -257,7 +249,9 @@ def list_personas():
     personas = kb.list_personas()
 
     if not personas:
-        console.print("[yellow]No personas found. Create one with 'avatarfactory create-persona'[/yellow]")
+        console.print(
+            "[yellow]No personas found. Create one with 'avatarfactory create-persona'[/yellow]"
+        )
         return
 
     table = Table(title="Personas")
@@ -271,7 +265,11 @@ def list_personas():
             table.add_row(
                 persona_id,
                 persona.identity.name,
-                persona.identity.tagline[:50] + "..." if len(persona.identity.tagline) > 50 else persona.identity.tagline,
+                (
+                    persona.identity.tagline[:50] + "..."
+                    if len(persona.identity.tagline) > 50
+                    else persona.identity.tagline
+                ),
             )
 
     console.print(table)
@@ -330,6 +328,7 @@ def delete_persona(
     with console.status("[bold red]Deleting persona...", spinner="dots"):
         # 1. Delete scheduled tasks
         from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
+
         scheduler = Scheduler(SchedulerConfig())
         tasks_removed = scheduler.remove_tasks_for_persona(persona_id)
 
@@ -353,9 +352,7 @@ def delete_persona(
 
 @app.command()
 def list_content(
-    persona_id: Optional[str] = typer.Option(
-        None, "--persona", "-p", help="Filter by persona ID"
-    ),
+    persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Filter by persona ID"),
     status: str = typer.Option("draft", "--status", "-s", help="draft or published"),
 ):
     """List content in the knowledges."""
@@ -375,9 +372,7 @@ def list_content(
     table.add_column("Score", style="magenta")
 
     for content in contents[:20]:  # Show latest 20
-        score_str = (
-            f"{content.review_score:.0f}" if content.review_score else "N/A"
-        )
+        score_str = f"{content.review_score:.0f}" if content.review_score else "N/A"
         table.add_row(
             content.id,
             content.title[:50] + "..." if len(content.title) > 50 else content.title,
@@ -408,7 +403,9 @@ def show_content(
         raise typer.Exit(1)
 
     # Get platform info for styling
-    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+    platform = (
+        content.platform.value if hasattr(content.platform, "value") else str(content.platform)
+    )
 
     # Platform-specific styling
     platform_styles = {
@@ -422,7 +419,9 @@ def show_content(
 
     # Header with platform info
     console.print()
-    console.print(f"[bold {style['color']}]{style['emoji']} {style['name']} Preview[/bold {style['color']}]")
+    console.print(
+        f"[bold {style['color']}]{style['emoji']} {style['name']} Preview[/bold {style['color']}]"
+    )
     console.print("─" * 60)
 
     # Title (platform-native style)
@@ -440,7 +439,9 @@ def show_content(
     # Image prompts section
     if content.image_prompts:
         console.print("\n" + "─" * 60)
-        console.print(f"[bold yellow]🖼️ Recommended Images ({len(content.image_prompts)})[/bold yellow]")
+        console.print(
+            f"[bold yellow]🖼️ Recommended Images ({len(content.image_prompts)})[/bold yellow]"
+        )
         for i, prompt in enumerate(content.image_prompts, 1):
             console.print(f"\n[dim]Image {i}:[/dim]")
             console.print(f"  {prompt}")
@@ -459,8 +460,14 @@ def show_content(
     console.print(f"[dim]Created: {content.created_at.strftime('%Y-%m-%d %H:%M')}[/dim]")
 
     if content.review_score:
-        score_color = "green" if content.review_score >= 80 else "yellow" if content.review_score >= 60 else "red"
-        console.print(f"[dim]Review Score: [{score_color}]{content.review_score:.0f}/100[/{score_color}][/dim]")
+        score_color = (
+            "green"
+            if content.review_score >= 80
+            else "yellow" if content.review_score >= 60 else "red"
+        )
+        console.print(
+            f"[dim]Review Score: [{score_color}]{content.review_score:.0f}/100[/{score_color}][/dim]"
+        )
 
     if content.review_issues:
         console.print("\n[yellow]Review Notes:[/yellow]")
@@ -473,10 +480,16 @@ def show_content(
 @app.command()
 def publish_draft(
     content_id: str = typer.Argument(..., help="Content ID to publish"),
-    platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Override platform (bluesky, twitter)"),
-    images: Optional[str] = typer.Option(None, "--images", "-i", help="Comma-separated image paths"),
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="Override platform (bluesky, twitter)"
+    ),
+    images: Optional[str] = typer.Option(
+        None, "--images", "-i", help="Comma-separated image paths"
+    ),
     confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
-    force_single: bool = typer.Option(False, "--single", "-s", help="Force single post (truncate instead of thread)"),
+    force_single: bool = typer.Option(
+        False, "--single", "-s", help="Force single post (truncate instead of thread)"
+    ),
 ):
     """
     Publish a draft content to social platform.
@@ -502,7 +515,9 @@ def publish_draft(
         raise typer.Exit(1)
 
     # Determine platform
-    target_platform = platform or (content.platform.value if hasattr(content.platform, 'value') else str(content.platform))
+    target_platform = platform or (
+        content.platform.value if hasattr(content.platform, "value") else str(content.platform)
+    )
 
     # Parse images
     image_list = [img.strip() for img in images.split(",")] if images else []
@@ -513,18 +528,21 @@ def publish_draft(
     adapted = adapter.adapt(content, images=image_list, force_single=force_single)
 
     # Show preview with adaptation info
-    console.print(Panel.fit(
-        f"[bold]Publishing to {target_platform}[/bold]\n\n"
-        f"[cyan]Title:[/cyan] {content.title}\n"
-        f"[cyan]Original length:[/cyan] {adapted.original_length} chars\n"
-        f"[cyan]Platform limit:[/cyan] {limits.max_text_length} chars/post\n"
-        f"[cyan]Adapted:[/cyan] {'Thread with ' + str(len(adapted.parts)) + ' posts' if adapted.is_thread else 'Single post'}"
-        + (" [yellow](truncated)[/yellow]" if adapted.truncated else "") + "\n"
-        f"[cyan]Tags:[/cyan] {', '.join(adapted.tags) if adapted.tags else 'None'}\n"
-        f"[cyan]Images:[/cyan] {len(image_list)} provided",
-        title=f"Content: {content_id}",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold]Publishing to {target_platform}[/bold]\n\n"
+            f"[cyan]Title:[/cyan] {content.title}\n"
+            f"[cyan]Original length:[/cyan] {adapted.original_length} chars\n"
+            f"[cyan]Platform limit:[/cyan] {limits.max_text_length} chars/post\n"
+            f"[cyan]Adapted:[/cyan] {'Thread with ' + str(len(adapted.parts)) + ' posts' if adapted.is_thread else 'Single post'}"
+            + (" [yellow](truncated)[/yellow]" if adapted.truncated else "")
+            + "\n"
+            f"[cyan]Tags:[/cyan] {', '.join(adapted.tags) if adapted.tags else 'None'}\n"
+            f"[cyan]Images:[/cyan] {len(image_list)} provided",
+            title=f"Content: {content_id}",
+            border_style="cyan",
+        )
+    )
 
     # Show adapted content preview
     if adapted.is_thread:
@@ -537,7 +555,9 @@ def publish_draft(
             console.print(f"[dim]({len(part)} chars)[/dim]")
     else:
         console.print("\n[bold]Post Preview:[/bold]")
-        preview = adapted.parts[0][:300] + "..." if len(adapted.parts[0]) > 300 else adapted.parts[0]
+        preview = (
+            adapted.parts[0][:300] + "..." if len(adapted.parts[0]) > 300 else adapted.parts[0]
+        )
         console.print(f"[dim]{preview}[/dim]")
         console.print(f"[dim]({len(adapted.parts[0])} chars)[/dim]")
 
@@ -571,7 +591,9 @@ def publish_draft(
         xhs_cookie = os.getenv("XIAOHONGSHU_COOKIE")
         if not xhs_cookie:
             console.print("[red]Error: XIAOHONGSHU_COOKIE not set[/red]")
-            console.print("Get your cookie from browser DevTools after logging in to xiaohongshu.com")
+            console.print(
+                "Get your cookie from browser DevTools after logging in to xiaohongshu.com"
+            )
             raise typer.Exit(1)
         config.extra = {
             "cookie": xhs_cookie,
@@ -582,7 +604,9 @@ def publish_draft(
         mastodon_token = os.getenv("MASTODON_ACCESS_TOKEN")
         mastodon_instance = os.getenv("MASTODON_INSTANCE_URL")
         if not mastodon_token or not mastodon_instance:
-            console.print("[red]Error: MASTODON_ACCESS_TOKEN and MASTODON_INSTANCE_URL not set[/red]")
+            console.print(
+                "[red]Error: MASTODON_ACCESS_TOKEN and MASTODON_INSTANCE_URL not set[/red]"
+            )
             raise typer.Exit(1)
         config.access_token = mastodon_token
         config.extra = {"instance_url": mastodon_instance}
@@ -590,7 +614,9 @@ def publish_draft(
         instagram_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
         instagram_account_id = os.getenv("INSTAGRAM_ACCOUNT_ID")
         if not instagram_token or not instagram_account_id:
-            console.print("[red]Error: INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID not set[/red]")
+            console.print(
+                "[red]Error: INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID not set[/red]"
+            )
             raise typer.Exit(1)
         config.access_token = instagram_token
         config.extra = {"account_id": instagram_account_id}
@@ -623,8 +649,17 @@ def publish_draft(
         config.access_token = toutiao_token
     else:
         console.print(f"[red]Error: Unknown platform '{target_platform}'[/red]")
-        supported = ["bluesky", "twitter", "xiaohongshu", "mastodon", "instagram",
-                     "weibo", "linkedin", "threads", "toutiao"]
+        supported = [
+            "bluesky",
+            "twitter",
+            "xiaohongshu",
+            "mastodon",
+            "instagram",
+            "weibo",
+            "linkedin",
+            "threads",
+            "toutiao",
+        ]
         console.print(f"[yellow]Supported platforms: {', '.join(supported)}[/yellow]")
         raise typer.Exit(1)
 
@@ -635,7 +670,7 @@ def publish_draft(
             await connector.connect()
 
             # Use publish_thread for threads if connector supports it
-            if adapted.is_thread and hasattr(connector, 'publish_thread'):
+            if adapted.is_thread and hasattr(connector, "publish_thread"):
                 # Use the dedicated thread publishing method
                 results = await connector.publish_thread(
                     posts=adapted.parts,
@@ -681,7 +716,9 @@ def publish_draft(
             console.print(f"[red]❌ Failed to publish: {failed[0].error}[/red]")
             if len(results) > 1:
                 success_count = sum(1 for r in results if r.success)
-                console.print(f"[yellow]Partial publish: {success_count}/{len(results)} posts succeeded[/yellow]")
+                console.print(
+                    f"[yellow]Partial publish: {success_count}/{len(results)} posts succeeded[/yellow]"
+                )
             raise typer.Exit(1)
 
     except CookieExpiredError as e:
@@ -690,6 +727,7 @@ def publish_draft(
         # Show refresh instructions for xiaohongshu
         if target_platform in ("xiaohongshu", "xhs"):
             from avatarfactory.connectors.xiaohongshu import XiaohongshuConnector
+
             console.print(XiaohongshuConnector(ConnectorConfig()).get_cookie_refresh_instructions())
         raise typer.Exit(1)
     except Exception as e:
@@ -734,6 +772,7 @@ def version():
 # Platform Connector Commands
 # =============================================================================
 
+
 @app.command()
 def connect(
     platform: str = typer.Argument(..., help="Platform to connect to (bluesky, twitter)"),
@@ -777,7 +816,9 @@ def connect(
         xhs_cookie = os.getenv("XIAOHONGSHU_COOKIE")
         if not xhs_cookie:
             console.print("[red]Error: XIAOHONGSHU_COOKIE not set in .env[/red]")
-            console.print("Get your cookie from browser DevTools after logging in to xiaohongshu.com")
+            console.print(
+                "Get your cookie from browser DevTools after logging in to xiaohongshu.com"
+            )
             raise typer.Exit(1)
         config.extra = {
             "cookie": xhs_cookie,
@@ -812,7 +853,9 @@ def connect(
 
 @app.command()
 def fetch(
-    platform: str = typer.Argument(..., help="Platform to fetch from (bluesky, twitter, xiaohongshu/xhs)"),
+    platform: str = typer.Argument(
+        ..., help="Platform to fetch from (bluesky, twitter, xiaohongshu/xhs)"
+    ),
     query: Optional[str] = typer.Option(None, "--query", "-q", help="Search query"),
     limit: int = typer.Option(10, "--limit", "-n", help="Number of posts to fetch"),
 ):
@@ -888,10 +931,15 @@ def fetch(
 
 @app.command()
 def publish(
-    platform: str = typer.Argument(..., help="Platform to publish to (bluesky, twitter, xiaohongshu, mastodon, instagram, weibo, linkedin, threads, toutiao)"),
+    platform: str = typer.Argument(
+        ...,
+        help="Platform to publish to (bluesky, twitter, xiaohongshu, mastodon, instagram, weibo, linkedin, threads, toutiao)",
+    ),
     content: str = typer.Argument(..., help="Content to publish"),
     tags: Optional[str] = typer.Option(None, "--tags", "-t", help="Comma-separated hashtags"),
-    title: Optional[str] = typer.Option(None, "--title", help="Content title (required for some platforms)"),
+    title: Optional[str] = typer.Option(
+        None, "--title", help="Content title (required for some platforms)"
+    ),
 ):
     """
     Publish content to a platform.
@@ -939,8 +987,17 @@ def publish(
         config.access_token = os.getenv("TOUTIAO_ACCESS_TOKEN")
     else:
         console.print(f"[red]Unknown platform: {platform}[/red]")
-        supported = ["bluesky", "twitter", "xiaohongshu", "mastodon", "instagram",
-                     "weibo", "linkedin", "threads", "toutiao"]
+        supported = [
+            "bluesky",
+            "twitter",
+            "xiaohongshu",
+            "mastodon",
+            "instagram",
+            "weibo",
+            "linkedin",
+            "threads",
+            "toutiao",
+        ]
         console.print(f"[yellow]Supported platforms: {', '.join(supported)}[/yellow]")
         raise typer.Exit(1)
 
@@ -974,6 +1031,7 @@ def publish(
 # Topic Commands
 # =============================================================================
 
+
 def get_topic_agent() -> TopicAgent:
     """Initialize topic agent with LLM provider from environment."""
     kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
@@ -991,8 +1049,12 @@ def get_topic_agent() -> TopicAgent:
 @app.command()
 def discover(
     platform: str = typer.Argument("bluesky", help="Platform to discover from (bluesky, twitter)"),
-    persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Persona ID for targeted discovery"),
-    query: Optional[str] = typer.Option(None, "--query", "-q", help="Search query (uses persona keywords if not provided)"),
+    persona_id: Optional[str] = typer.Option(
+        None, "--persona", "-p", help="Persona ID for targeted discovery"
+    ),
+    query: Optional[str] = typer.Option(
+        None, "--query", "-q", help="Search query (uses persona keywords if not provided)"
+    ),
     limit: int = typer.Option(20, "--limit", "-n", help="Number of posts to analyze"),
 ):
     """
@@ -1005,13 +1067,15 @@ def discover(
         avatarfactory discover bluesky --persona persona_xxx
         avatarfactory discover twitter -q "AI productivity" -n 30
     """
-    console.print(Panel.fit(
-        f"[bold cyan]Topic Agent[/bold cyan]\n"
-        f"Platform: {platform}\n"
-        f"Persona: {persona_id or 'None (general discovery)'}\n"
-        f"Query: {query or 'Auto (from persona)'}",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Topic Agent[/bold cyan]\n"
+            f"Platform: {platform}\n"
+            f"Persona: {persona_id or 'None (general discovery)'}\n"
+            f"Query: {query or 'Auto (from persona)'}",
+            border_style="cyan",
+        )
+    )
 
     agent = get_topic_agent()
 
@@ -1025,11 +1089,13 @@ def discover(
             )
         else:
             # Just fetch trending without full analysis
-            return await agent._discover_trending({
-                "platform": platform,
-                "query": query,
-                "limit": limit,
-            })
+            return await agent._discover_trending(
+                {
+                    "platform": platform,
+                    "query": query,
+                    "limit": limit,
+                }
+            )
 
     with console.status("[bold cyan]Discovering and analyzing content...", spinner="dots"):
         result = asyncio.run(run_discovery())
@@ -1062,7 +1128,9 @@ def discover(
         console.print("\n[bold]Pattern Analysis[/bold]")
 
         if analysis.get("trending_topics"):
-            console.print(f"[yellow]Trending Topics:[/yellow] {', '.join(analysis['trending_topics'][:5])}")
+            console.print(
+                f"[yellow]Trending Topics:[/yellow] {', '.join(analysis['trending_topics'][:5])}"
+            )
 
         if analysis.get("key_insights"):
             console.print("\n[yellow]Key Insights:[/yellow]")
@@ -1078,7 +1146,9 @@ def discover(
             console.print(f"   [dim]Angle:[/dim] {idea.get('angle', 'N/A')}")
             if idea.get("hook"):
                 console.print(f"   [dim]Hook:[/dim] \"{idea['hook']}\"")
-            console.print(f"   [dim]Pillar:[/dim] {idea.get('suggested_pillar', 'N/A')} | [dim]Engagement:[/dim] {idea.get('estimated_engagement', 'medium')}")
+            console.print(
+                f"   [dim]Pillar:[/dim] {idea.get('suggested_pillar', 'N/A')} | [dim]Engagement:[/dim] {idea.get('estimated_engagement', 'medium')}"
+            )
 
     # Display persona suggestions
     if "persona_suggestions" in data and data["persona_suggestions"]:
@@ -1104,12 +1174,14 @@ def inspire(
         avatarfactory inspire persona_xxx
         avatarfactory inspire persona_xxx --platform twitter --ideas 10
     """
-    console.print(Panel.fit(
-        f"[bold cyan]Getting Inspiration[/bold cyan]\n"
-        f"Persona: {persona_id}\n"
-        f"Platform: {platform}",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Getting Inspiration[/bold cyan]\n"
+            f"Persona: {persona_id}\n"
+            f"Platform: {platform}",
+            border_style="cyan",
+        )
+    )
 
     agent = get_topic_agent()
 
@@ -1141,7 +1213,9 @@ def inspire(
             console.print(f"[yellow]Angle:[/yellow] {idea.get('angle', 'N/A')}")
             if idea.get("hook"):
                 console.print(f"[yellow]Hook:[/yellow] \"{idea['hook']}\"")
-            console.print(f"[dim]Type: {idea.get('content_type', 'post')} | Pillar: {idea.get('suggested_pillar', 'N/A')}[/dim]")
+            console.print(
+                f"[dim]Type: {idea.get('content_type', 'post')} | Pillar: {idea.get('suggested_pillar', 'N/A')}[/dim]"
+            )
             if idea.get("reasoning"):
                 console.print(f"[dim]Why: {idea['reasoning']}[/dim]")
 
@@ -1156,6 +1230,7 @@ def inspire(
 # =============================================================================
 # Scheduler Commands
 # =============================================================================
+
 
 @app.command()
 def daemon(
@@ -1176,16 +1251,11 @@ def daemon(
     from avatarfactory.scheduler import Scheduler, SchedulerConfig
 
     pid_file = os.path.join(
-        os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
-        "scheduler",
-        "daemon.pid"
+        os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler", "daemon.pid"
     )
 
     config = SchedulerConfig(
-        data_dir=os.path.join(
-            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
-            "scheduler"
-        )
+        data_dir=os.path.join(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler")
     )
     scheduler = Scheduler(config)
 
@@ -1198,6 +1268,7 @@ def daemon(
                         old_pid = int(f.read().strip())
                     # Check if process is still running (Windows-compatible)
                     import signal
+
                     try:
                         os.kill(old_pid, 0)
                         console.print(f"[yellow]Daemon already running (PID: {old_pid})[/yellow]")
@@ -1245,11 +1316,12 @@ def daemon(
             return
 
         # Foreground mode
-        console.print(Panel.fit(
-            "[bold cyan]Starting AvatarFactory Daemon[/bold cyan]\n"
-            "Press Ctrl+C to stop",
-            border_style="cyan",
-        ))
+        console.print(
+            Panel.fit(
+                "[bold cyan]Starting AvatarFactory Daemon[/bold cyan]\n" "Press Ctrl+C to stop",
+                border_style="cyan",
+            )
+        )
 
         # Show scheduled tasks
         tasks = scheduler.list_tasks()
@@ -1259,7 +1331,9 @@ def daemon(
                 status = "✓" if task.enabled else "○"
                 console.print(f"  {status} {task.name} ({task.schedule})")
         else:
-            console.print("\n[yellow]No scheduled tasks. Use 'avatarfactory schedule add' to create tasks.[/yellow]")
+            console.print(
+                "\n[yellow]No scheduled tasks. Use 'avatarfactory schedule add' to create tasks.[/yellow]"
+            )
 
         queue = scheduler.get_publish_queue(status="pending")
         if queue:
@@ -1296,7 +1370,9 @@ def daemon(
                 last_run = task.last_run.strftime("%Y-%m-%d %H:%M") if task.last_run else "Never"
                 last_status = task.last_status or "N/A"
                 console.print(f"  {status_icon} [cyan]{task.name}[/cyan] ({task.schedule})")
-                console.print(f"      Last: {last_run} | Status: {last_status} | Runs: {task.run_count}")
+                console.print(
+                    f"      Last: {last_run} | Status: {last_status} | Runs: {task.run_count}"
+                )
 
     elif action == "stop":
         # Try to stop background daemon
@@ -1306,19 +1382,21 @@ def daemon(
                     daemon_pid = int(f.read().strip())
 
                 import signal
+
                 try:
                     if sys.platform == "win32":
                         # Windows: use taskkill
                         subprocess.run(
-                            ["taskkill", "/F", "/PID", str(daemon_pid)],
-                            capture_output=True
+                            ["taskkill", "/F", "/PID", str(daemon_pid)], capture_output=True
                         )
                     else:
                         os.kill(daemon_pid, signal.SIGTERM)
 
                     console.print(f"[green]Daemon stopped (PID: {daemon_pid})[/green]")
                 except OSError:
-                    console.print(f"[yellow]Daemon not running (PID {daemon_pid} not found)[/yellow]")
+                    console.print(
+                        f"[yellow]Daemon not running (PID {daemon_pid} not found)[/yellow]"
+                    )
 
                 os.remove(pid_file)
             except (ValueError, FileNotFoundError):
@@ -1338,7 +1416,9 @@ def serve(
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to listen on"),
     reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload for development"),
-    dashboard: bool = typer.Option(False, "--dashboard", "-d", help="Also start the visual dashboard"),
+    dashboard: bool = typer.Option(
+        False, "--dashboard", "-d", help="Also start the visual dashboard"
+    ),
     dashboard_port: int = typer.Option(8501, "--dashboard-port", help="Port for the dashboard"),
 ):
     """
@@ -1355,7 +1435,7 @@ def serve(
     """
     from avatarfactory.daemon_runner import run_full_service
 
-    display_host = host if host != '0.0.0.0' else 'localhost'
+    display_host = host if host != "0.0.0.0" else "localhost"
 
     info_text = (
         f"[bold cyan]AvatarFactory API Server[/bold cyan]\n\n"
@@ -1368,8 +1448,7 @@ def serve(
 
     if dashboard:
         info_text += (
-            f"\n\n[bold cyan]Dashboard[/bold cyan]\n"
-            f"URL: http://{display_host}:{dashboard_port}"
+            f"\n\n[bold cyan]Dashboard[/bold cyan]\n" f"URL: http://{display_host}:{dashboard_port}"
         )
 
     console.print(Panel.fit(info_text, title="Starting Service"))
@@ -1409,41 +1488,59 @@ def dashboard(
     dashboard_path = Path(__file__).parent / "dashboard" / "Dashboard.py"
 
     if not dashboard_path.exists():
-        console.print("[red]Dashboard not found. Please ensure the dashboard module is installed.[/red]")
+        console.print(
+            "[red]Dashboard not found. Please ensure the dashboard module is installed.[/red]"
+        )
         raise typer.Exit(1)
 
-    console.print(Panel.fit(
-        f"[bold cyan]AvatarFactory Dashboard[/bold cyan]\n\n"
-        f"Host: {host}\n"
-        f"Port: {port}\n\n"
-        f"Dashboard URL: http://{host if host != '0.0.0.0' else 'localhost'}:{port}\n\n"
-        f"[dim]Press Ctrl+C to stop[/dim]",
-        title="Starting Dashboard",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]AvatarFactory Dashboard[/bold cyan]\n\n"
+            f"Host: {host}\n"
+            f"Port: {port}\n\n"
+            f"Dashboard URL: http://{host if host != '0.0.0.0' else 'localhost'}:{port}\n\n"
+            f"[dim]Press Ctrl+C to stop[/dim]",
+            title="Starting Dashboard",
+            border_style="cyan",
+        )
+    )
 
     try:
-        subprocess.run([
-            sys.executable, "-m", "streamlit", "run",
-            str(dashboard_path),
-            "--server.port", str(port),
-            "--server.address", host,
-            "--server.headless", "true",
-        ])
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "streamlit",
+                "run",
+                str(dashboard_path),
+                "--server.port",
+                str(port),
+                "--server.address",
+                host,
+                "--server.headless",
+                "true",
+            ]
+        )
     except KeyboardInterrupt:
         console.print("\n[cyan]Dashboard stopped.[/cyan]")
     except FileNotFoundError:
-        console.print("[red]Streamlit not installed. Install with: pip install streamlit streamlit-agraph[/red]")
+        console.print(
+            "[red]Streamlit not installed. Install with: pip install streamlit streamlit-agraph[/red]"
+        )
         raise typer.Exit(1)
 
 
 @app.command()
 def schedule(
     action: str = typer.Argument(..., help="Action: add, remove, list, enable, disable"),
-    task_type: Optional[str] = typer.Option(None, "--type", "-t", help="Task type: discovery, content, publish, report"),
+    task_type: Optional[str] = typer.Option(
+        None, "--type", "-t", help="Task type: discovery, content, publish, report"
+    ),
     persona_id: Optional[str] = typer.Option(None, "--persona", "-p", help="Persona ID"),
     platform: Optional[str] = typer.Option(None, "--platform", help="Platform (bluesky, twitter)"),
-    cron: Optional[str] = typer.Option(None, "--cron", "-c", help="Cron schedule (e.g., '0 9 * * *')"),
+    cron: Optional[str] = typer.Option(
+        None, "--cron", "-c", help="Cron schedule (e.g., '0 9 * * *')"
+    ),
     task_id: Optional[str] = typer.Option(None, "--id", help="Task ID (for remove/enable/disable)"),
 ):
     """
@@ -1460,10 +1557,7 @@ def schedule(
     import uuid
 
     config = SchedulerConfig(
-        data_dir=os.path.join(
-            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
-            "scheduler"
-        )
+        data_dir=os.path.join(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler")
     )
     scheduler = Scheduler(config)
 
@@ -1472,7 +1566,9 @@ def schedule(
 
         if not tasks:
             console.print("[yellow]No scheduled tasks.[/yellow]")
-            console.print("Create one with: avatarfactory schedule add --type discovery --persona <id> --cron '0 9 * * *'")
+            console.print(
+                "Create one with: avatarfactory schedule add --type discovery --persona <id> --cron '0 9 * * *'"
+            )
             return
 
         table = Table(title="Scheduled Tasks")
@@ -1570,6 +1666,7 @@ def schedule(
         console.print(f"[cyan]Running task: {task.name}...[/cyan]")
 
         import asyncio
+
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -1593,7 +1690,9 @@ def queue(
     action: str = typer.Argument(..., help="Action: add, remove, list"),
     content_id: Optional[str] = typer.Option(None, "--content", "-c", help="Content ID to queue"),
     platform: Optional[str] = typer.Option(None, "--platform", "-p", help="Target platform"),
-    schedule_time: Optional[str] = typer.Option(None, "--time", "-t", help="Schedule time (ISO format or 'now')"),
+    schedule_time: Optional[str] = typer.Option(
+        None, "--time", "-t", help="Schedule time (ISO format or 'now')"
+    ),
     item_id: Optional[str] = typer.Option(None, "--id", help="Queue item ID (for remove)"),
 ):
     """
@@ -1609,10 +1708,7 @@ def queue(
     from datetime import datetime
 
     config = SchedulerConfig(
-        data_dir=os.path.join(
-            os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"),
-            "scheduler"
-        )
+        data_dir=os.path.join(os.getenv("AVATARFACTORY_KB_PATH", "./knowledges"), "scheduler")
     )
     scheduler = Scheduler(config)
 
@@ -1631,7 +1727,9 @@ def queue(
         table.add_column("Status", style="white")
 
         for item in queue_items:
-            scheduled = item.scheduled_time.strftime("%m-%d %H:%M") if item.scheduled_time else "ASAP"
+            scheduled = (
+                item.scheduled_time.strftime("%m-%d %H:%M") if item.scheduled_time else "ASAP"
+            )
             status_style = {
                 "pending": "yellow",
                 "published": "green",
@@ -1696,17 +1794,30 @@ def queue(
 # Video Generation Commands
 # =============================================================================
 
+
 @app.command()
 def video(
     action: str = typer.Argument(..., help="Action: generate, list-voices, list-avatars, info"),
-    content_id: Optional[str] = typer.Option(None, "--content", "-c", help="Content ID to generate video from"),
-    video_type: str = typer.Option("slideshow", "--type", "-t", help="Video type: slideshow or avatar"),
-    provider: str = typer.Option("auto", "--provider", "-P", help="TTS provider: auto, azure, edge"),
+    content_id: Optional[str] = typer.Option(
+        None, "--content", "-c", help="Content ID to generate video from"
+    ),
+    video_type: str = typer.Option(
+        "slideshow", "--type", "-t", help="Video type: slideshow or avatar"
+    ),
+    provider: str = typer.Option(
+        "auto", "--provider", "-P", help="TTS provider: auto, azure, edge"
+    ),
     voice: str = typer.Option("zh-CN-XiaoxuanNeural", "--voice", "-v", help="Voice ID for TTS"),
-    avatar: Optional[str] = typer.Option(None, "--avatar", "-a", help="Avatar character (lisa, grace, harry, max)"),
+    avatar: Optional[str] = typer.Option(
+        None, "--avatar", "-a", help="Avatar character (lisa, grace, harry, max)"
+    ),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
-    images: Optional[str] = typer.Option(None, "--images", "-i", help="Comma-separated image paths for slideshow"),
-    locale: Optional[str] = typer.Option(None, "--locale", "-l", help="Filter voices by locale (e.g., zh-CN)"),
+    images: Optional[str] = typer.Option(
+        None, "--images", "-i", help="Comma-separated image paths for slideshow"
+    ),
+    locale: Optional[str] = typer.Option(
+        None, "--locale", "-l", help="Filter voices by locale (e.g., zh-CN)"
+    ),
 ):
     """
     Generate videos from content using TTS.
@@ -1754,15 +1865,17 @@ def video(
             output_path=Path(output) if output else None,
         )
 
-        console.print(Panel.fit(
-            f"[bold cyan]Generating Video[/bold cyan]\n\n"
-            f"[cyan]Content:[/cyan] {content_id}\n"
-            f"[cyan]Type:[/cyan] {video_type}\n"
-            f"[cyan]Provider:[/cyan] {provider}\n"
-            f"[cyan]Voice:[/cyan] {voice}"
-            + (f"\n[cyan]Avatar:[/cyan] {avatar}" if avatar else ""),
-            border_style="cyan",
-        ))
+        console.print(
+            Panel.fit(
+                f"[bold cyan]Generating Video[/bold cyan]\n\n"
+                f"[cyan]Content:[/cyan] {content_id}\n"
+                f"[cyan]Type:[/cyan] {video_type}\n"
+                f"[cyan]Provider:[/cyan] {provider}\n"
+                f"[cyan]Voice:[/cyan] {voice}"
+                + (f"\n[cyan]Avatar:[/cyan] {avatar}" if avatar else ""),
+                border_style="cyan",
+            )
+        )
 
         generator = VideoGenerator(tts_provider=provider)
 
@@ -1793,10 +1906,7 @@ def video(
                 images=image_list,
             )
 
-        with console.status(
-            f"[bold cyan]Generating {video_type} video...",
-            spinner="dots"
-        ):
+        with console.status(f"[bold cyan]Generating {video_type} video...", spinner="dots"):
             result = asyncio.run(do_generate())
 
         if result.success:
@@ -1840,7 +1950,9 @@ def video(
         console.print(table)
 
         if len(voices) > 50:
-            console.print(f"\n[dim]Showing 50 of {len(voices)} voices. Use --locale to filter.[/dim]")
+            console.print(
+                f"\n[dim]Showing 50 of {len(voices)} voices. Use --locale to filter.[/dim]"
+            )
 
         # Show recommended Chinese voices
         console.print("\n[bold]Recommended Chinese Voices:[/bold]")
@@ -1880,21 +1992,26 @@ def video(
         table.add_column("Provider", style="cyan")
         table.add_column("Status", style="green")
 
-        table.add_row(
-            "Active TTS Provider",
-            info["tts_provider"] or "[red]None[/red]"
-        )
+        table.add_row("Active TTS Provider", info["tts_provider"] or "[red]None[/red]")
         table.add_row(
             "Edge TTS (Free)",
-            "[green]Available[/green]" if info["edge_available"] else "[red]Not installed[/red]"
+            "[green]Available[/green]" if info["edge_available"] else "[red]Not installed[/red]",
         )
         table.add_row(
             "Azure TTS",
-            "[green]Available[/green]" if info["azure_available"] else "[yellow]Not configured[/yellow]"
+            (
+                "[green]Available[/green]"
+                if info["azure_available"]
+                else "[yellow]Not configured[/yellow]"
+            ),
         )
         table.add_row(
             "Azure Avatar",
-            "[green]Available[/green]" if info["avatar_available"] else "[yellow]Not configured[/yellow]"
+            (
+                "[green]Available[/green]"
+                if info["avatar_available"]
+                else "[yellow]Not configured[/yellow]"
+            ),
         )
 
         console.print(table)
@@ -1914,7 +2031,9 @@ def video(
 
 @app.command()
 def migrate_storage(
-    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview changes without modifying files"),
+    dry_run: bool = typer.Option(
+        True, "--dry-run/--execute", help="Preview changes without modifying files"
+    ),
 ):
     """
     Migrate content and discovery data to new persona-based structure.
@@ -1980,7 +2099,9 @@ def migrate_storage(
                 new_dir = base_path / "personas" / persona_id / "content" / folder
                 new_path = new_dir / new_filename
 
-                console.print(f"  {file_path.name} -> personas/{persona_id}/content/{folder}/{new_filename}")
+                console.print(
+                    f"  {file_path.name} -> personas/{persona_id}/content/{folder}/{new_filename}"
+                )
 
                 if not dry_run:
                     new_dir.mkdir(parents=True, exist_ok=True)
@@ -2064,7 +2185,9 @@ def migrate_storage(
             console.print(f"  ⚠️  {error}")
 
     if dry_run:
-        console.print("\n[yellow]This was a dry run. Use --no-dry-run to execute migration.[/yellow]")
+        console.print(
+            "\n[yellow]This was a dry run. Use --no-dry-run to execute migration.[/yellow]"
+        )
     else:
         console.print("\n[green]✅ Migration complete![/green]")
 
@@ -2072,6 +2195,7 @@ def migrate_storage(
 # =============================================================================
 # Recommendation Commands
 # =============================================================================
+
 
 @app.command()
 def recommendations(
@@ -2119,7 +2243,9 @@ def recommendations(
         )
 
     console.print(table)
-    console.print("\n[dim]Use 'avatarfactory adopt <ID>' to create a persona from a recommendation.[/dim]")
+    console.print(
+        "\n[dim]Use 'avatarfactory adopt <ID>' to create a persona from a recommendation.[/dim]"
+    )
 
 
 @app.command()
@@ -2142,12 +2268,14 @@ def adopt(
         console.print("Use 'avatarfactory recommendations' to see available recommendations.")
         raise typer.Exit(1)
 
-    console.print(Panel.fit(
-        f"Adopting recommendation: {rec.name}\n"
-        f"Domain: {rec.domain}\n"
-        f"Tagline: {rec.tagline}",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            f"Adopting recommendation: {rec.name}\n"
+            f"Domain: {rec.domain}\n"
+            f"Tagline: {rec.tagline}",
+            border_style="cyan",
+        )
+    )
 
     # Build description from recommendation
     description = (
@@ -2192,12 +2320,15 @@ def adopt(
 @app.command(name="scan-trends")
 def scan_trends(
     platforms: Optional[str] = typer.Option(
-        "bluesky", "--platforms", "-p",
-        help="Comma-separated platforms to scan (bluesky,twitter,xiaohongshu)"
+        "bluesky",
+        "--platforms",
+        "-p",
+        help="Comma-separated platforms to scan (bluesky,twitter,xiaohongshu)",
     ),
     generate_recs: bool = typer.Option(
-        True, "--generate-recommendations/--no-recommendations",
-        help="Generate persona recommendations after scanning"
+        True,
+        "--generate-recommendations/--no-recommendations",
+        help="Generate persona recommendations after scanning",
     ),
 ):
     """
@@ -2218,10 +2349,9 @@ def scan_trends(
     from avatarfactory.scheduler.engine import ScheduledTask
 
     platform_list = [p.strip() for p in platforms.split(",")]
-    console.print(Panel.fit(
-        f"Scanning trends from: {', '.join(platform_list)}",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(f"Scanning trends from: {', '.join(platform_list)}", border_style="cyan")
+    )
 
     # Create a mock task for the runner
     scan_task = ScheduledTask(
@@ -2247,7 +2377,9 @@ def scan_trends(
                     f"{data.get('topics_count', 0)} topics"
                 )
             else:
-                console.print(f"   • {platform}: [red]Failed - {data.get('error', 'Unknown')}[/red]")
+                console.print(
+                    f"   • {platform}: [red]Failed - {data.get('error', 'Unknown')}[/red]"
+                )
 
         # Generate recommendations if requested
         if generate_recs:
@@ -2271,7 +2403,9 @@ def scan_trends(
                     console.print(f"   • {rec.get('name')} ({rec.get('domain')})")
                 console.print("\n[dim]Use 'avatarfactory recommendations' to view details.[/dim]")
             else:
-                console.print(f"[yellow]⚠️ Recommendation generation: {rec_result.get('error', 'Unknown')}[/yellow]")
+                console.print(
+                    f"[yellow]⚠️ Recommendation generation: {rec_result.get('error', 'Unknown')}[/yellow]"
+                )
     else:
         console.print(f"[red]Error: {result.get('error', 'Unknown error')}[/red]")
         raise typer.Exit(1)
@@ -2281,23 +2415,20 @@ def scan_trends(
 # Database Migration Commands
 # =============================================================================
 
+
 @app.command()
 def migrate_db(
     kb_path: str = typer.Option(
-        "./knowledges", "--kb-path", "-k",
-        help="Path to knowledges directory for migration"
+        "./knowledges", "--kb-path", "-k", help="Path to knowledges directory for migration"
     ),
     db_url: Optional[str] = typer.Option(
-        None, "--db-url", "-d",
-        help="Database URL (default: sqlite:///knowledges.db)"
+        None, "--db-url", "-d", help="Database URL (default: sqlite:///knowledges.db)"
     ),
     drop_existing: bool = typer.Option(
-        False, "--drop", "-D",
-        help="Drop existing tables before migration"
+        False, "--drop", "-D", help="Drop existing tables before migration"
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run",
-        help="Show what would be migrated without actually migrating"
+        False, "--dry-run", help="Show what would be migrated without actually migrating"
     ),
 ):
     """
@@ -2314,13 +2445,15 @@ def migrate_db(
     """
     from avatarfactory.core.database.migrate import run_migration
 
-    console.print(Panel.fit(
-        "[bold cyan]Database Migration Tool[/bold cyan]\n\n"
-        f"Source: {kb_path}\n"
-        f"Database: {db_url or 'sqlite:///knowledges.db (default)'}\n"
-        f"Drop existing: {'Yes' if drop_existing else 'No'}",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]Database Migration Tool[/bold cyan]\n\n"
+            f"Source: {kb_path}\n"
+            f"Database: {db_url or 'sqlite:///knowledges.db (default)'}\n"
+            f"Drop existing: {'Yes' if drop_existing else 'No'}",
+            border_style="cyan",
+        )
+    )
 
     if dry_run:
         console.print("[yellow]DRY RUN - No actual migration will occur[/yellow]\n")
@@ -2330,13 +2463,16 @@ def migrate_db(
 
         # Check if source exists
         from pathlib import Path
+
         kb = Path(kb_path)
         if not kb.exists():
             console.print(f"\n[red]Error: Knowledges path not found: {kb_path}[/red]")
             raise typer.Exit(1)
 
         # Count potential items
-        personas_count = len(list((kb / "personas").glob("persona_*.yaml"))) if (kb / "personas").exists() else 0
+        personas_count = (
+            len(list((kb / "personas").glob("persona_*.yaml"))) if (kb / "personas").exists() else 0
+        )
         content_count = len(list(kb.rglob("content_*.json")))
         discovery_count = len(list(kb.rglob("discovery_*.json")))
         tasks_count = 1 if (kb / "scheduler" / "tasks.yaml").exists() else 0
@@ -2372,19 +2508,27 @@ def migrate_db(
     table.add_row("Discoveries", str(report.discoveries_migrated), str(report.discoveries_errors))
     table.add_row("Scheduled Tasks", str(report.tasks_migrated), str(report.tasks_errors))
     table.add_row("Trend Snapshots", str(report.trends_migrated), str(report.trends_errors))
-    table.add_row("Recommendations", str(report.recommendations_migrated), str(report.recommendations_errors))
+    table.add_row(
+        "Recommendations", str(report.recommendations_migrated), str(report.recommendations_errors)
+    )
 
     console.print(table)
 
     total_migrated = (
-        report.personas_migrated + report.contents_migrated +
-        report.discoveries_migrated + report.tasks_migrated +
-        report.trends_migrated + report.recommendations_migrated
+        report.personas_migrated
+        + report.contents_migrated
+        + report.discoveries_migrated
+        + report.tasks_migrated
+        + report.trends_migrated
+        + report.recommendations_migrated
     )
     total_errors = (
-        report.personas_errors + report.contents_errors +
-        report.discoveries_errors + report.tasks_errors +
-        report.trends_errors + report.recommendations_errors
+        report.personas_errors
+        + report.contents_errors
+        + report.discoveries_errors
+        + report.tasks_errors
+        + report.trends_errors
+        + report.recommendations_errors
     )
 
     if total_errors > 0:

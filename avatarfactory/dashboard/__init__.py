@@ -16,9 +16,16 @@ def run_dashboard(port: int = 8501, host: str = "localhost") -> None:
 
     app_path = Path(__file__).parent / "Dashboard.py"
 
-    subprocess.run([
-        sys.executable, "-m", "streamlit", "run",
-        str(app_path),
-        "--server.port", str(port),
-        "--server.address", host,
-    ])
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(app_path),
+            "--server.port",
+            str(port),
+            "--server.address",
+            host,
+        ]
+    )

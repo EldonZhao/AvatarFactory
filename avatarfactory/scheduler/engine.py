@@ -35,20 +35,17 @@ class SchedulerConfig(BaseModel):
 
     # Default schedules (cron expressions)
     discovery_schedule: str = Field(
-        default="0 9 * * *",  # Daily at 9 AM
-        description="Cron schedule for discovery tasks"
+        default="0 9 * * *", description="Cron schedule for discovery tasks"  # Daily at 9 AM
     )
     content_schedule: str = Field(
-        default="0 10 * * *",  # Daily at 10 AM
-        description="Cron schedule for content generation"
+        default="0 10 * * *", description="Cron schedule for content generation"  # Daily at 10 AM
     )
     publish_schedule: str = Field(
         default="0 12,18 * * *",  # Twice daily at 12 PM and 6 PM
-        description="Cron schedule for publishing queued content"
+        description="Cron schedule for publishing queued content",
     )
     weekly_report_schedule: str = Field(
-        default="0 18 * * 5",  # Friday at 6 PM
-        description="Cron schedule for weekly reports"
+        default="0 18 * * 5", description="Cron schedule for weekly reports"  # Friday at 6 PM
     )
 
     # Behavior
@@ -343,8 +340,7 @@ class Scheduler:
         from avatarfactory.core.database.repositories.scheduler import SchedulerRepository
 
         tasks_to_remove = [
-            task_id for task_id, task in self._tasks.items()
-            if task.persona_id == persona_id
+            task_id for task_id, task in self._tasks.items() if task.persona_id == persona_id
         ]
 
         # Remove from database
@@ -443,17 +439,19 @@ class Scheduler:
 
         items = []
         for db_item in db_items:
-            items.append(PublishQueueItem(
-                id=db_item.id,
-                content_id=db_item.content_id,
-                platform=db_item.platform,
-                scheduled_time=db_item.scheduled_time,
-                status=db_item.status,
-                created_at=db_item.created_at,
-                published_at=db_item.published_at,
-                error=db_item.error,
-                post_url=db_item.post_url,
-            ))
+            items.append(
+                PublishQueueItem(
+                    id=db_item.id,
+                    content_id=db_item.content_id,
+                    platform=db_item.platform,
+                    scheduled_time=db_item.scheduled_time,
+                    status=db_item.status,
+                    created_at=db_item.created_at,
+                    published_at=db_item.published_at,
+                    error=db_item.error,
+                    post_url=db_item.post_url,
+                )
+            )
         return items
 
     async def remove_from_queue(self, item_id: str) -> bool:
@@ -603,21 +601,25 @@ class Scheduler:
         - Other types: Console only, no webhook notification
         """
         import os
-        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
+        from avatarfactory.notifications import (
+            ConsoleNotifier,
+            NotificationMessage,
+            NotificationPriority,
+        )
 
         # Build console notification for all task types
         if task.task_type in ("topic", "discovery"):
             title = f"Discovery Complete: {task.name}"
             body = f"Found {result.get('trending_count', 0)} trending posts, generated {result.get('ideas_count', 0)} ideas."
-            if result.get('suggestions'):
+            if result.get("suggestions"):
                 body += f"\nSuggestions: {result['suggestions'][0][:100]}..."
         elif task.task_type == "content":
             title = f"Content Generated: {task.name}"
             body = f"Created: {result.get('title', 'New content')}\nID: {result.get('content_id', 'N/A')}"
         elif task.task_type == "report":
             title = f"Report Ready: {task.name}"
-            report = result.get('report', {})
-            stats = report.get('stats', {})
+            report = result.get("report", {})
+            stats = report.get("stats", {})
             body = f"Published: {stats.get('total_published', 0)}, Drafts: {stats.get('total_drafts', 0)}"
         else:
             title = f"Task Complete: {task.name}"
@@ -642,17 +644,23 @@ class Scheduler:
         # Check if persona has notifications enabled
         if task.persona_id:
             from avatarfactory.core.knowledges_db import get_knowledge_base
+
             kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
             kb = get_knowledge_base(kb_path)
             persona = kb.load_persona(task.persona_id)
             if persona:
                 # Check if persona has notification disabled
                 if persona.notification is None or not persona.notification.enabled:
-                    logger.debug(f"Skipping notification for persona {task.persona_id}: notifications disabled")
+                    logger.debug(
+                        f"Skipping notification for persona {task.persona_id}: notifications disabled"
+                    )
                     return
 
                 # Check notification type preferences
-                if task.task_type in ("topic", "discovery") and not persona.notification.notify_on_discovery:
+                if (
+                    task.task_type in ("topic", "discovery")
+                    and not persona.notification.notify_on_discovery
+                ):
                     logger.debug(f"Skipping topic notification for persona {task.persona_id}")
                     return
                 if task.task_type == "content" and not persona.notification.notify_on_content:
@@ -679,22 +687,22 @@ class Scheduler:
         parts.append("")
 
         # Trending count and ideas count
-        trending_count = result.get('trending_count', 0)
-        ideas_count = result.get('ideas_count', 0)
+        trending_count = result.get("trending_count", 0)
+        ideas_count = result.get("ideas_count", 0)
         parts.append(f"📊 发现 **{trending_count}** 条热点，生成 **{ideas_count}** 个创意")
         parts.append("")
 
         # Pattern analysis
-        pattern_analysis = result.get('pattern_analysis', {})
+        pattern_analysis = result.get("pattern_analysis", {})
         if pattern_analysis:
-            trending_topics = pattern_analysis.get('trending_topics', [])
+            trending_topics = pattern_analysis.get("trending_topics", [])
             if trending_topics:
                 parts.append("**🔥 热点话题:**")
                 for topic in trending_topics[:5]:
                     parts.append(f"> {topic}")
                 parts.append("")
 
-            key_insights = pattern_analysis.get('key_insights', [])
+            key_insights = pattern_analysis.get("key_insights", [])
             if key_insights:
                 parts.append("**💡 关键洞察:**")
                 for insight in key_insights[:3]:
@@ -702,12 +710,12 @@ class Scheduler:
                 parts.append("")
 
         # Ideas/suggestions
-        ideas = result.get('ideas', [])
-        suggestions = result.get('suggestions', [])
+        ideas = result.get("ideas", [])
+        suggestions = result.get("suggestions", [])
         if ideas:
             parts.append("**📝 创作建议:**")
             for idea in ideas[:3]:
-                topic = idea.get('topic', '') if isinstance(idea, dict) else str(idea)
+                topic = idea.get("topic", "") if isinstance(idea, dict) else str(idea)
                 parts.append(f"> {topic}")
             parts.append("")
         elif suggestions:
@@ -719,10 +727,7 @@ class Scheduler:
         content = "\n".join(parts)
 
         # Send via WeChat Work markdown format
-        payload = {
-            "msgtype": "markdown",
-            "markdown": {"content": content}
-        }
+        payload = {"msgtype": "markdown", "markdown": {"content": content}}
 
         try:
             async with httpx.AsyncClient() as client:
@@ -750,12 +755,12 @@ class Scheduler:
         import os
         import httpx
 
-        content_id = result.get('content_id', '')
-        content_title = result.get('title', 'New Content')
-        content_body = result.get('body', '')
-        review_score = result.get('review_score')
-        persona_name = result.get('persona_name', '')
-        platform = result.get('platform', '')
+        content_id = result.get("content_id", "")
+        content_title = result.get("title", "New Content")
+        content_body = result.get("body", "")
+        review_score = result.get("review_score")
+        persona_name = result.get("persona_name", "")
+        platform = result.get("platform", "")
 
         # Build description
         description_parts = []
@@ -772,7 +777,7 @@ class Scheduler:
                 description_parts.append(f"❌ 评分: {review_score:.0f}/100")
 
         # Content preview
-        body_preview = content_body[:300] if content_body else ''
+        body_preview = content_body[:300] if content_body else ""
         if len(content_body) > 300:
             body_preview += "..."
 
@@ -799,9 +804,7 @@ class Scheduler:
         if not url:
             payload = {
                 "msgtype": "markdown",
-                "markdown": {
-                    "content": f"### {title}\n\n{description}"
-                }
+                "markdown": {"content": f"### {title}\n\n{description}"},
             }
         else:
             # Use news card format
@@ -816,7 +819,7 @@ class Scheduler:
                             "picurl": "",
                         }
                     ]
-                }
+                },
             }
 
         try:
@@ -842,7 +845,11 @@ class Scheduler:
         """Send notification when task fails."""
         import os
         import httpx
-        from avatarfactory.notifications import ConsoleNotifier, NotificationMessage, NotificationPriority
+        from avatarfactory.notifications import (
+            ConsoleNotifier,
+            NotificationMessage,
+            NotificationPriority,
+        )
 
         message = NotificationMessage(
             title=f"Task Failed: {task.name}",
@@ -866,12 +873,15 @@ class Scheduler:
         # Check if persona has notifications enabled
         if task.persona_id:
             from avatarfactory.core.knowledges_db import get_knowledge_base
+
             kb_path = os.getenv("AVATARFACTORY_KB_PATH", "./knowledges")
             kb = get_knowledge_base(kb_path)
             persona = kb.load_persona(task.persona_id)
             if persona:
                 if persona.notification is None or not persona.notification.enabled:
-                    logger.debug(f"Skipping error notification for persona {task.persona_id}: notifications disabled")
+                    logger.debug(
+                        f"Skipping error notification for persona {task.persona_id}: notifications disabled"
+                    )
                     return
 
         # Build error notification
@@ -879,10 +889,7 @@ class Scheduler:
         content += f"**类型:** {task.task_type}\n"
         content += f"**错误:** {error[:500]}"
 
-        payload = {
-            "msgtype": "markdown",
-            "markdown": {"content": content}
-        }
+        payload = {"msgtype": "markdown", "markdown": {"content": content}}
 
         try:
             async with httpx.AsyncClient() as client:
@@ -986,6 +993,7 @@ class Scheduler:
             # We're in an async context, schedule initialization as a task
             # The initialize will run in background
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(self._sync_initialize)
                 future.result(timeout=30)  # Wait up to 30 seconds
@@ -1026,12 +1034,13 @@ class Scheduler:
                 sys.exit(0)
 
             signal.signal(signal.SIGINT, signal_handler)
-            if hasattr(signal, 'SIGTERM'):
+            if hasattr(signal, "SIGTERM"):
                 signal.signal(signal.SIGTERM, signal_handler)
 
             # Keep running
             try:
                 import time
+
                 while self._running:
                     time.sleep(1)
             except KeyboardInterrupt:
@@ -1073,17 +1082,20 @@ class Scheduler:
                 continue
             task = self._tasks.get(job.id)
             if task:
-                result.append({
-                    "task_id": task.id,
-                    "task_name": task.name,
-                    "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-                })
+                result.append(
+                    {
+                        "task_id": task.id,
+                        "task_name": task.name,
+                        "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                    }
+                )
         return result
 
 
 # =============================================================================
 # Migration Utilities
 # =============================================================================
+
 
 async def migrate_tasks_from_json(data_dir: str = "./knowledges/scheduler") -> int:
     """

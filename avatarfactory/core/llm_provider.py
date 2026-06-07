@@ -133,23 +133,27 @@ class AnthropicProvider(BaseLLMProvider):
                 for img in images:
                     resolved = _resolve_image_content(img)
                     if resolved["type"] == "url":
-                        content_blocks.append({
-                            "type": "image",
-                            "source": {
-                                "type": "url",
-                                "url": resolved["url"],
-                            },
-                        })
+                        content_blocks.append(
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "url",
+                                    "url": resolved["url"],
+                                },
+                            }
+                        )
                     else:
                         # base64 data
-                        content_blocks.append({
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": resolved.get("mime_type", "image/png"),
-                                "data": resolved["base64_data"],
-                            },
-                        })
+                        content_blocks.append(
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": resolved.get("mime_type", "image/png"),
+                                    "data": resolved["base64_data"],
+                                },
+                            }
+                        )
                 content_blocks.append({"type": "text", "text": prompt})
                 user_content: Union[str, List[Dict[str, Any]]] = content_blocks
             else:
@@ -221,10 +225,12 @@ class AzureOpenAIProvider(BaseLLMProvider):
                         image_url = resolved["url"]
                     else:
                         image_url = resolved["data_uri"]
-                    user_content.append({
-                        "type": "image_url",
-                        "image_url": {"url": image_url},
-                    })
+                    user_content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url},
+                        }
+                    )
                 user_content.append({"type": "text", "text": prompt})
                 messages.append({"role": "user", "content": user_content})
             else:
@@ -275,9 +281,7 @@ class AzureOpenAIProvider(BaseLLMProvider):
             raise RuntimeError(f"Azure OpenAI API call failed: {e}")
 
     def validate_config(self) -> bool:
-        return bool(
-            os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
+        return bool(os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT"))
 
 
 class OpenAIProvider(BaseLLMProvider):
@@ -316,10 +320,12 @@ class OpenAIProvider(BaseLLMProvider):
                         image_url = resolved["url"]
                     else:
                         image_url = resolved["data_uri"]
-                    user_content.append({
-                        "type": "image_url",
-                        "image_url": {"url": image_url},
-                    })
+                    user_content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url},
+                        }
+                    )
                 user_content.append({"type": "text", "text": prompt})
                 messages.append({"role": "user", "content": user_content})
             else:
@@ -379,8 +385,7 @@ class LLMProviderFactory:
         """
         if provider_type not in cls._providers:
             raise ValueError(
-                f"Unknown provider: {provider_type}. "
-                f"Supported: {list(cls._providers.keys())}"
+                f"Unknown provider: {provider_type}. " f"Supported: {list(cls._providers.keys())}"
             )
 
         provider_class = cls._providers[provider_type]

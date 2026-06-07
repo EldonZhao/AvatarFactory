@@ -27,6 +27,7 @@ def _get_orchestrator():
     """Get the orchestrator instance from app state."""
     try:
         from avatarfactory.service.app import get_orchestrator
+
         return get_orchestrator()
     except HTTPException:
         raise
@@ -71,26 +72,42 @@ async def _build_all_events(orchestrator, persona_id: Optional[str] = None) -> L
                 # Add persona version events from history
                 history = orchestrator.kb.get_persona_history(pid)
                 for version in history:
-                    timestamp = version.timestamp.isoformat() if hasattr(version.timestamp, 'isoformat') else str(version.timestamp)
-                    event_type = "persona_created" if version.version == "v1.0" else "persona_updated"
-                    title = f"人设诞生：{persona_names.get(pid, pid)}" if version.version == "v1.0" else f"人设进化：{persona_names.get(pid, pid)} → {version.version}"
-                    description = f"原因：{version.reason}" if version.reason else (", ".join(version.changes) if version.changes else "")
+                    timestamp = (
+                        version.timestamp.isoformat()
+                        if hasattr(version.timestamp, "isoformat")
+                        else str(version.timestamp)
+                    )
+                    event_type = (
+                        "persona_created" if version.version == "v1.0" else "persona_updated"
+                    )
+                    title = (
+                        f"人设诞生：{persona_names.get(pid, pid)}"
+                        if version.version == "v1.0"
+                        else f"人设进化：{persona_names.get(pid, pid)} → {version.version}"
+                    )
+                    description = (
+                        f"原因：{version.reason}"
+                        if version.reason
+                        else (", ".join(version.changes) if version.changes else "")
+                    )
 
-                    events.append({
-                        "id": f"{pid}-{version.version}",
-                        "type": event_type,
-                        "timestamp": timestamp,
-                        "title": title,
-                        "description": description,
-                        "persona_id": pid,
-                        "persona_name": persona_names.get(pid, pid),
-                        "metadata": {
-                            "version": version.version,
-                            "changes": version.changes,
-                            "reason": version.reason,
-                            "author": version.author,
-                        },
-                    })
+                    events.append(
+                        {
+                            "id": f"{pid}-{version.version}",
+                            "type": event_type,
+                            "timestamp": timestamp,
+                            "title": title,
+                            "description": description,
+                            "persona_id": pid,
+                            "persona_name": persona_names.get(pid, pid),
+                            "metadata": {
+                                "version": version.version,
+                                "changes": version.changes,
+                                "reason": version.reason,
+                                "author": version.author,
+                            },
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load history for persona {pid}: {e}")
 
@@ -104,53 +121,79 @@ async def _build_all_events(orchestrator, persona_id: Optional[str] = None) -> L
                 for content in drafts:
                     if content.id not in published_ids:
                         timestamp = content.created_at.isoformat() if content.created_at else ""
-                        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                        events.append({
-                            "id": f"content-{content.id}",
-                            "type": "content_created",
+                        platform = (
+                            content.platform.value
+                            if hasattr(content.platform, "value")
+                            else str(content.platform)
+                        )
+                        events.append(
+                            {
+                                "id": f"content-{content.id}",
+                                "type": "content_created",
+                                "timestamp": timestamp,
+                                "title": (
+                                    f"创作新内容：{content.title[:30]}..."
+                                    if len(content.title) > 30
+                                    else f"创作新内容：{content.title}"
+                                ),
+                                "description": f"平台: {platform} | 栏目: {content.pillar}",
+                                "persona_id": pid,
+                                "persona_name": persona_names.get(pid, pid),
+                                "content_id": content.id,
+                                "content": content.body,  # Include full content body
+                                "metadata": {"platform": platform, "pillar": content.pillar},
+                            }
+                        )
+
+                for content in published:
+                    timestamp = content.created_at.isoformat() if content.created_at else ""
+                    platform = (
+                        content.platform.value
+                        if hasattr(content.platform, "value")
+                        else str(content.platform)
+                    )
+                    events.append(
+                        {
+                            "id": f"publish-{content.id}",
+                            "type": "content_published",
                             "timestamp": timestamp,
-                            "title": f"创作新内容：{content.title[:30]}..." if len(content.title) > 30 else f"创作新内容：{content.title}",
-                            "description": f"平台: {platform} | 栏目: {content.pillar}",
+                            "title": (
+                                f"内容发布：{content.title[:30]}..."
+                                if len(content.title) > 30
+                                else f"内容发布：{content.title}"
+                            ),
+                            "description": f"成功发布到 {platform}",
                             "persona_id": pid,
                             "persona_name": persona_names.get(pid, pid),
                             "content_id": content.id,
                             "content": content.body,  # Include full content body
                             "metadata": {"platform": platform, "pillar": content.pillar},
-                        })
-
-                for content in published:
-                    timestamp = content.created_at.isoformat() if content.created_at else ""
-                    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                    events.append({
-                        "id": f"publish-{content.id}",
-                        "type": "content_published",
-                        "timestamp": timestamp,
-                        "title": f"内容发布：{content.title[:30]}..." if len(content.title) > 30 else f"内容发布：{content.title}",
-                        "description": f"成功发布到 {platform}",
-                        "persona_id": pid,
-                        "persona_name": persona_names.get(pid, pid),
-                        "content_id": content.id,
-                        "content": content.body,  # Include full content body
-                        "metadata": {"platform": platform, "pillar": content.pillar},
-                    })
+                        }
+                    )
 
                 # Add review events
                 contents = drafts + published
                 for content in contents:
                     review = orchestrator.kb.load_review_report(content.id, pid)
                     if review:
-                        timestamp = review.reviewed_at.isoformat() if hasattr(review.reviewed_at, 'isoformat') else str(review.reviewed_at)
-                        events.append({
-                            "id": f"review-{content.id}",
-                            "type": "review_completed",
-                            "timestamp": timestamp,
-                            "title": f"质量评审：{review.overall_score}分",
-                            "description": f"内容《{content.title[:20]}》通过质量评审",
-                            "persona_id": pid,
-                            "persona_name": persona_names.get(pid, pid),
-                            "content_id": content.id,
-                            "metadata": {"score": review.overall_score},
-                        })
+                        timestamp = (
+                            review.reviewed_at.isoformat()
+                            if hasattr(review.reviewed_at, "isoformat")
+                            else str(review.reviewed_at)
+                        )
+                        events.append(
+                            {
+                                "id": f"review-{content.id}",
+                                "type": "review_completed",
+                                "timestamp": timestamp,
+                                "title": f"质量评审：{review.overall_score}分",
+                                "description": f"内容《{content.title[:20]}》通过质量评审",
+                                "persona_id": pid,
+                                "persona_name": persona_names.get(pid, pid),
+                                "content_id": content.id,
+                                "metadata": {"score": review.overall_score},
+                            }
+                        )
             except Exception as e:
                 logger.warning(f"Failed to load content/reviews for persona {pid}: {e}")
 
@@ -163,16 +206,24 @@ async def _build_all_events(orchestrator, persona_id: Optional[str] = None) -> L
                         continue
                     timestamp = task.last_run.isoformat()
                     success = task.last_status == "success"
-                    events.append({
-                        "id": f"task-{task.id}-{timestamp}",
-                        "type": "task_executed",
-                        "timestamp": timestamp,
-                        "title": f"任务执行：{task.name}",
-                        "description": "执行成功" if success else f"执行失败: {task.last_error}",
-                        "persona_id": task.persona_id,
-                        "persona_name": persona_names.get(task.persona_id, task.persona_id) if task.persona_id else None,
-                        "metadata": {"task_type": task.task_type, "status": task.last_status},
-                    })
+                    events.append(
+                        {
+                            "id": f"task-{task.id}-{timestamp}",
+                            "type": "task_executed",
+                            "timestamp": timestamp,
+                            "title": f"任务执行：{task.name}",
+                            "description": (
+                                "执行成功" if success else f"执行失败: {task.last_error}"
+                            ),
+                            "persona_id": task.persona_id,
+                            "persona_name": (
+                                persona_names.get(task.persona_id, task.persona_id)
+                                if task.persona_id
+                                else None
+                            ),
+                            "metadata": {"task_type": task.task_type, "status": task.last_status},
+                        }
+                    )
 
     except Exception as e:
         logger.error(f"Failed to build timeline events: {e}")
@@ -182,7 +233,9 @@ async def _build_all_events(orchestrator, persona_id: Optional[str] = None) -> L
     return events
 
 
-async def _get_cached_events(orchestrator, persona_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _get_cached_events(
+    orchestrator, persona_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Get timeline events with caching."""
     cache_key = f"events:{persona_id or 'all'}"
     cached = timeline_cache.get(cache_key)
@@ -196,8 +249,7 @@ async def _get_cached_events(orchestrator, persona_id: Optional[str] = None) -> 
 
 @router.get("/events")
 async def list_events(
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100)
+    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100)
 ) -> Dict[str, Any]:
     """Get paginated timeline events."""
     orchestrator = _get_orchestrator()
@@ -217,9 +269,7 @@ async def list_events(
 
 
 @router.get("/events/recent")
-async def get_recent_events(
-    limit: int = Query(10, ge=1, le=100)
-) -> List[Dict[str, Any]]:
+async def get_recent_events(limit: int = Query(10, ge=1, le=100)) -> List[Dict[str, Any]]:
     """Get most recent events."""
     orchestrator = _get_orchestrator()
     all_events = await _get_cached_events(orchestrator)
@@ -274,16 +324,22 @@ async def list_personas() -> List[Dict[str, Any]]:
                 drafts = orchestrator.kb.list_content(persona_id=pid, status="draft")
                 published = orchestrator.kb.list_content(persona_id=pid, status="published")
                 published_ids = {c.id for c in published}
-                content_count = len(published) + len([d for d in drafts if d.id not in published_ids])
+                content_count = len(published) + len(
+                    [d for d in drafts if d.id not in published_ids]
+                )
 
-                personas.append({
-                    "id": persona.id,
-                    "name": persona.identity.name,
-                    "tagline": persona.identity.tagline,
-                    "expertise": persona.identity.expertise,
-                    "content_count": content_count,
-                    "created_at": persona.created_at.isoformat() if persona.created_at else None,
-                })
+                personas.append(
+                    {
+                        "id": persona.id,
+                        "name": persona.identity.name,
+                        "tagline": persona.identity.tagline,
+                        "expertise": persona.identity.expertise,
+                        "content_count": content_count,
+                        "created_at": (
+                            persona.created_at.isoformat() if persona.created_at else None
+                        ),
+                    }
+                )
         except Exception as e:
             logger.warning(f"Failed to load persona {pid}: {e}")
 
@@ -321,9 +377,7 @@ async def get_persona(persona_id: str) -> Optional[Dict[str, Any]]:
 
 
 @router.get("/content/recent")
-async def get_recent_content(
-    limit: int = Query(5, ge=1, le=50)
-) -> List[Dict[str, Any]]:
+async def get_recent_content(limit: int = Query(5, ge=1, le=50)) -> List[Dict[str, Any]]:
     """Get recently published content."""
     orchestrator = _get_orchestrator()
     persona_ids = orchestrator.kb.list_personas()
@@ -343,19 +397,29 @@ async def get_recent_content(
         try:
             published = orchestrator.kb.list_content(persona_id=pid, status="published")
             for content in published:
-                platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                all_content.append({
-                    "id": content.id,
-                    "persona_id": pid,
-                    "persona_name": persona_names.get(pid, pid),
-                    "title": content.title,
-                    "body": content.body[:200] + "..." if len(content.body) > 200 else content.body,
-                    "pillar": content.pillar,
-                    "platform": platform,
-                    "status": "published",
-                    "created_at": content.created_at.isoformat() if content.created_at else None,
-                    "review_score": content.review_score,
-                })
+                platform = (
+                    content.platform.value
+                    if hasattr(content.platform, "value")
+                    else str(content.platform)
+                )
+                all_content.append(
+                    {
+                        "id": content.id,
+                        "persona_id": pid,
+                        "persona_name": persona_names.get(pid, pid),
+                        "title": content.title,
+                        "body": (
+                            content.body[:200] + "..." if len(content.body) > 200 else content.body
+                        ),
+                        "pillar": content.pillar,
+                        "platform": platform,
+                        "status": "published",
+                        "created_at": (
+                            content.created_at.isoformat() if content.created_at else None
+                        ),
+                        "review_score": content.review_score,
+                    }
+                )
         except Exception as e:
             logger.warning(f"Failed to load content for persona {pid}: {e}")
 
@@ -389,7 +453,9 @@ async def get_content(content_id: str) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
 
-    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
+    platform = (
+        content.platform.value if hasattr(content.platform, "value") else str(content.platform)
+    )
 
     return {
         "id": content.id,
@@ -418,7 +484,6 @@ async def get_journal_stats() -> Dict[str, Any]:
     cached = stats_cache.get(cache_key)
     if cached is not None:
         return cached
-
 
     orchestrator = _get_orchestrator()
     persona_ids = orchestrator.kb.list_personas()
@@ -534,7 +599,9 @@ async def get_journal_dashboard() -> Dict[str, Any]:
             "total_content": total_content,
             "total_published": total_published,
             "events_by_type": events_by_type,
-            "events_by_day": [{"date": date, "count": count} for date, count in events_by_day.items()],
+            "events_by_day": [
+                {"date": date, "count": count} for date, count in events_by_day.items()
+            ],
         }
 
         return {
@@ -546,8 +613,7 @@ async def get_journal_dashboard() -> Dict[str, Any]:
 
 
 async def _build_all_events_optimized(
-    orchestrator,
-    persona_id: Optional[str] = None
+    orchestrator, persona_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Build all timeline events using batch loading for better performance.
@@ -579,26 +645,42 @@ async def _build_all_events_optimized(
                 # Add persona version events from history
                 history = orchestrator.kb.get_persona_history(pid)
                 for version in history:
-                    timestamp = version.timestamp.isoformat() if hasattr(version.timestamp, 'isoformat') else str(version.timestamp)
-                    event_type = "persona_created" if version.version == "v1.0" else "persona_updated"
-                    title = f"人设诞生：{persona_names.get(pid, pid)}" if version.version == "v1.0" else f"人设进化：{persona_names.get(pid, pid)} → {version.version}"
-                    description = f"原因：{version.reason}" if version.reason else (", ".join(version.changes) if version.changes else "")
+                    timestamp = (
+                        version.timestamp.isoformat()
+                        if hasattr(version.timestamp, "isoformat")
+                        else str(version.timestamp)
+                    )
+                    event_type = (
+                        "persona_created" if version.version == "v1.0" else "persona_updated"
+                    )
+                    title = (
+                        f"人设诞生：{persona_names.get(pid, pid)}"
+                        if version.version == "v1.0"
+                        else f"人设进化：{persona_names.get(pid, pid)} → {version.version}"
+                    )
+                    description = (
+                        f"原因：{version.reason}"
+                        if version.reason
+                        else (", ".join(version.changes) if version.changes else "")
+                    )
 
-                    events.append({
-                        "id": f"{pid}-{version.version}",
-                        "type": event_type,
-                        "timestamp": timestamp,
-                        "title": title,
-                        "description": description,
-                        "persona_id": pid,
-                        "persona_name": persona_names.get(pid, pid),
-                        "metadata": {
-                            "version": version.version,
-                            "changes": version.changes,
-                            "reason": version.reason,
-                            "author": version.author,
-                        },
-                    })
+                    events.append(
+                        {
+                            "id": f"{pid}-{version.version}",
+                            "type": event_type,
+                            "timestamp": timestamp,
+                            "title": title,
+                            "description": description,
+                            "persona_id": pid,
+                            "persona_name": persona_names.get(pid, pid),
+                            "metadata": {
+                                "version": version.version,
+                                "changes": version.changes,
+                                "reason": version.reason,
+                                "author": version.author,
+                            },
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load history for persona {pid}: {e}")
 
@@ -612,35 +694,55 @@ async def _build_all_events_optimized(
                 for content in drafts:
                     if content.id not in published_ids:
                         timestamp = content.created_at.isoformat() if content.created_at else ""
-                        platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                        events.append({
-                            "id": f"content-{content.id}",
-                            "type": "content_created",
+                        platform = (
+                            content.platform.value
+                            if hasattr(content.platform, "value")
+                            else str(content.platform)
+                        )
+                        events.append(
+                            {
+                                "id": f"content-{content.id}",
+                                "type": "content_created",
+                                "timestamp": timestamp,
+                                "title": (
+                                    f"创作新内容：{content.title[:30]}..."
+                                    if len(content.title) > 30
+                                    else f"创作新内容：{content.title}"
+                                ),
+                                "description": f"平台: {platform} | 栏目: {content.pillar}",
+                                "persona_id": pid,
+                                "persona_name": persona_names.get(pid, pid),
+                                "content_id": content.id,
+                                "content": content.body,
+                                "metadata": {"platform": platform, "pillar": content.pillar},
+                            }
+                        )
+
+                for content in published:
+                    timestamp = content.created_at.isoformat() if content.created_at else ""
+                    platform = (
+                        content.platform.value
+                        if hasattr(content.platform, "value")
+                        else str(content.platform)
+                    )
+                    events.append(
+                        {
+                            "id": f"publish-{content.id}",
+                            "type": "content_published",
                             "timestamp": timestamp,
-                            "title": f"创作新内容：{content.title[:30]}..." if len(content.title) > 30 else f"创作新内容：{content.title}",
-                            "description": f"平台: {platform} | 栏目: {content.pillar}",
+                            "title": (
+                                f"内容发布：{content.title[:30]}..."
+                                if len(content.title) > 30
+                                else f"内容发布：{content.title}"
+                            ),
+                            "description": f"成功发布到 {platform}",
                             "persona_id": pid,
                             "persona_name": persona_names.get(pid, pid),
                             "content_id": content.id,
                             "content": content.body,
                             "metadata": {"platform": platform, "pillar": content.pillar},
-                        })
-
-                for content in published:
-                    timestamp = content.created_at.isoformat() if content.created_at else ""
-                    platform = content.platform.value if hasattr(content.platform, 'value') else str(content.platform)
-                    events.append({
-                        "id": f"publish-{content.id}",
-                        "type": "content_published",
-                        "timestamp": timestamp,
-                        "title": f"内容发布：{content.title[:30]}..." if len(content.title) > 30 else f"内容发布：{content.title}",
-                        "description": f"成功发布到 {platform}",
-                        "persona_id": pid,
-                        "persona_name": persona_names.get(pid, pid),
-                        "content_id": content.id,
-                        "content": content.body,
-                        "metadata": {"platform": platform, "pillar": content.pillar},
-                    })
+                        }
+                    )
 
                 # Add review events using batch-loaded reviews (no N+1!)
                 contents = drafts + published
@@ -652,17 +754,19 @@ async def _build_all_events_optimized(
                             timestamp = reviewed_at.isoformat()
                         else:
                             timestamp = str(reviewed_at)
-                        events.append({
-                            "id": f"review-{content.id}",
-                            "type": "review_completed",
-                            "timestamp": timestamp,
-                            "title": f"质量评审：{review.get('overall_score', 0)}分",
-                            "description": f"内容《{content.title[:20]}》通过质量评审",
-                            "persona_id": pid,
-                            "persona_name": persona_names.get(pid, pid),
-                            "content_id": content.id,
-                            "metadata": {"score": review.get("overall_score", 0)},
-                        })
+                        events.append(
+                            {
+                                "id": f"review-{content.id}",
+                                "type": "review_completed",
+                                "timestamp": timestamp,
+                                "title": f"质量评审：{review.get('overall_score', 0)}分",
+                                "description": f"内容《{content.title[:20]}》通过质量评审",
+                                "persona_id": pid,
+                                "persona_name": persona_names.get(pid, pid),
+                                "content_id": content.id,
+                                "metadata": {"score": review.get("overall_score", 0)},
+                            }
+                        )
             except Exception as e:
                 logger.warning(f"Failed to load content/reviews for persona {pid}: {e}")
 
@@ -675,16 +779,24 @@ async def _build_all_events_optimized(
                         continue
                     timestamp = task.last_run.isoformat()
                     success = task.last_status == "success"
-                    events.append({
-                        "id": f"task-{task.id}-{timestamp}",
-                        "type": "task_executed",
-                        "timestamp": timestamp,
-                        "title": f"任务执行：{task.name}",
-                        "description": "执行成功" if success else f"执行失败: {task.last_error}",
-                        "persona_id": task.persona_id,
-                        "persona_name": persona_names.get(task.persona_id, task.persona_id) if task.persona_id else None,
-                        "metadata": {"task_type": task.task_type, "status": task.last_status},
-                    })
+                    events.append(
+                        {
+                            "id": f"task-{task.id}-{timestamp}",
+                            "type": "task_executed",
+                            "timestamp": timestamp,
+                            "title": f"任务执行：{task.name}",
+                            "description": (
+                                "执行成功" if success else f"执行失败: {task.last_error}"
+                            ),
+                            "persona_id": task.persona_id,
+                            "persona_name": (
+                                persona_names.get(task.persona_id, task.persona_id)
+                                if task.persona_id
+                                else None
+                            ),
+                            "metadata": {"task_type": task.task_type, "status": task.last_status},
+                        }
+                    )
 
     except Exception as e:
         logger.error(f"Failed to build timeline events: {e}")

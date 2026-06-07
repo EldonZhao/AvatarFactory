@@ -14,6 +14,7 @@ from avatarfactory.models.schemas import Content
 @dataclass
 class PlatformLimits:
     """Content limits for a platform."""
+
     max_text_length: int  # Maximum text length per post
     max_title_length: int  # Maximum title length (0 if no title support)
     max_images: int  # Maximum images per post
@@ -125,6 +126,7 @@ PLATFORM_LIMITS: Dict[str, PlatformLimits] = {
 @dataclass
 class AdaptedContent:
     """Content adapted for a specific platform."""
+
     platform: str
     parts: List[str]  # Content split into parts (for threads) or single part
     title: Optional[str]
@@ -168,24 +170,24 @@ class ContentAdapter:
         import re
 
         # Remove bold: **text** or __text__
-        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-        text = re.sub(r'__(.+?)__', r'\1', text)
+        text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+        text = re.sub(r"__(.+?)__", r"\1", text)
 
         # Remove italic: *text* or _text_ (but not inside words)
-        text = re.sub(r'(?<!\w)\*([^*]+?)\*(?!\w)', r'\1', text)
-        text = re.sub(r'(?<!\w)_([^_]+?)_(?!\w)', r'\1', text)
+        text = re.sub(r"(?<!\w)\*([^*]+?)\*(?!\w)", r"\1", text)
+        text = re.sub(r"(?<!\w)_([^_]+?)_(?!\w)", r"\1", text)
 
         # Remove links: [text](url) → text
-        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+        text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
 
         # Remove inline code: `code` → code
-        text = re.sub(r'`([^`]+)`', r'\1', text)
+        text = re.sub(r"`([^`]+)`", r"\1", text)
 
         # Remove headers: # Header → Header
-        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+        text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
 
         # Remove horizontal rules
-        text = re.sub(r'^[-*_]{3,}\s*$', '———', text, flags=re.MULTILINE)
+        text = re.sub(r"^[-*_]{3,}\s*$", "———", text, flags=re.MULTILINE)
 
         return text
 
@@ -209,8 +211,8 @@ class ContentAdapter:
         # Get text content
         text = content.body
         title = content.title
-        tags = content.tags[:self.limits.max_tags] if content.tags else []
-        image_list = (images or [])[:self.limits.max_images]
+        tags = content.tags[: self.limits.max_tags] if content.tags else []
+        image_list = (images or [])[: self.limits.max_images]
 
         # Strip markdown for platforms that don't support it
         if not self.limits.supports_markdown:
@@ -232,7 +234,8 @@ class ContentAdapter:
             for i, part in enumerate(body_parts):
                 # Remove old numbering if present and add new
                 import re
-                part_text = re.sub(r'^\d+/\d+\s*🧵?\s*\n?', '', part)
+
+                part_text = re.sub(r"^\d+/\d+\s*🧵?\s*\n?", "", part)
                 if i < len(body_parts) - 1:
                     renumbered_parts.append(f"{i+2}/{total} 🧵\n{part_text}")
                 else:
@@ -312,7 +315,7 @@ class ContentAdapter:
         Returns:
             AdaptedContent
         """
-        tag_list = (tags or [])[:self.limits.max_tags]
+        tag_list = (tags or [])[: self.limits.max_tags]
         original_length = len(text)
 
         # Calculate space needed for tags
@@ -402,8 +405,8 @@ class ContentAdapter:
                         # If single sentence is too long, hard split
                         if len(sentence) > effective_max:
                             while len(sentence) > effective_max:
-                                parts.append(sentence[:effective_max-3] + "...")
-                                sentence = sentence[effective_max-3:]
+                                parts.append(sentence[: effective_max - 3] + "...")
+                                sentence = sentence[effective_max - 3 :]
                             current_part = sentence
                         else:
                             current_part = sentence
@@ -439,8 +442,9 @@ class ContentAdapter:
     def _split_sentences(self, text: str) -> List[str]:
         """Split text into sentences."""
         import re
+
         # Split on sentence endings, keeping the punctuation
-        sentences = re.split(r'(?<=[。！？.!?])\s*', text)
+        sentences = re.split(r"(?<=[。！？.!?])\s*", text)
         return [s.strip() for s in sentences if s.strip()]
 
     def _smart_truncate(self, text: str, max_length: Optional[int] = None) -> str:
@@ -461,7 +465,7 @@ class ContentAdapter:
         for ending in ["。", "！", "？", ".", "!", "?"]:
             last_pos = truncated.rfind(ending)
             if last_pos > available * 0.5:  # At least half the content
-                return truncated[:last_pos + 1]
+                return truncated[: last_pos + 1]
 
         # Fall back to word boundary (space or Chinese char)
         last_space = truncated.rfind(" ")

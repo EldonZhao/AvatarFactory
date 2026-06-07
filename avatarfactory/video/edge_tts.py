@@ -47,9 +47,7 @@ class EdgeTTSProvider(TTSProvider):
         try:
             import edge_tts
         except ImportError:
-            raise TTSError(
-                "edge-tts not installed. Install with: pip install edge-tts"
-            )
+            raise TTSError("edge-tts not installed. Install with: pip install edge-tts")
 
         try:
             output_path = Path(output_path)
@@ -89,9 +87,7 @@ class EdgeTTSProvider(TTSProvider):
         try:
             import edge_tts
         except ImportError:
-            raise TTSError(
-                "edge-tts not installed. Install with: pip install edge-tts"
-            )
+            raise TTSError("edge-tts not installed. Install with: pip install edge-tts")
 
         try:
             voices = await edge_tts.list_voices()
@@ -104,14 +100,16 @@ class EdgeTTSProvider(TTSProvider):
                 if locale and not voice_locale.startswith(locale):
                     continue
 
-                result.append(VoiceInfo(
-                    id=voice.get("ShortName", ""),
-                    name=voice.get("FriendlyName", voice.get("ShortName", "")),
-                    gender=voice.get("Gender", "Unknown"),
-                    locale=voice_locale,
-                    style=None,  # Edge TTS doesn't expose styles in the API
-                    provider=self.name,
-                ))
+                result.append(
+                    VoiceInfo(
+                        id=voice.get("ShortName", ""),
+                        name=voice.get("FriendlyName", voice.get("ShortName", "")),
+                        gender=voice.get("Gender", "Unknown"),
+                        locale=voice_locale,
+                        style=None,  # Edge TTS doesn't expose styles in the API
+                        provider=self.name,
+                    )
+                )
 
             return result
 

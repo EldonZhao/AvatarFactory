@@ -180,8 +180,8 @@ API docs available at `http://localhost:8000/docs`
 ### Docker
 
 ```bash
-docker-compose up -d
-docker-compose logs -f
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml logs -f
 ```
 
 ### Python API

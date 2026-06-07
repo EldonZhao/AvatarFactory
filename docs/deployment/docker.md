@@ -1,20 +1,23 @@
 # Docker Deployment
 
-Deploy AvatarFactory using Docker and docker-compose.
+Deploy AvatarFactory using Docker Compose.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Build and run
-docker-compose up -d
+# Development stack (API + admin + journal, hot-reload)
+docker compose -f docker-compose.dev.yml up -d
+
+# Production-like single container stack
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop
-docker-compose down
+docker compose down
 ```
 
 ## Configuration
@@ -46,14 +49,14 @@ volumes:
 ## Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost/health
 ```
 
 ## Build from Source
 
 ```bash
 docker build -t avatarfactory:latest .
-docker run -p 8000:80 --env-file .env -v ./knowledges:/app/knowledges avatarfactory:latest
+docker run -p 80:80 --env-file .env -v ./knowledges:/app/knowledges avatarfactory:latest
 ```
 
 ## For Azure deployment

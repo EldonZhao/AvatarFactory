@@ -30,9 +30,10 @@ class BaseAgent(ABC):
 
     def __init__(
         self,
-        agent_id: str,
         knowledge_base: KnowledgeBaseType,
         llm_provider: Optional[BaseLLMProvider] = None,
+        *,
+        agent_id: str,
         # Deprecated parameters (kept for backward compatibility)
         anthropic_client: Optional[Any] = None,
         model: Optional[str] = None,

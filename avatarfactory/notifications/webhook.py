@@ -11,7 +11,7 @@ Supports various webhook formats including:
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from avatarfactory.notifications.base import (
     NotificationMessage,
@@ -124,7 +124,7 @@ class WebhookNotifier(NotificationProvider):
             "urgent": "#ff0000",
         }.get(message.priority.value, "#36a64f")
 
-        blocks = [
+        blocks: List[Dict[str, Any]] = [
             {
                 "type": "header",
                 "text": {

@@ -13,7 +13,7 @@ import base64
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from anthropic import Anthropic
 
@@ -164,7 +164,7 @@ class AnthropicProvider(BaseLLMProvider):
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system=system if system else [],
-                messages=[{"role": "user", "content": user_content}],
+                messages=cast(Any, [{"role": "user", "content": user_content}]),
             )
             return response.content[0].text
         except Exception as e:

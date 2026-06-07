@@ -199,5 +199,7 @@ Environment variables (see `.env.example`):
 - Wait for user to say "deploy" or similar before running deployment scripts
 
 ### PR Approval (Solo Maintainer Exception)
-- For this repository's current solo-maintainer workflow, the owner may approve and merge their own PRs.
-- Preserve normal quality checks (tests, lint, docs) before self-approval.
+### PR Approval (Owner Required)
+- All PRs must be approved by repository owner (`@EldonZhao`) before merge.
+- Do not merge PRs without explicit owner approval.
+- Preserve normal quality checks (tests, lint, docs) before requesting approval.

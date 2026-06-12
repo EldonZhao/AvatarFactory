@@ -5,6 +5,7 @@ Persona repository for database operations.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from pydantic import TypeAdapter
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
@@ -16,6 +17,8 @@ from avatarfactory.core.database.models import (
 )
 from avatarfactory.core.database.repositories.base import BaseRepository
 from avatarfactory.models.schemas import Persona
+
+_JSON_DICT_ADAPTER = TypeAdapter(Dict[str, Any])
 
 
 class PersonaRepository(BaseRepository[PersonaModel]):
@@ -236,7 +239,11 @@ class PersonaRepository(BaseRepository[PersonaModel]):
             identity=identity,
             target_audience=schema.target_audience.model_dump() if schema.target_audience else {},
             voice_style=schema.voice_style.model_dump() if schema.voice_style else {},
-            content_pillars=schema.content_pillars.model_dump() if schema.content_pillars else {},
+            content_pillars=(
+                [pillar.model_dump() for pillar in schema.content_pillars]
+                if schema.content_pillars
+                else []
+            ),
             boundaries=schema.boundaries.model_dump() if schema.boundaries else {},
             notification=schema.notification.model_dump() if schema.notification else None,
             evolution=schema.evolution.model_dump() if schema.evolution else None,
@@ -276,7 +283,8 @@ class PersonaRepository(BaseRepository[PersonaModel]):
             changes=changes,
             reason=reason,
             expected_impact=expected_impact,
-            config_snapshot=config_snapshot,
+            # Ensure JSON-safe payload for DB JSON column (e.g., datetime -> ISO string).
+            config_snapshot=_JSON_DICT_ADAPTER.dump_python(config_snapshot, mode="json"),
             author=author,
         )
         self.session.add(version_model)

@@ -108,24 +108,16 @@ class KnowledgeBaseDB:
                     existing.tagline = identity.get("tagline")
                     existing.expertise = identity.get("expertise")
                     existing.identity = identity
-                    existing.target_audience = (
-                        persona.target_audience.model_dump() if persona.target_audience else {}
-                    )
-                    existing.voice_style = (
-                        persona.voice_style.model_dump() if persona.voice_style else {}
-                    )
+                    existing.target_audience = persona.target_audience.model_dump() if persona.target_audience else {}
+                    existing.voice_style = persona.voice_style.model_dump() if persona.voice_style else {}
                     existing.content_pillars = (
-                        persona.content_pillars.model_dump() if persona.content_pillars else {}
+                        [pillar.model_dump() for pillar in persona.content_pillars]
+                        if persona.content_pillars
+                        else []
                     )
-                    existing.boundaries = (
-                        persona.boundaries.model_dump() if persona.boundaries else {}
-                    )
-                    existing.notification = (
-                        persona.notification.model_dump() if persona.notification else None
-                    )
-                    existing.evolution = (
-                        persona.evolution.model_dump() if persona.evolution else None
-                    )
+                    existing.boundaries = persona.boundaries.model_dump() if persona.boundaries else {}
+                    existing.notification = persona.notification.model_dump() if persona.notification else None
+                    existing.evolution = persona.evolution.model_dump() if persona.evolution else None
                     existing.agent_configs = persona.agent_configs
                     existing.metadata_ = persona.metadata
                     existing.updated_at = datetime.utcnow()
@@ -144,7 +136,9 @@ class KnowledgeBaseDB:
                         ),
                         voice_style=persona.voice_style.model_dump() if persona.voice_style else {},
                         content_pillars=(
-                            persona.content_pillars.model_dump() if persona.content_pillars else {}
+                            [pillar.model_dump() for pillar in persona.content_pillars]
+                            if persona.content_pillars
+                            else []
                         ),
                         boundaries=persona.boundaries.model_dump() if persona.boundaries else {},
                         notification=(
@@ -188,13 +182,20 @@ class KnowledgeBaseDB:
         async def _save():
             async with get_session() as session:
                 repo = PersonaRepository(session)
+                # Backward-compatible: older PersonaVersion records may not carry
+                # config_snapshot; fallback to current persona snapshot.
+                config_snapshot = getattr(version_info, "config_snapshot", None) or {}
+                if not config_snapshot:
+                    persona_model = await repo.get(persona_id)
+                    if persona_model and not persona_model.is_deleted:
+                        config_snapshot = repo.to_schema(persona_model).model_dump(mode="json")
                 await repo.save_version(
                     persona_id=persona_id,
                     version=version_info.version,
                     changes=version_info.changes,
                     reason=version_info.reason,
                     expected_impact=version_info.expected_impact,
-                    config_snapshot=version_info.config_snapshot or {},
+                    config_snapshot=config_snapshot,
                     author=version_info.author,
                 )
 

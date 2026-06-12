@@ -83,7 +83,18 @@ class OrchestratorAgent(BaseAgent):
         has_persona = bool(context.get("persona_id"))
 
         # Step 1: Understand user intent (with persona awareness)
-        intent = await self._understand_intent(user_input, has_persona=has_persona)
+        try:
+            intent = await self._understand_intent(user_input, has_persona=has_persona)
+        except Exception as e:
+            self.log("ERROR", f"Intent understanding failed: {e}")
+            return {
+                "status": "error",
+                "message": (
+                    "LLM service is temporarily unavailable. "
+                    "Please check model provider settings and retry."
+                ),
+                "error_type": "llm_unavailable",
+            }
         self.log("INFO", f"Detected intent: {intent.intent_type}")
 
         # Merge context into parameters (e.g., persona_id from scheduler)

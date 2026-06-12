@@ -13,6 +13,7 @@ import base64
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any, Dict, List, Optional, Union, cast
 
 from anthropic import Anthropic
@@ -192,9 +193,12 @@ class AzureOpenAIProvider(BaseLLMProvider):
                 "openai package required for Azure OpenAI. Install with: pip install openai"
             )
 
+        self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
+        self.api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
+
         self.client = AsyncAzureOpenAI(
-            api_key=api_key or os.getenv("AZURE_OPENAI_API_KEY"),
-            azure_endpoint=endpoint or os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=self.api_key,
+            azure_endpoint=self.endpoint,
             api_version=api_version,
         )
 
@@ -277,7 +281,15 @@ class AzureOpenAIProvider(BaseLLMProvider):
                     return response.choices[0].message.content
                 except Exception as e2:
                     raise RuntimeError(f"Azure OpenAI API call failed: {e2}")
-            raise RuntimeError(f"Azure OpenAI API call failed: {e}")
+
+            parsed = urlparse(self.endpoint or "")
+            endpoint_hint = parsed.netloc or (self.endpoint or "<not-set>")
+            if "Connection error" in error_str:
+                raise RuntimeError(
+                    "Azure OpenAI API call failed: Connection error. "
+                    f"Endpoint: {endpoint_hint}. "
+                    "Please verify AZURE_OPENAI_ENDPOINT DNS/reachability and network access."
+                )
             raise RuntimeError(f"Azure OpenAI API call failed: {e}")
 
     def validate_config(self) -> bool:

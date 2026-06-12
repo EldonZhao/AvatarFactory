@@ -179,6 +179,9 @@ class PersonaVersion(BaseModel):
     expected_impact: str = Field(..., description="Expected impact")
     author: str = Field(default="user", description="Who made the change")
     approved: bool = Field(default=False, description="Whether approved by user")
+    config_snapshot: Dict[str, Any] = Field(
+        default_factory=dict, description="Full persona snapshot at this version"
+    )
 
 
 # ============================================================================

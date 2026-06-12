@@ -69,3 +69,7 @@ web-journal/.astro/
 *.zip
 nul
 cookies.txt
+
+# Local tool/runtime state (contains machine-specific config/secrets)
+.azure-cli/
+.codex/

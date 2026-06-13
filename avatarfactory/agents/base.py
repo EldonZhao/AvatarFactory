@@ -154,6 +154,20 @@ class BaseAgent(ABC):
                     avoid_text = "Patterns to avoid: " + ", ".join(avoid_patterns)
                     system = f"{system}\n\n{avoid_text}"
 
+            # Apply persona-level prompt policy (language/style guardrails)
+            if persona_id is not None:
+                try:
+                    persona = self.kb.load_persona(persona_id)
+                except Exception:
+                    persona = None
+                if persona is not None:
+                    policy_text = self._build_persona_prompt_policy(persona)
+                    if policy_text:
+                        if system:
+                            system = f"{system}\n\n{policy_text}"
+                        else:
+                            system = policy_text
+
             return await self.llm_provider.generate(
                 prompt=prompt,
                 system=system,
@@ -164,6 +178,49 @@ class BaseAgent(ABC):
         except Exception as e:
             self.log("ERROR", f"LLM call failed: {e}")
             raise
+
+    def _build_persona_prompt_policy(self, persona: Any) -> str:
+        """
+        Build persona-wide prompt policy from metadata with safe defaults.
+
+        Defaults enforce Chinese-first output and support colloquial publishing style.
+        """
+        metadata = getattr(persona, "metadata", {}) or {}
+        prefs = metadata.get("prompt_preferences", {}) or {}
+
+        language = str(prefs.get("language", "zh-CN-only")).lower()
+        allow_colloquial = bool(prefs.get("allow_colloquial", True))
+        base_prompt = str(
+            prefs.get(
+                "base_prompt",
+                "请始终使用自然、准确、可发布的中文表达，保持人设一致并避免机械翻译腔。",
+            )
+        ).strip()
+
+        style_keywords = prefs.get("style_keywords", []) or []
+        avoid_words = prefs.get("avoid_words", []) or []
+
+        lines: List[str] = []
+        lines.append("【人设提示策略】")
+        if base_prompt:
+            lines.append(base_prompt)
+
+        if language in ("zh-cn-only", "zh_only", "cn_only", "chinese_only"):
+            lines.append("输出语言要求：必须使用中文，不要输出英文段落或英文标题。")
+        else:
+            lines.append("输出语言要求：默认中文，除非用户明确要求其它语言。")
+
+        if allow_colloquial:
+            lines.append("表达风格要求：允许自然口语化表达，语气可亲和，但避免低俗和过度网络黑话。")
+        else:
+            lines.append("表达风格要求：偏正式书面表达，保持清晰、专业。")
+
+        if style_keywords:
+            lines.append("风格关键词：" + "、".join(str(k) for k in style_keywords if str(k).strip()))
+        if avoid_words:
+            lines.append("避免词汇：" + "、".join(str(w) for w in avoid_words if str(w).strip()))
+
+        return "\n".join(lines)
 
     def get_persona_context(self, persona_id: str) -> Dict[str, Any]:
         """

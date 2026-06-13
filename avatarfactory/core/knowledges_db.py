@@ -1126,21 +1126,40 @@ class KnowledgeBaseDB:
                     "id": suggestion.id,
                     "persona_id": persona_id,
                     "created_at": suggestion.created_at or datetime.utcnow(),
-                    "trigger_type": suggestion.trigger_type,
-                    "source_data": suggestion.source_data,
-                    "suggested_changes": (
-                        [c.model_dump() for c in suggestion.suggested_changes]
-                        if suggestion.suggested_changes
-                        else []
+                    "target": (
+                        suggestion.target.value
+                        if hasattr(suggestion.target, "value")
+                        else str(suggestion.target)
                     ),
+                    "area": (
+                        suggestion.area.value
+                        if hasattr(suggestion.area, "value")
+                        else str(suggestion.area)
+                    ),
+                    "suggestion": suggestion.suggestion,
+                    "current_value": suggestion.current_value,
+                    "proposed_value": suggestion.proposed_value,
                     "rationale": suggestion.rationale,
                     "expected_impact": suggestion.expected_impact,
+                    "confidence": suggestion.confidence,
+                    "severity": (
+                        suggestion.severity.value
+                        if hasattr(suggestion.severity, "value")
+                        else str(suggestion.severity)
+                    ),
+                    "evidence": [str(item) for item in (suggestion.evidence or [])],
+                    "source": (
+                        suggestion.source.value
+                        if hasattr(suggestion.source, "value")
+                        else str(suggestion.source)
+                    ),
                     "status": (
                         suggestion.status.value
                         if hasattr(suggestion.status, "value")
                         else str(suggestion.status)
                     ),
-                    "applied_at": suggestion.applied_at,
+                    "reviewed_at": suggestion.reviewed_at,
+                    "rejection_reason": suggestion.rejection_reason,
                     "applied_version": suggestion.applied_version,
                 }
 
@@ -1164,7 +1183,6 @@ class KnowledgeBaseDB:
         async def _load():
             async with get_session() as session:
                 from sqlalchemy import select
-                from avatarfactory.models.schemas import SuggestedChange, EvolutionStatus
 
                 query = select(EvolutionSuggestionModel).where(
                     EvolutionSuggestionModel.id == suggestion_id
@@ -1178,19 +1196,20 @@ class KnowledgeBaseDB:
                 return EvolutionSuggestion(
                     id=model.id,
                     created_at=model.created_at,
-                    trigger_type=model.trigger_type,
-                    source_data=model.source_data,
-                    suggested_changes=(
-                        [SuggestedChange(**c) for c in model.suggested_changes]
-                        if model.suggested_changes
-                        else []
-                    ),
+                    target=model.target,
+                    area=model.area,
+                    suggestion=model.suggestion,
+                    current_value=model.current_value,
+                    proposed_value=model.proposed_value,
                     rationale=model.rationale,
                     expected_impact=model.expected_impact,
-                    status=(
-                        EvolutionStatus(model.status) if model.status else EvolutionStatus.PENDING
-                    ),
-                    applied_at=model.applied_at,
+                    confidence=model.confidence,
+                    severity=model.severity,
+                    evidence=[str(item) for item in (model.evidence or [])],
+                    source=model.source,
+                    status=model.status or "pending",
+                    reviewed_at=model.reviewed_at,
+                    rejection_reason=model.rejection_reason,
                     applied_version=model.applied_version,
                 )
 
@@ -1207,7 +1226,6 @@ class KnowledgeBaseDB:
         async def _list():
             async with get_session() as session:
                 from sqlalchemy import select
-                from avatarfactory.models.schemas import SuggestedChange, EvolutionStatus
 
                 query = (
                     select(EvolutionSuggestionModel)
@@ -1226,17 +1244,20 @@ class KnowledgeBaseDB:
                     EvolutionSuggestion(
                         id=m.id,
                         created_at=m.created_at,
-                        trigger_type=m.trigger_type,
-                        source_data=m.source_data,
-                        suggested_changes=(
-                            [SuggestedChange(**c) for c in m.suggested_changes]
-                            if m.suggested_changes
-                            else []
-                        ),
+                        target=m.target,
+                        area=m.area,
+                        suggestion=m.suggestion,
+                        current_value=m.current_value,
+                        proposed_value=m.proposed_value,
                         rationale=m.rationale,
                         expected_impact=m.expected_impact,
-                        status=EvolutionStatus(m.status) if m.status else EvolutionStatus.PENDING,
-                        applied_at=m.applied_at,
+                        confidence=m.confidence,
+                        severity=m.severity,
+                        evidence=[str(item) for item in (m.evidence or [])],
+                        source=m.source,
+                        status=m.status or "pending",
+                        reviewed_at=m.reviewed_at,
+                        rejection_reason=m.rejection_reason,
                         applied_version=m.applied_version,
                     )
                     for m in models

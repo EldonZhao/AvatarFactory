@@ -3,6 +3,9 @@ Orchestrator Agent - Main controller that coordinates all sub-agents.
 """
 
 import json
+import re
+import uuid
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from avatarfactory.agents.base import BaseAgent
@@ -82,19 +85,21 @@ class OrchestratorAgent(BaseAgent):
         # Check if we have a persona_id in context
         has_persona = bool(context.get("persona_id"))
 
-        # Step 1: Understand user intent (with persona awareness)
-        try:
-            intent = await self._understand_intent(user_input, has_persona=has_persona)
-        except Exception as e:
-            self.log("ERROR", f"Intent understanding failed: {e}")
-            return {
-                "status": "error",
-                "message": (
-                    "LLM service is temporarily unavailable. "
-                    "Please check model provider settings and retry."
-                ),
-                "error_type": "llm_unavailable",
-            }
+        # Step 1: Try direct command parsing first, then LLM intent classification
+        direct_intent = self._parse_direct_intent(user_input)
+        if direct_intent is not None:
+            intent = direct_intent
+        else:
+            # Understand user intent (with persona awareness)
+            try:
+                intent = await self._understand_intent(user_input, has_persona=has_persona)
+            except Exception as e:
+                self.log("ERROR", f"Intent understanding failed: {e}")
+                return {
+                    "status": "error",
+                    "message": "当前模型服务暂时不可用，请稍后重试。",
+                    "error_type": "llm_unavailable",
+                }
         self.log("INFO", f"Detected intent: {intent.intent_type}")
 
         # Merge context into parameters (e.g., persona_id from scheduler)
@@ -113,6 +118,9 @@ class OrchestratorAgent(BaseAgent):
             "review_suggestion": self._handle_review_suggestion,
             "show_suggestions": self._handle_show_suggestions,
             "agent_config": self._handle_agent_config,
+            "prompt_config": self._handle_prompt_config,
+            "scheduler_manage": self._handle_scheduler_manage,
+            "resource_overview": self._handle_resource_overview,
             "rollback": self._handle_rollback,
             # No-persona intents (recommendation-related)
             "browse_recommendations": self._handle_browse_recommendations,
@@ -126,7 +134,7 @@ class OrchestratorAgent(BaseAgent):
         if not handler:
             return {
                 "status": "error",
-                "message": f"Unknown intent type: {intent.intent_type}",
+                "message": f"无法识别的意图类型：{intent.intent_type}",
             }
 
         # Step 3: Execute handler
@@ -154,16 +162,22 @@ Possible intents:
 - review_suggestion: User wants to approve or reject a pending suggestion (e.g., "approve suggestion X", "reject")
 - show_suggestions: User wants to see pending evolution suggestions
 - agent_config: User wants to modify agent behavior settings (e.g., "make content longer", "increase creativity")
+- prompt_config: User wants to view/update persona-level prompt preferences
+- scheduler_manage: User wants to create/list/update/toggle/delete/run scheduler tasks
+- resource_overview: User wants a unified overview of personas/content/scheduler/evolution resources
 - rollback: User wants to rollback to a previous persona version
 
 Output MUST be valid JSON:
 {
-  "intent_type": "create_persona|generate_content|discover_trends|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|rollback",
+  "intent_type": "create_persona|generate_content|discover_trends|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|prompt_config|scheduler_manage|resource_overview|rollback",
   "parameters": {
     // Extract relevant parameters from user input
     // For discover_trends: include "platform" if mentioned (bluesky, twitter, xiaohongshu, etc.)
     // For evolve_persona: include "user_feedback" with the suggestion
     // For review_suggestion: include "suggestion_id" and "approved" (boolean)
+    // For prompt_config: include "operation"(show/update) and updates fields when needed
+    // For scheduler_manage: include "operation"(list/create/toggle/delete/run/update), task_id, task_type, schedule, enabled
+    // For resource_overview: include optional "scope"
     // For rollback: include "version" (e.g., "v1.0")
   },
   "confidence": <0.0-1.0>
@@ -179,14 +193,16 @@ Possible intents (no persona selected):
 - create_from_recommendation: User wants to create a persona from a recommendation (e.g., "用推荐的xxx创建", "create from recommendation X")
 - create_persona: User wants to create a new persona from a description (e.g., "创建一个科技博主", "create a tech blogger persona")
 - list_personas: User wants to see existing personas (e.g., "有哪些角色", "列出所有角色", "list personas", "show my personas")
+- resource_overview: User wants an overview of all resources
 - help: User is asking for help or doesn't know what to do (e.g., "怎么用", "帮助", "help", "what can you do")
 
 Output MUST be valid JSON:
 {
-  "intent_type": "browse_recommendations|view_trends|create_from_recommendation|create_persona|list_personas|help",
+  "intent_type": "browse_recommendations|view_trends|create_from_recommendation|create_persona|list_personas|resource_overview|help",
   "parameters": {
     // For create_persona: include "user_description"
     // For create_from_recommendation: include "recommendation_id" if specified
+    // For resource_overview: include optional "scope"
   },
   "confidence": <0.0-1.0>
 }"""
@@ -220,6 +236,152 @@ Output MUST be valid JSON:
                     parameters={},
                     confidence=0.5,
                 )
+
+    def _parse_direct_intent(self, user_input: str) -> Optional[Intent]:
+        """
+        Parse high-confidence direct commands without LLM.
+
+        This improves reliability for Chinese operations like scheduler/prompt management.
+        """
+        text = user_input.strip()
+        if not text:
+            return None
+        lowered = text.lower()
+
+        # Resource overview shortcuts
+        if any(k in text for k in ("资源总览", "资源概览", "查看资源", "总览")):
+            return Intent(intent_type="resource_overview", parameters={}, confidence=0.99)
+
+        # Prompt config shortcuts
+        if any(k in text for k in ("prompt", "提示词", "人设提示", "基础提示")):
+            if any(k in text for k in ("查看", "显示", "show")):
+                return Intent(
+                    intent_type="prompt_config",
+                    parameters={"operation": "show"},
+                    confidence=0.99,
+                )
+
+            updates: Dict[str, Any] = {}
+            if any(k in text for k in ("口语", "口语化")):
+                updates["allow_colloquial"] = True
+            if any(k in text for k in ("正式", "书面")):
+                updates["allow_colloquial"] = False
+
+            base_match = re.search(
+                r"(?:prompt|提示词|基础提示|基础提示词)(?:改为|设为|设置为|为|:|：)\s*(.+)$",
+                text,
+                re.IGNORECASE,
+            )
+            if base_match:
+                updates["base_prompt"] = self._normalize_prompt_text(base_match.group(1))
+            if updates:
+                return Intent(
+                    intent_type="prompt_config",
+                    parameters={"operation": "update", "updates": updates},
+                    confidence=0.99,
+                )
+
+        # Evolution shortcuts
+        if any(k in text for k in ("进化建议", "待审批建议", "待处理建议")):
+            status = "pending" if any(k in text for k in ("待", "pending")) else "pending"
+            return Intent(
+                intent_type="show_suggestions",
+                parameters={"status": status},
+                confidence=0.98,
+            )
+
+        approve_match = re.search(r"(批准|通过|approve)\s*(建议)?\s*([a-zA-Z0-9_-]{6,})", text, re.IGNORECASE)
+        if approve_match:
+            return Intent(
+                intent_type="review_suggestion",
+                parameters={"suggestion_id": approve_match.group(3), "approved": True},
+                confidence=0.98,
+            )
+
+        reject_match = re.search(r"(拒绝|驳回|reject)\s*(建议)?\s*([a-zA-Z0-9_-]{6,})", text, re.IGNORECASE)
+        if reject_match:
+            return Intent(
+                intent_type="review_suggestion",
+                parameters={"suggestion_id": reject_match.group(3), "approved": False},
+                confidence=0.98,
+            )
+
+        rollback_match = re.search(r"(回滚|rollback).*(v\d+\.\d+)", text, re.IGNORECASE)
+        if rollback_match:
+            return Intent(
+                intent_type="rollback",
+                parameters={"version": rollback_match.group(2)},
+                confidence=0.98,
+            )
+
+        if any(k in text for k in ("进化", "优化人设", "改进人设")):
+            feedback = text
+            evolve_match = re.search(r"(?:进化|优化|改进)(?:这个人设|该人设|persona)?(?:：|:)?\s*(.+)$", text)
+            if evolve_match:
+                feedback = evolve_match.group(1).strip()
+            return Intent(
+                intent_type="evolve_persona",
+                parameters={"user_feedback": feedback},
+                confidence=0.9,
+            )
+
+        # Scheduler direct operations
+        if any(k in lowered for k in ("scheduler", "schedule", "cron")) or any(
+            k in text for k in ("定时", "周期", "任务", "排期")
+        ):
+            if any(k in text for k in ("列表", "查看", "显示")):
+                return Intent(
+                    intent_type="scheduler_manage",
+                    parameters={"operation": "list"},
+                    confidence=0.99,
+                )
+            if any(k in text for k in ("删除", "remove", "delete")):
+                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
+                params: Dict[str, Any] = {"operation": "delete"}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("启用", "开启")):
+                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
+                params = {"operation": "toggle", "enabled": True}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("停用", "关闭", "禁用")):
+                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
+                params = {"operation": "toggle", "enabled": False}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("立即执行", "立刻执行", "run now")):
+                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
+                params = {"operation": "run"}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("创建", "新建", "新增")):
+                if "发现" in text and "发布" in text:
+                    return Intent(
+                        intent_type="scheduler_manage",
+                        parameters={"operation": "create_bundle"},
+                        confidence=0.95,
+                    )
+                task_type = "topic"
+                if any(k in text for k in ("发布", "publish")):
+                    task_type = "publish"
+                elif any(k in text for k in ("内容", "写作", "content")):
+                    task_type = "content"
+                schedule = "0 9 * * *"
+                cron_match = re.search(r"(\d+\s+\d+\s+\*?\d+\s+\*?\d+\s+\*?\d+)", text)
+                if cron_match:
+                    schedule = cron_match.group(1)
+                return Intent(
+                    intent_type="scheduler_manage",
+                    parameters={"operation": "create", "task_type": task_type, "schedule": schedule},
+                    confidence=0.95,
+                )
+
+        return None
 
     async def _handle_create_persona(
         self, parameters: Dict[str, Any], original_input: str
@@ -294,10 +456,10 @@ Output MUST be valid JSON:
             "sample_content": sample_content.model_dump() if sample_content else None,
             "review": review_report.model_dump() if review_report else None,
             "message": (
-                f"✅ Created persona '{persona.identity.name}' (ID: {persona.id})\n"
-                f"Validation score: {validation.get('overall_score', 'N/A')}/100\n"
+                f"✅ 已创建人设「{persona.identity.name}」（ID: {persona.id}）\n"
+                f"校验分：{validation.get('overall_score', 'N/A')}/100\n"
                 + (
-                    f"Sample content generated with review score: {review_report.overall_score}/100"
+                    f"示例内容已生成，评审分：{review_report.overall_score}/100"
                     if review_report
                     else ""
                 )
@@ -314,13 +476,13 @@ Output MUST be valid JSON:
             # Try to find the most recent persona (sorted by created_at desc)
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found. Please create a persona first."}
+                return {"message": "未找到可用人设，请先创建 persona。"}
             persona_id = personas[0]
             self.log("WARNING", f"No persona_id specified, using most recent: {persona_id}")
 
         persona = self.kb.load_persona(persona_id)
         if not persona:
-            return {"message": f"Persona {persona_id} not found"}
+            return {"message": f"未找到 persona：{persona_id}"}
 
         self.log("INFO", f"Generating content for persona {persona_id} ({persona.identity.name})")
 
@@ -366,9 +528,9 @@ Output MUST be valid JSON:
             "content": content.model_dump(),
             "review": review_report.model_dump(),
             "message": (
-                f"✅ Generated content: '{content.title}'\n"
-                f"Review score: {review_report.overall_score}/100\n"
-                f"Status: {'✅ Approved' if review_report.overall_score >= 70 else '⚠️ Needs revision'}"
+                f"✅ 已生成内容：《{content.title}》\n"
+                f"评审分：{review_report.overall_score}/100\n"
+                f"状态：{'✅ 可发布' if review_report.overall_score >= 70 else '⚠️ 建议修改'}"
             ),
         }
 
@@ -381,12 +543,12 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found. Please create a persona first."}
+                return {"message": "未找到可用人设，请先创建 persona。"}
             persona_id = personas[0]
 
         persona = self.kb.load_persona(persona_id)
         if not persona:
-            return {"message": f"Persona {persona_id} not found"}
+            return {"message": f"未找到 persona：{persona_id}"}
 
         platform = parameters.get("platform", "bluesky")
 
@@ -408,7 +570,7 @@ Output MUST be valid JSON:
             )
 
             if result.get("status") != "success":
-                return {"message": f"Discovery failed: {result.get('message', 'Unknown error')}"}
+                return {"message": f"热点发现失败：{result.get('message', '未知错误')}"}
 
             data = result.get("data", {})
             ideas = data.get("ideas", [])
@@ -428,15 +590,15 @@ Output MUST be valid JSON:
                 "trending_count": trending_count,
                 "ideas": ideas,
                 "message": (
-                    f"🔍 Discovered {trending_count} trending posts on {platform}\n"
-                    f"Generated {len(ideas)} content ideas for {persona.identity.name}"
+                    f"🔍 在 {platform} 发现 {trending_count} 条热点内容\n"
+                    f"已为 {persona.identity.name} 生成 {len(ideas)} 个选题想法"
                     f"{ideas_text}"
                 ),
             }
 
         except Exception as e:
             self.log("ERROR", f"Discovery failed: {e}")
-            return {"message": f"Discovery failed: {str(e)}"}
+            return {"message": f"热点发现失败：{str(e)}"}
 
     async def _handle_analyze_data(
         self, parameters: Dict[str, Any], original_input: str
@@ -447,7 +609,7 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
 
         # Get content statistics
@@ -484,7 +646,7 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
 
         # Get basic trend data
@@ -522,8 +684,10 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
+
+        self._ensure_persona_evolution_defaults(persona_id)
 
         # Get user feedback from parameters or use original input
         user_feedback = parameters.get("user_feedback", original_input)
@@ -535,7 +699,7 @@ Output MUST be valid JSON:
 
         if not suggestions:
             return {
-                "message": "Could not generate suggestions from the feedback.",
+                "message": "无法根据这条反馈生成进化建议。",
                 "suggestions": [],
             }
 
@@ -557,12 +721,12 @@ Output MUST be valid JSON:
             "suggestions": suggestion_list,
             "count": len(suggestions),
             "message": (
-                f"🔄 Generated {len(suggestions)} suggestion(s):\n\n"
+                f"🔄 已生成 {len(suggestions)} 条进化建议：\n\n"
                 + "\n".join(
                     [
                         f"  [{s['severity']}] {s['area']}: {s['suggestion']}\n"
-                        f"     Rationale: {s['rationale']}\n"
-                        f"     Use 'approve suggestion {s['id']}' or 'reject suggestion {s['id']}' to review."
+                        f"     原因：{s['rationale']}\n"
+                        f"     可说「批准建议 {s['id']}」或「拒绝建议 {s['id']}」进行处理。"
                         for s in suggestion_list
                     ]
                 )
@@ -578,7 +742,7 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
 
         suggestion_id = parameters.get("suggestion_id")
@@ -588,7 +752,7 @@ Output MUST be valid JSON:
             if pending:
                 suggestion_id = pending[0].id
             else:
-                return {"message": "No pending suggestions to review."}
+                return {"message": "当前没有待处理的建议。"}
 
         approved = parameters.get("approved", True)
         rejection_reason = parameters.get("rejection_reason")
@@ -602,14 +766,14 @@ Output MUST be valid JSON:
             return {
                 "suggestion": suggestion.model_dump(mode="json"),
                 "message": (
-                    f"✅ Approved and applied suggestion: {suggestion.suggestion}\n"
-                    f"New version: {suggestion.applied_version}"
+                    f"✅ 已批准并应用建议：{suggestion.suggestion}\n"
+                    f"新版本：{suggestion.applied_version}"
                 ),
             }
         else:
             return {
                 "suggestion": suggestion.model_dump(mode="json"),
-                "message": f"❌ Rejected suggestion: {suggestion.suggestion}",
+                "message": f"❌ 已拒绝建议：{suggestion.suggestion}",
             }
 
     async def _handle_show_suggestions(
@@ -621,8 +785,10 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
+
+        self._ensure_persona_evolution_defaults(persona_id)
 
         status = parameters.get("status", "pending")
         suggestions = self.kb.list_evolution_suggestions(persona_id, status=status)
@@ -630,7 +796,7 @@ Output MUST be valid JSON:
         if not suggestions:
             return {
                 "suggestions": [],
-                "message": f"No {status} suggestions found.",
+                "message": f"当前没有「{status}」状态的进化建议。",
             }
 
         suggestion_list = []
@@ -638,8 +804,8 @@ Output MUST be valid JSON:
             suggestion_list.append(
                 {
                     "id": s.id,
-                    "severity": s.severity.value,
-                    "area": s.area.value,
+                    "severity": s.severity.value if hasattr(s.severity, "value") else str(s.severity),
+                    "area": s.area.value if hasattr(s.area, "value") else str(s.area),
                     "suggestion": s.suggestion,
                     "confidence": s.confidence,
                     "created_at": s.created_at.isoformat(),
@@ -650,7 +816,7 @@ Output MUST be valid JSON:
             "suggestions": suggestion_list,
             "count": len(suggestions),
             "message": (
-                f"📋 {len(suggestions)} {status} suggestion(s):\n\n"
+                f"📋 共 {len(suggestions)} 条「{status}」进化建议：\n\n"
                 + "\n".join(
                     [f"  [{s['severity']}] {s['id']}: {s['suggestion']}" for s in suggestion_list]
                 )
@@ -666,7 +832,7 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
 
         agent_type = parameters.get("agent_type", "content")
@@ -683,7 +849,7 @@ Output MUST be valid JSON:
             if config_suggestions:
                 return {
                     "suggestions": [s.model_dump(mode="json") for s in config_suggestions],
-                    "message": f"Generated {len(config_suggestions)} agent config suggestions. Use 'approve' to apply.",
+                    "message": f"已生成 {len(config_suggestions)} 条 Agent 配置建议，可继续说“批准建议 <ID>”来应用。",
                 }
 
         # Apply direct config updates
@@ -694,10 +860,343 @@ Output MUST be valid JSON:
             new_config = config_manager.update_config(persona_id, agent_type, updates)
             return {
                 "config": new_config.model_dump(),
-                "message": f"✅ Updated {agent_type} agent configuration.",
+                "message": f"✅ 已更新 {agent_type} Agent 配置。",
             }
 
-        return {"message": "No configuration changes specified."}
+        return {"message": "未识别到可执行的配置变更。"}
+
+    async def _handle_prompt_config(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle persona-level prompt preference management."""
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if not personas:
+                return {"message": "还没有可配置的人设，请先创建一个 persona。"}
+            persona_id = personas[0]
+
+        persona = self.kb.load_persona(persona_id)
+        if not persona:
+            return {"message": f"未找到 persona：{persona_id}"}
+
+        operation = parameters.get("operation", "show")
+        prefs = (persona.metadata or {}).get("prompt_preferences", {}) or {}
+        if not prefs:
+            prefs = {
+                "language": "zh-CN-only",
+                "allow_colloquial": True,
+                "base_prompt": "请始终使用中文输出，保持人设一致，支持自然口语化表达。",
+                "style_keywords": ["中文", "口语化", "人设一致"],
+                "avoid_words": [],
+            }
+
+        if operation == "show":
+            return {
+                "persona_id": persona_id,
+                "prompt_preferences": prefs,
+                "message": (
+                    f"🧩 人设 {persona_id} 的 Prompt 配置：\n"
+                    f"- language: {prefs.get('language')}\n"
+                    f"- allow_colloquial: {prefs.get('allow_colloquial')}\n"
+                    f"- base_prompt: {prefs.get('base_prompt')}"
+                ),
+            }
+
+        updates = parameters.get("updates", {}) or {}
+        if not updates and original_input:
+            base_match = re.search(
+                r"(?:prompt|提示词|基础提示|基础提示词)(?:改为|设为|设置为|为|:|：)\s*(.+)$",
+                original_input,
+                re.IGNORECASE,
+            )
+            if base_match:
+                updates["base_prompt"] = self._normalize_prompt_text(base_match.group(1))
+            if any(k in original_input for k in ("口语", "口语化")):
+                updates["allow_colloquial"] = True
+            if any(k in original_input for k in ("正式", "书面")):
+                updates["allow_colloquial"] = False
+
+        if not updates:
+            return {"message": "没有识别到可更新的 prompt 字段。"}
+
+        prefs.update(updates)
+        metadata = dict(persona.metadata or {})
+        metadata["prompt_preferences"] = prefs
+
+        # Direct update (no LLM dependency) for prompt preference changes
+        old_version = persona.version or "v1.0"
+        match = re.match(r"^v?(\d+)\.(\d+)$", old_version.strip())
+        if match:
+            major, minor = int(match.group(1)), int(match.group(2))
+            minor += 1
+            new_version = f"v{major}.{minor}"
+        else:
+            # Fallback to a safe next version if historical data is non-standard.
+            new_version = "v1.1"
+
+        persona.metadata = metadata
+        persona.version = new_version
+        persona.updated_at = datetime.now()
+        self.kb.save_persona(persona)
+
+        from avatarfactory.models.schemas import PersonaVersion
+
+        self.kb.save_persona_version(
+            persona_id,
+            PersonaVersion(
+                version=new_version,
+                timestamp=datetime.now(),
+                changes=["更新 persona 级 prompt 配置"],
+                reason="用户调整提示词策略",
+                expected_impact="提升中文一致性与口语化可发布性",
+                author="user",
+                approved=True,
+                config_snapshot=persona.model_dump(mode="json"),
+            ),
+        )
+
+        return {
+            "persona_id": persona_id,
+            "prompt_preferences": prefs,
+            "version": new_version,
+            "message": f"✅ 已更新 {persona_id} 的 Prompt 配置（版本 {new_version}）。",
+        }
+
+    async def _handle_scheduler_manage(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle scheduler operations through conversation."""
+        scheduler = self._get_runtime_scheduler()
+        if scheduler is None:
+            return {
+                "message": (
+                    "当前进程未加载调度器实例，无法直接管理定时任务。"
+                    "请在 service 模式启动后重试。"
+                )
+            }
+
+        operation = parameters.get("operation", "list")
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            personas = self.kb.list_personas()
+            if personas:
+                persona_id = personas[0]
+
+        if operation == "list":
+            tasks = scheduler.list_tasks()
+            if persona_id:
+                tasks = [t for t in tasks if t.persona_id == persona_id]
+            task_rows = [
+                {
+                    "id": t.id,
+                    "name": t.name,
+                    "task_type": t.task_type,
+                    "schedule": t.schedule,
+                    "enabled": t.enabled,
+                    "persona_id": t.persona_id,
+                    "platform": t.platform,
+                    "last_status": t.last_status,
+                    "last_run": t.last_run.isoformat() if t.last_run else None,
+                }
+                for t in tasks
+            ]
+            if not task_rows:
+                return {"tasks": [], "message": "当前没有符合条件的定时任务。"}
+            lines = [
+                f"- {t['id']} | {t['task_type']} | {t['schedule']} | {'启用' if t['enabled'] else '停用'}"
+                for t in task_rows
+            ]
+            return {"tasks": task_rows, "message": "🗓️ 当前定时任务：\n" + "\n".join(lines)}
+
+        if operation == "create":
+            task_type = parameters.get("task_type", "topic")
+            schedule = parameters.get("schedule", "0 9 * * *")
+            platform = parameters.get("platform", "bluesky")
+
+            task_id = f"{task_type}_{uuid.uuid4().hex[:8]}"
+            task_name_map = {"topic": "周期发现热点", "content": "周期生成内容", "publish": "周期发布内容"}
+            task_name = parameters.get("name") or task_name_map.get(task_type, "自定义定时任务")
+
+            task_dict = {
+                "id": task_id,
+                "name": task_name,
+                "task_type": task_type,
+                "schedule": schedule,
+                "enabled": True,
+                "persona_id": persona_id,
+                "platform": platform,
+                "extra_params": parameters.get("extra_params", {}),
+            }
+            created = await scheduler.add_task_from_dict(task_dict)
+            return {
+                "task": created.model_dump(mode="json"),
+                "message": f"✅ 已创建定时任务 {created.id}（{created.task_type} / {created.schedule}）。",
+            }
+
+        if operation == "create_bundle":
+            if not persona_id:
+                return {"message": "请先选择一个 persona 后再配置周期发现/发布任务。"}
+            existing = scheduler.list_tasks()
+            existing_by_type = {
+                t.task_type: t
+                for t in existing
+                if t.persona_id == persona_id and t.task_type in {"topic", "publish"}
+            }
+
+            topic_task = existing_by_type.get("topic")
+            if topic_task is None:
+                topic_task = await scheduler.add_task_from_dict(
+                    {
+                        "id": f"topic_{uuid.uuid4().hex[:8]}",
+                        "name": "周期发现热点",
+                        "task_type": "topic",
+                        "schedule": "0 9 * * *",
+                        "enabled": True,
+                        "persona_id": persona_id,
+                        "platform": "bluesky",
+                        "extra_params": {"limit": 20},
+                    }
+                )
+
+            publish_task = existing_by_type.get("publish")
+            if publish_task is None:
+                publish_task = await scheduler.add_task_from_dict(
+                    {
+                        "id": f"publish_{uuid.uuid4().hex[:8]}",
+                        "name": "周期发布内容",
+                        "task_type": "publish",
+                        "schedule": "0 18 * * *",
+                        "enabled": True,
+                        "persona_id": persona_id,
+                        "platform": "bluesky",
+                        "extra_params": {},
+                    }
+                )
+            return {
+                "tasks": [
+                    topic_task.model_dump(mode="json"),
+                    publish_task.model_dump(mode="json"),
+                ],
+                "message": (
+                    f"✅ {persona_id} 的周期任务已就绪：\n"
+                    f"- 发现热点：{topic_task.id}（每天 09:00）\n"
+                    f"- 发布内容：{publish_task.id}（每天 18:00）\n"
+                    "如任务已存在则复用，不会重复创建。"
+                ),
+            }
+
+        task_id = parameters.get("task_id")
+        if not task_id:
+            match = re.search(r"([a-z]+_[0-9a-f]{8})", original_input.lower())
+            if match:
+                task_id = match.group(1)
+
+        if not task_id:
+            return {"message": "请提供 task_id。示例：topic_ab12cd34"}
+
+        if operation == "delete":
+            ok = await scheduler.remove_task(task_id)
+            return {"task_id": task_id, "deleted": ok, "message": "✅ 已删除任务。" if ok else "未找到该任务。"}
+
+        if operation == "toggle":
+            enabled = bool(parameters.get("enabled", True))
+            updated = await scheduler.update_task(task_id, {"enabled": enabled})
+            if not updated:
+                return {"message": f"未找到任务 {task_id}。"}
+            return {
+                "task": updated.model_dump(mode="json"),
+                "message": f"✅ 任务 {task_id} 已{'启用' if enabled else '停用'}。",
+            }
+
+        if operation == "run":
+            await scheduler._run_task_async(task_id)
+            return {"task_id": task_id, "message": f"✅ 已触发任务 {task_id} 立即执行。"}
+
+        if operation == "update":
+            allowed_updates = {"name", "schedule", "platform", "enabled", "extra_params"}
+            updates = {k: v for k, v in (parameters.get("updates", {}) or {}).items() if k in allowed_updates}
+            if not updates:
+                return {"message": "没有可更新字段。可更新：name/schedule/platform/enabled/extra_params"}
+            updated = await scheduler.update_task(task_id, updates)
+            if not updated:
+                return {"message": f"未找到任务 {task_id}。"}
+            return {
+                "task": updated.model_dump(mode="json"),
+                "message": f"✅ 已更新任务 {task_id}。",
+            }
+
+        return {"message": f"不支持的 scheduler 操作：{operation}"}
+
+    async def _handle_resource_overview(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Unified overview for personas/content/evolution/scheduler resources."""
+        persona_ids = self.kb.list_personas()
+        content_count = len(self.kb.list_content())
+
+        pending_suggestions = 0
+        for pid in persona_ids:
+            try:
+                pending_suggestions += len(self.kb.list_evolution_suggestions(pid, status="pending"))
+            except Exception:
+                # Keep overview available even if suggestion storage has legacy incompatibilities.
+                continue
+
+        scheduler = self._get_runtime_scheduler()
+        tasks = scheduler.list_tasks() if scheduler else []
+
+        return {
+            "summary": {
+                "persona_count": len(persona_ids),
+                "content_count": content_count,
+                "pending_suggestions": pending_suggestions,
+                "scheduler_task_count": len(tasks),
+            },
+            "message": (
+                "📦 项目资源总览：\n"
+                f"- Persona 数量：{len(persona_ids)}\n"
+                f"- 内容总数：{content_count}\n"
+                f"- 待处理进化建议：{pending_suggestions}\n"
+                f"- 定时任务数：{len(tasks)}\n\n"
+                "你可以继续说：\n"
+                "1) 查看 prompt 配置\n"
+                "2) 创建定时发现/发布任务\n"
+                "3) 查看待审批进化建议"
+            ),
+        }
+
+    def _get_runtime_scheduler(self) -> Optional[Any]:
+        """Get runtime scheduler from service app when available."""
+        try:
+            import importlib
+
+            service_app_module = importlib.import_module("avatarfactory.service.app")
+
+            scheduler = getattr(service_app_module, "_scheduler", None)
+            return scheduler
+        except Exception:
+            return None
+
+    def _ensure_persona_evolution_defaults(self, persona_id: str) -> None:
+        """Ensure each persona has evolution config enabled by default."""
+        try:
+            from avatarfactory.models.schemas import EvolutionConfig
+
+            persona = self.kb.load_persona(persona_id)
+            if persona is None:
+                return
+            if persona.evolution is None:
+                persona.evolution = EvolutionConfig(enabled=True)
+                self.kb.save_persona(persona)
+        except Exception as e:
+            self.log("WARNING", f"Failed to ensure evolution defaults for {persona_id}: {e}")
+
+    def _normalize_prompt_text(self, text: str) -> str:
+        """Clean extracted prompt text to avoid leading punctuation artifacts."""
+        cleaned = (text or "").strip()
+        cleaned = re.sub(r"^[：:\s]+", "", cleaned)
+        return cleaned.strip()
 
     async def _handle_rollback(
         self, parameters: Dict[str, Any], original_input: str
@@ -708,7 +1207,7 @@ Output MUST be valid JSON:
         if not persona_id:
             personas = self.kb.list_personas()
             if not personas:
-                return {"message": "No persona found."}
+                return {"message": "未找到可用人设。"}
             persona_id = personas[0]
 
         version = parameters.get("version")
@@ -716,12 +1215,12 @@ Output MUST be valid JSON:
             # Show available versions
             versions = self.kb.list_persona_versions(persona_id)
             if len(versions) <= 1:
-                return {"message": "No previous versions available for rollback."}
+                return {"message": "没有可回滚的历史版本。"}
             return {
                 "versions": versions,
                 "message": (
-                    f"Available versions: {', '.join(versions)}\n"
-                    "Specify a version to rollback to."
+                    f"可用版本：{', '.join(versions)}\n"
+                    "请指定要回滚的版本号。"
                 ),
             }
 

@@ -14,6 +14,7 @@ from avatarfactory.models.schemas import (
     AgentMessage,
     Boundaries,
     ContentPillar,
+    EvolutionConfig,
     Identity,
     NotificationConfig,
     Persona,
@@ -57,7 +58,7 @@ class PersonaAgent(BaseAgent):
         self.log("INFO", f"Creating persona from description: {user_description[:100]}...")
 
         # Generate persona using LLM
-        system_prompt = """You are a social media persona design expert. Your task is to create a detailed, structured persona configuration based on the user's description.
+        system_prompt = """你是一位社交媒体人设设计专家。请根据用户描述，生成结构化且可持续运营的人设配置。
 
 Output MUST be valid JSON matching this exact structure:
 {
@@ -91,10 +92,10 @@ Output MUST be valid JSON matching this exact structure:
 }
 
 IMPORTANT:
-- Be specific and actionable
-- Ensure consistency across all fields
-- Design for sustainable content creation (not one-off viral posts)
-- Consider platform-specific best practices
+- 所有文本内容必须使用中文
+- 语言表达允许口语化，但要自然、可发布
+- 内容要具体、可执行，字段间保持一致
+- 设计要支持长期稳定创作，不追求一次性爆款
 """
 
         user_prompt = f"""Create a persona for: {user_description}
@@ -132,6 +133,20 @@ Provide a complete persona configuration in JSON format."""
             boundaries=Boundaries(**persona_data["boundaries"]),
             # Enable notifications by default for new personas
             notification=NotificationConfig(enabled=True),
+            # Enable evolution by default for every persona
+            evolution=EvolutionConfig(enabled=True),
+            metadata={
+                "prompt_preferences": {
+                    "language": "zh-CN-only",
+                    "allow_colloquial": True,
+                    "base_prompt": (
+                        "请始终使用中文输出，保持人设一致，"
+                        "支持自然口语化表达并确保内容可直接发布。"
+                    ),
+                    "style_keywords": ["中文", "口语化", "可发布", "人设一致"],
+                    "avoid_words": [],
+                }
+            },
         )
 
         # Save to knowledges

@@ -50,6 +50,7 @@ class FakeScheduler:
     def __init__(self, tasks: Optional[List[ScheduledTask]] = None) -> None:
         self._tasks = list(tasks or [])
         self.add_calls: List[Dict[str, Any]] = []
+        self.removed_persona_ids: List[str] = []
 
     def list_tasks(self) -> List[ScheduledTask]:
         return list(self._tasks)
@@ -59,6 +60,12 @@ class FakeScheduler:
         task = ScheduledTask(**task_dict)
         self._tasks.append(task)
         return task
+
+    async def remove_tasks_for_persona(self, persona_id: str) -> int:
+        self.removed_persona_ids.append(persona_id)
+        before = len(self._tasks)
+        self._tasks = [task for task in self._tasks if task.persona_id != persona_id]
+        return before - len(self._tasks)
 
 
 def _build_persona(persona_id: str) -> Persona:
@@ -130,6 +137,38 @@ def test_parse_no_persona_chinese_shortcuts(orchestrator: OrchestratorAgent) -> 
     assert intent.intent_type == "list_personas"
 
 
+def test_parse_delete_persona_shortcut(orchestrator: OrchestratorAgent) -> None:
+    intent = orchestrator._parse_direct_intent("帮我把下面的删掉：persona_02286f25")
+    assert intent is not None
+    assert intent.intent_type == "delete_persona"
+    assert intent.parameters["persona_id"] == "persona_02286f25"
+
+
+def test_scheduler_commands_not_misrouted_to_delete_persona(orchestrator: OrchestratorAgent) -> None:
+    intent = orchestrator._parse_direct_intent("删除任务 topic_persona_demo")
+    assert intent is not None
+    assert intent.intent_type == "scheduler_manage"
+    assert intent.parameters["operation"] == "delete"
+    assert intent.parameters["task_id"] == "topic_persona_demo"
+
+
+def test_parse_scheduler_create_with_hotspot_words(orchestrator: OrchestratorAgent) -> None:
+    intent = orchestrator._parse_direct_intent("创建一个热点发现任务 每天9点")
+    assert intent is not None
+    assert intent.intent_type == "scheduler_manage"
+    assert intent.parameters["operation"] == "create"
+    assert intent.parameters["task_type"] == "topic"
+
+
+def test_parse_scheduler_create_with_cron_expression(orchestrator: OrchestratorAgent) -> None:
+    intent = orchestrator._parse_direct_intent("设置cron 0 */6 * * * 发布任务")
+    assert intent is not None
+    assert intent.intent_type == "scheduler_manage"
+    assert intent.parameters["operation"] == "create"
+    assert intent.parameters["task_type"] == "publish"
+    assert intent.parameters["schedule"] == "0 */6 * * *"
+
+
 @pytest.mark.asyncio
 async def test_direct_intent_path_works_without_llm(orchestrator: OrchestratorAgent) -> None:
     async def _boom(*args: Any, **kwargs: Any) -> Any:
@@ -180,6 +219,85 @@ async def test_scheduler_bundle_reuses_existing_tasks(orchestrator: Orchestrator
     assert len(scheduler.add_calls) == 0
     assert "不会重复创建" in result["message"]
     assert len(result["tasks"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_persona_direct_intent_removes_persona_and_tasks(
+    orchestrator: OrchestratorAgent,
+) -> None:
+    scheduler = FakeScheduler(
+        tasks=[
+            ScheduledTask(
+                id="topic_test001",
+                name="周期发现热点",
+                task_type="topic",
+                schedule="0 9 * * *",
+                enabled=True,
+                persona_id="persona_test_direct",
+                platform="bluesky",
+                extra_params={},
+            )
+        ]
+    )
+    orchestrator._get_runtime_scheduler = lambda: scheduler  # type: ignore[assignment]
+
+    result = await orchestrator._handle_user_input("帮我把下面的删掉：persona_test_direct", context={})
+
+    assert result["status"] == "success"
+    assert result["data"]["persona_deleted"] is True
+    assert result["data"]["tasks_removed"] == 1
+    assert "persona_test_direct" in scheduler.removed_persona_ids
+    assert orchestrator.kb.load_persona("persona_test_direct") is None
+
+
+@pytest.mark.asyncio
+async def test_scheduler_list_all_not_forced_to_first_persona(
+    orchestrator: OrchestratorAgent,
+) -> None:
+    scheduler = FakeScheduler(
+        tasks=[
+            ScheduledTask(
+                id="topic_persona_test_direct",
+                name="周期发现热点",
+                task_type="topic",
+                schedule="0 9 * * *",
+                enabled=True,
+                persona_id="persona_test_direct",
+                platform="bluesky",
+                extra_params={},
+            ),
+            ScheduledTask(
+                id="topic_other_persona",
+                name="周期发现热点",
+                task_type="topic",
+                schedule="0 9 * * *",
+                enabled=True,
+                persona_id="persona_other",
+                platform="bluesky",
+                extra_params={},
+            ),
+        ]
+    )
+    orchestrator._get_runtime_scheduler = lambda: scheduler  # type: ignore[assignment]
+
+    result = await orchestrator._handle_scheduler_manage({"operation": "list"}, "查看所有定时任务")
+
+    assert len(result["tasks"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_understand_intent_fallback_on_schema_validation_error(
+    orchestrator: OrchestratorAgent,
+) -> None:
+    async def _bad_call_llm(*args: Any, **kwargs: Any) -> str:
+        # JSON is valid, but schema is invalid for Intent (intent_type should be string)
+        return '{"intent_type": 123, "parameters": {}, "confidence": 0.7}'
+
+    orchestrator.call_llm = _bad_call_llm  # type: ignore[assignment]
+
+    intent = await orchestrator._understand_intent("随便说点什么", has_persona=True)
+    assert intent.intent_type == "create_persona"
+    assert "user_description" in intent.parameters
 
 
 def test_backfill_persona_defaults(orchestrator: OrchestratorAgent) -> None:

@@ -114,6 +114,7 @@ class OrchestratorAgent(BaseAgent):
         # Step 2: Route to appropriate handler
         handlers = {
             "create_persona": self._handle_create_persona,
+            "delete_persona": self._handle_delete_persona,
             "generate_content": self._handle_generate_content,
             "discover_trends": self._handle_discover_trends,
             "analyze_data": self._handle_analyze_data,
@@ -161,6 +162,7 @@ Possible intents:
 - create_persona: User wants to create a new persona
 - generate_content: User wants to generate content for an existing persona
 - discover_trends: User wants to discover trending topics, hot topics, or what's popular on social platforms
+- delete_persona: User wants to delete an existing persona
 - analyze_data: User wants to analyze performance data or statistics
 - optimize_persona: User wants to optimize an existing persona
 - evolve_persona: User wants to suggest or apply changes to persona (e.g., "make it more casual", "change the tone")
@@ -174,9 +176,10 @@ Possible intents:
 
 Output MUST be valid JSON:
 {
-  "intent_type": "create_persona|generate_content|discover_trends|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|prompt_config|scheduler_manage|resource_overview|rollback",
+  "intent_type": "create_persona|delete_persona|generate_content|discover_trends|analyze_data|optimize_persona|evolve_persona|review_suggestion|show_suggestions|agent_config|prompt_config|scheduler_manage|resource_overview|rollback",
   "parameters": {
     // Extract relevant parameters from user input
+    // For delete_persona: include "persona_id" when specified and optional "keep_content" (boolean)
     // For discover_trends: include "platform" if mentioned (bluesky, twitter, xiaohongshu, etc.)
     // For evolve_persona: include "user_feedback" with the suggestion
     // For review_suggestion: include "suggestion_id" and "approved" (boolean)
@@ -197,15 +200,17 @@ Possible intents (no persona selected):
 - view_trends: User wants to see current hot topics/trends (e.g., "热点", "趋势", "查看热点趋势", "what's trending", "show trends")
 - create_from_recommendation: User wants to create a persona from a recommendation (e.g., "用推荐的xxx创建", "create from recommendation X")
 - create_persona: User wants to create a new persona from a description (e.g., "创建一个科技博主", "create a tech blogger persona")
+- delete_persona: User wants to delete an existing persona
 - list_personas: User wants to see existing personas (e.g., "有哪些角色", "列出所有角色", "list personas", "show my personas")
 - resource_overview: User wants an overview of all resources
 - help: User is asking for help or doesn't know what to do (e.g., "怎么用", "帮助", "help", "what can you do")
 
 Output MUST be valid JSON:
 {
-  "intent_type": "browse_recommendations|view_trends|create_from_recommendation|create_persona|list_personas|resource_overview|help",
+  "intent_type": "browse_recommendations|view_trends|create_from_recommendation|create_persona|delete_persona|list_personas|resource_overview|help",
   "parameters": {
     // For create_persona: include "user_description"
+    // For delete_persona: include "persona_id"
     // For create_from_recommendation: include "recommendation_id" if specified
     // For resource_overview: include optional "scope"
   },
@@ -226,7 +231,7 @@ Output MUST be valid JSON:
 
             intent_data = json.loads(json_str)
             return Intent(**intent_data)
-        except json.JSONDecodeError as e:
+        except Exception as e:
             self.log("WARNING", f"Failed to parse intent: {e}")
             # Default based on whether persona exists
             if has_persona:
@@ -252,6 +257,79 @@ Output MUST be valid JSON:
         if not text:
             return None
         lowered = text.lower()
+        scheduler_context = any(k in lowered for k in ("scheduler", "schedule", "cron")) or any(
+            k in text for k in ("定时", "周期", "任务", "排期")
+        )
+
+        # Scheduler direct operations (high-priority to avoid misrouting "删除任务" to persona deletion)
+        if scheduler_context:
+            if any(k in text for k in ("列表", "查看", "显示")):
+                params: Dict[str, Any] = {"operation": "list"}
+                if any(k in text for k in ("所有", "全部", "all")):
+                    params["persona_id"] = None
+                return Intent(
+                    intent_type="scheduler_manage",
+                    parameters=params,
+                    confidence=0.99,
+                )
+
+            task_match = re.search(
+                r"((?:task|topic|content|publish|evolution|discovery|trending|content_suggest|optimize)"
+                r"_[a-z0-9][a-z0-9_-]*)",
+                lowered,
+            )
+
+            if any(k in text for k in ("删除", "remove", "delete")):
+                params = {"operation": "delete"}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("启用", "开启")):
+                params = {"operation": "toggle", "enabled": True}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("停用", "关闭", "禁用")):
+                params = {"operation": "toggle", "enabled": False}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+            if any(k in text for k in ("立即执行", "立刻执行", "run now")):
+                params = {"operation": "run"}
+                if task_match:
+                    params["task_id"] = task_match.group(1)
+                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
+
+            cron_match = re.search(
+                r"((?:\*|\d+)(?:/\d+)?\s+"
+                r"(?:\*|\d+)(?:/\d+)?\s+"
+                r"(?:\*|\d+)(?:/\d+)?\s+"
+                r"(?:\*|\d+)(?:/\d+)?\s+"
+                r"(?:\*|\d+)(?:/\d+)?)",
+                text,
+            )
+            if any(k in text for k in ("创建", "新建", "新增")) or (
+                cron_match and any(k in text for k in ("发布", "publish", "内容", "写作", "发现"))
+            ):
+                if "发现" in text and "发布" in text:
+                    return Intent(
+                        intent_type="scheduler_manage",
+                        parameters={"operation": "create_bundle"},
+                        confidence=0.95,
+                    )
+                task_type = "topic"
+                if any(k in text for k in ("发布", "publish")):
+                    task_type = "publish"
+                elif any(k in text for k in ("内容", "写作", "content")):
+                    task_type = "content"
+                schedule = "0 9 * * *"
+                if cron_match:
+                    schedule = cron_match.group(1)
+                return Intent(
+                    intent_type="scheduler_manage",
+                    parameters={"operation": "create", "task_type": task_type, "schedule": schedule},
+                    confidence=0.95,
+                )
 
         # General conversational shortcuts (no persona required)
         if any(k in text for k in ("角色列表", "列出角色", "查看角色", "我的角色")) or "list persona" in lowered:
@@ -265,6 +343,39 @@ Output MUST be valid JSON:
 
         if any(k in text for k in ("帮助", "怎么用", "help", "能做什么")):
             return Intent(intent_type="help", parameters={}, confidence=0.95)
+
+        # Persona delete shortcuts
+        if any(k in text for k in ("删除", "删掉", "移除")) and any(
+            k in text for k in ("persona", "角色", "人设")
+        ) and not scheduler_context:
+            params: Dict[str, Any] = {}
+            persona_match = re.search(
+                r"(?<![A-Za-z0-9_])(persona_[A-Za-z0-9_-]+)\b",
+                text,
+                re.IGNORECASE,
+            )
+            if persona_match:
+                params["persona_id"] = persona_match.group(1)
+            if any(k in text for k in ("保留内容", "不删内容", "keep content")):
+                params["keep_content"] = True
+            return Intent(intent_type="delete_persona", parameters=params, confidence=0.99)
+
+        # Persona delete with explicit ID (e.g. "帮我把下面的删掉：persona_xxx")
+        persona_only_match = re.search(
+            r"(?<![A-Za-z0-9_])(persona_[A-Za-z0-9_-]+)\b",
+            text,
+            re.IGNORECASE,
+        )
+        if (
+            persona_only_match
+            and any(k in text for k in ("删除", "删掉", "移除", "去掉"))
+            and not scheduler_context
+        ):
+            return Intent(
+                intent_type="delete_persona",
+                parameters={"persona_id": persona_only_match.group(1)},
+                confidence=0.99,
+            )
 
         # Resource overview shortcuts
         if any(k in text for k in ("资源总览", "资源概览", "查看资源", "总览")):
@@ -342,62 +453,6 @@ Output MUST be valid JSON:
                 parameters={"user_feedback": feedback},
                 confidence=0.9,
             )
-
-        # Scheduler direct operations
-        if any(k in lowered for k in ("scheduler", "schedule", "cron")) or any(
-            k in text for k in ("定时", "周期", "任务", "排期")
-        ):
-            if any(k in text for k in ("列表", "查看", "显示")):
-                return Intent(
-                    intent_type="scheduler_manage",
-                    parameters={"operation": "list"},
-                    confidence=0.99,
-                )
-            if any(k in text for k in ("删除", "remove", "delete")):
-                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
-                params: Dict[str, Any] = {"operation": "delete"}
-                if task_match:
-                    params["task_id"] = task_match.group(1)
-                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
-            if any(k in text for k in ("启用", "开启")):
-                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
-                params = {"operation": "toggle", "enabled": True}
-                if task_match:
-                    params["task_id"] = task_match.group(1)
-                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
-            if any(k in text for k in ("停用", "关闭", "禁用")):
-                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
-                params = {"operation": "toggle", "enabled": False}
-                if task_match:
-                    params["task_id"] = task_match.group(1)
-                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
-            if any(k in text for k in ("立即执行", "立刻执行", "run now")):
-                task_match = re.search(r"(task[_-][a-zA-Z0-9_-]+|[a-z]+_[0-9a-f]{8})", lowered)
-                params = {"operation": "run"}
-                if task_match:
-                    params["task_id"] = task_match.group(1)
-                return Intent(intent_type="scheduler_manage", parameters=params, confidence=0.95)
-            if any(k in text for k in ("创建", "新建", "新增")):
-                if "发现" in text and "发布" in text:
-                    return Intent(
-                        intent_type="scheduler_manage",
-                        parameters={"operation": "create_bundle"},
-                        confidence=0.95,
-                    )
-                task_type = "topic"
-                if any(k in text for k in ("发布", "publish")):
-                    task_type = "publish"
-                elif any(k in text for k in ("内容", "写作", "content")):
-                    task_type = "content"
-                schedule = "0 9 * * *"
-                cron_match = re.search(r"(\d+\s+\d+\s+\*?\d+\s+\*?\d+\s+\*?\d+)", text)
-                if cron_match:
-                    schedule = cron_match.group(1)
-                return Intent(
-                    intent_type="scheduler_manage",
-                    parameters={"operation": "create", "task_type": task_type, "schedule": schedule},
-                    confidence=0.95,
-                )
 
         return None
 
@@ -481,6 +536,58 @@ Output MUST be valid JSON:
                     if review_report
                     else ""
                 )
+            ),
+        }
+
+    async def _handle_delete_persona(
+        self, parameters: Dict[str, Any], original_input: str
+    ) -> Dict[str, Any]:
+        """Handle persona deletion workflow."""
+        persona_id = parameters.get("persona_id")
+        if not persona_id:
+            match = re.search(
+                r"(?<![A-Za-z0-9_])(persona_[A-Za-z0-9_-]+)\b",
+                original_input,
+                re.IGNORECASE,
+            )
+            if match:
+                persona_id = match.group(1)
+
+        if not persona_id:
+            return {"message": "请提供要删除的 persona_id，例如：删除 persona_xxx。"}
+
+        persona = self.kb.load_persona(persona_id)
+        if not persona:
+            return {"message": f"未找到 persona：{persona_id}"}
+
+        keep_content = bool(parameters.get("keep_content", False))
+        tasks_removed = 0
+
+        scheduler = self._get_runtime_scheduler()
+        if scheduler is not None:
+            try:
+                tasks_removed = await scheduler.remove_tasks_for_persona(persona_id)
+            except Exception as e:
+                self.log("WARNING", f"Failed to remove scheduler tasks for {persona_id}: {e}")
+
+        result = self.kb.delete_persona(persona_id, delete_content=not keep_content)
+
+        if not result.get("persona_deleted"):
+            errors = result.get("errors", [])
+            err_text = f" 错误：{'；'.join(errors)}" if errors else ""
+            return {"message": f"删除失败：{persona_id}。{err_text}".strip()}
+
+        return {
+            "persona_id": persona_id,
+            "persona_deleted": result.get("persona_deleted", False),
+            "content_deleted": result.get("content_deleted", 0),
+            "discovery_deleted": result.get("discovery_deleted", 0),
+            "tasks_removed": tasks_removed,
+            "message": (
+                f"✅ 已删除 persona：{persona_id}\n"
+                f"- 内容文件删除：{result.get('content_deleted', 0)}\n"
+                f"- 发现数据删除：{result.get('discovery_deleted', 0)}\n"
+                f"- 定时任务清理：{tasks_removed}"
             ),
         }
 
@@ -990,7 +1097,7 @@ Output MUST be valid JSON:
 
         operation = parameters.get("operation", "list")
         persona_id = parameters.get("persona_id")
-        if not persona_id:
+        if operation != "list" and not persona_id:
             personas = self.kb.list_personas()
             if personas:
                 persona_id = personas[0]
@@ -1100,7 +1207,11 @@ Output MUST be valid JSON:
 
         task_id = parameters.get("task_id")
         if not task_id:
-            match = re.search(r"([a-z]+_[0-9a-f]{8})", original_input.lower())
+            match = re.search(
+                r"((?:task|topic|content|publish|evolution|discovery|trending|content_suggest|optimize)"
+                r"_[a-z0-9][a-z0-9_-]*)",
+                original_input.lower(),
+            )
             if match:
                 task_id = match.group(1)
 

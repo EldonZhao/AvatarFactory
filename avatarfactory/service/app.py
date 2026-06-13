@@ -284,6 +284,12 @@ async def lifespan(app: FastAPI):
         scheduler=_scheduler,
     )
 
+    # Backfill defaults for historical personas (Chinese prompt policy + evolution settings).
+    try:
+        _orchestrator.backfill_persona_defaults()
+    except Exception:
+        pass
+
     # Start scheduler in non-blocking mode
     _scheduler.start(blocking=False)
 

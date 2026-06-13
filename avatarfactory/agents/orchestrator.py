@@ -106,6 +106,11 @@ class OrchestratorAgent(BaseAgent):
         if context.get("persona_id") and "persona_id" not in intent.parameters:
             intent.parameters["persona_id"] = context["persona_id"]
 
+        persona_id = intent.parameters.get("persona_id")
+        if persona_id:
+            self._ensure_persona_evolution_defaults(persona_id)
+            self._ensure_persona_prompt_defaults(persona_id)
+
         # Step 2: Route to appropriate handler
         handlers = {
             "create_persona": self._handle_create_persona,
@@ -247,6 +252,19 @@ Output MUST be valid JSON:
         if not text:
             return None
         lowered = text.lower()
+
+        # General conversational shortcuts (no persona required)
+        if any(k in text for k in ("角色列表", "列出角色", "查看角色", "我的角色")) or "list persona" in lowered:
+            return Intent(intent_type="list_personas", parameters={}, confidence=0.99)
+
+        if any(k in text for k in ("推荐角色", "角色推荐", "看推荐")) or text.strip() in ("推荐", "推荐一下"):
+            return Intent(intent_type="browse_recommendations", parameters={}, confidence=0.99)
+
+        if any(k in text for k in ("热点", "趋势", "热门话题")):
+            return Intent(intent_type="view_trends", parameters={}, confidence=0.95)
+
+        if any(k in text for k in ("帮助", "怎么用", "help", "能做什么")):
+            return Intent(intent_type="help", parameters={}, confidence=0.95)
 
         # Resource overview shortcuts
         if any(k in text for k in ("资源总览", "资源概览", "查看资源", "总览")):
@@ -579,9 +597,9 @@ Output MUST be valid JSON:
             # Build message with top ideas
             ideas_text = ""
             if ideas:
-                ideas_text = "\n\nTop content ideas:\n" + "\n".join(
+                ideas_text = "\n\n热门选题建议：\n" + "\n".join(
                     [
-                        f"  • {idea.get('topic', '')} ({idea.get('estimated_engagement', 'medium')} engagement)"
+                        f"  • {idea.get('topic', '')}（预估热度：{idea.get('estimated_engagement', '中')}）"
                         for idea in ideas[:5]
                     ]
                 )
@@ -630,10 +648,10 @@ Output MUST be valid JSON:
         return {
             "stats": stats,
             "message": (
-                f"📊 Analysis for persona {persona_id}:\n"
-                f"- Published content: {stats['total_published']}\n"
-                f"- Draft content: {stats['total_drafts']}\n"
-                f"- Avg review score: {stats['avg_review_score']:.1f}/100"
+                f"📊 人设 {persona_id} 的数据分析：\n"
+                f"- 已发布内容：{stats['total_published']}\n"
+                f"- 草稿内容：{stats['total_drafts']}\n"
+                f"- 平均评审分：{stats['avg_review_score']:.1f}/100"
             ),
         }
 
@@ -668,7 +686,7 @@ Output MUST be valid JSON:
 
         return {
             "suggestions": suggestions,
-            "message": f"💡 Found {len(suggestions)} optimization suggestions",
+            "message": f"💡 已生成 {len(suggestions)} 条优化建议。",
         }
 
     # =========================================================================
@@ -883,13 +901,7 @@ Output MUST be valid JSON:
         operation = parameters.get("operation", "show")
         prefs = (persona.metadata or {}).get("prompt_preferences", {}) or {}
         if not prefs:
-            prefs = {
-                "language": "zh-CN-only",
-                "allow_colloquial": True,
-                "base_prompt": "请始终使用中文输出，保持人设一致，支持自然口语化表达。",
-                "style_keywords": ["中文", "口语化", "人设一致"],
-                "avoid_words": [],
-            }
+            prefs = self._default_prompt_preferences()
 
         if operation == "show":
             return {
@@ -1155,12 +1167,12 @@ Output MUST be valid JSON:
             },
             "message": (
                 "📦 项目资源总览：\n"
-                f"- Persona 数量：{len(persona_ids)}\n"
+                f"- 人设数量：{len(persona_ids)}\n"
                 f"- 内容总数：{content_count}\n"
                 f"- 待处理进化建议：{pending_suggestions}\n"
                 f"- 定时任务数：{len(tasks)}\n\n"
                 "你可以继续说：\n"
-                "1) 查看 prompt 配置\n"
+                "1) 查看提示词配置\n"
                 "2) 创建定时发现/发布任务\n"
                 "3) 查看待审批进化建议"
             ),
@@ -1191,6 +1203,51 @@ Output MUST be valid JSON:
                 self.kb.save_persona(persona)
         except Exception as e:
             self.log("WARNING", f"Failed to ensure evolution defaults for {persona_id}: {e}")
+
+    def _default_prompt_preferences(self) -> Dict[str, Any]:
+        """Default persona-level prompt preferences."""
+        return {
+            "language": "zh-CN-only",
+            "allow_colloquial": True,
+            "base_prompt": "请始终使用中文输出，保持人设一致，支持自然口语化表达并确保内容可直接发布。",
+            "style_keywords": ["中文", "口语化", "可发布", "人设一致"],
+            "avoid_words": [],
+        }
+
+    def _ensure_persona_prompt_defaults(self, persona_id: str) -> None:
+        """Ensure persona has prompt preference defaults and required keys."""
+        try:
+            persona = self.kb.load_persona(persona_id)
+            if persona is None:
+                return
+
+            defaults = self._default_prompt_preferences()
+            metadata = dict(persona.metadata or {})
+            prefs = dict(metadata.get("prompt_preferences", {}) or {})
+
+            changed = False
+            for key, value in defaults.items():
+                if key not in prefs:
+                    prefs[key] = value
+                    changed = True
+
+            if changed:
+                metadata["prompt_preferences"] = prefs
+                persona.metadata = metadata
+                self.kb.save_persona(persona)
+        except Exception as e:
+            self.log("WARNING", f"Failed to ensure prompt defaults for {persona_id}: {e}")
+
+    def backfill_persona_defaults(self) -> Dict[str, int]:
+        """Backfill evolution and prompt defaults for all personas."""
+        stats = {"total": 0, "processed": 0}
+        persona_ids = self.kb.list_personas()
+        stats["total"] = len(persona_ids)
+        for pid in persona_ids:
+            self._ensure_persona_evolution_defaults(pid)
+            self._ensure_persona_prompt_defaults(pid)
+            stats["processed"] += 1
+        return stats
 
     def _normalize_prompt_text(self, text: str) -> str:
         """Clean extracted prompt text to avoid leading punctuation artifacts."""
@@ -1229,7 +1286,7 @@ Output MUST be valid JSON:
 
         return {
             "persona": persona.model_dump(mode="json"),
-            "message": f"⏪ Rolled back to version {version}. Current version: {persona.version}",
+            "message": f"⏪ 已回滚到版本 {version}，当前版本：{persona.version}。",
         }
 
     # =========================================================================

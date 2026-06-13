@@ -116,6 +116,20 @@ def test_parse_evolution_review_and_rollback(orchestrator: OrchestratorAgent) ->
     assert rollback.parameters["version"] == "v1.2"
 
 
+def test_parse_no_persona_chinese_shortcuts(orchestrator: OrchestratorAgent) -> None:
+    intent = orchestrator._parse_direct_intent("推荐")
+    assert intent is not None
+    assert intent.intent_type == "browse_recommendations"
+
+    intent = orchestrator._parse_direct_intent("看看热点趋势")
+    assert intent is not None
+    assert intent.intent_type == "view_trends"
+
+    intent = orchestrator._parse_direct_intent("角色列表")
+    assert intent is not None
+    assert intent.intent_type == "list_personas"
+
+
 @pytest.mark.asyncio
 async def test_direct_intent_path_works_without_llm(orchestrator: OrchestratorAgent) -> None:
     async def _boom(*args: Any, **kwargs: Any) -> Any:
@@ -166,3 +180,22 @@ async def test_scheduler_bundle_reuses_existing_tasks(orchestrator: Orchestrator
     assert len(scheduler.add_calls) == 0
     assert "不会重复创建" in result["message"]
     assert len(result["tasks"]) == 2
+
+
+def test_backfill_persona_defaults(orchestrator: OrchestratorAgent) -> None:
+    persona = orchestrator.kb.load_persona("persona_test_direct")
+    assert persona is not None
+    persona.metadata = {}
+    persona.evolution = None
+    orchestrator.kb.save_persona(persona)
+
+    stats = orchestrator.backfill_persona_defaults()
+    assert stats["processed"] >= 1
+
+    refreshed = orchestrator.kb.load_persona("persona_test_direct")
+    assert refreshed is not None
+    assert refreshed.evolution is not None
+    assert refreshed.evolution.enabled is True
+    prefs = (refreshed.metadata or {}).get("prompt_preferences", {})
+    assert prefs.get("language") == "zh-CN-only"
+    assert prefs.get("allow_colloquial") is True

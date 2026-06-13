@@ -788,10 +788,15 @@ def register_routes(app: FastAPI):
             )
 
         # Delete scheduled tasks
-        from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
+        scheduler = get_scheduler()
+        if scheduler:
+            tasks_removed = await scheduler.remove_tasks_for_persona(persona_id)
+        else:
+            # Fallback for cases where scheduler is unavailable in current process
+            from avatarfactory.scheduler.engine import Scheduler, SchedulerConfig
 
-        scheduler = Scheduler(SchedulerConfig())
-        tasks_removed = scheduler.remove_tasks_for_persona(persona_id)
+            scheduler_fallback = Scheduler(SchedulerConfig())
+            tasks_removed = await scheduler_fallback.remove_tasks_for_persona(persona_id)
 
         # Delete persona and content
         result = orchestrator.kb.delete_persona(persona_id, delete_content=not keep_content)
